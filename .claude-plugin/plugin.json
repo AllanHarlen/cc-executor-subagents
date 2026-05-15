@@ -1,0 +1,25 @@
+{
+  "name": "cc-executor-subagents",
+  "version": "0.1.0",
+  "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, delegates to Codex and optional Gemini subagents in parallel, integrates patches, verifies, and reports without OpenSpec ceremony.",
+  "author": {
+    "name": "allanharlen"
+  },
+  "dependencies": [
+    {
+      "name": "codex",
+      "marketplace": "openai-codex"
+    }
+  ],
+  "keywords": [
+    "executor",
+    "multi-agent",
+    "codex",
+    "gemini",
+    "subagents",
+    "fast-fix",
+    "parallel-execution",
+    "goal",
+    "autonomous"
+  ]
+}

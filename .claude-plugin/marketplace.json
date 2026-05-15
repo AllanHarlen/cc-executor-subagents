@@ -1,0 +1,38 @@
+{
+    "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+    "name": "cc-executor-subagents",
+    "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, delegates to Codex and optional Gemini subagents in parallel, integrates patches, verifies, and reports without OpenSpec ceremony.",
+    "owner": {
+        "name": "allanharlen",
+        "email": "allanharlen@gmail.com"
+    },
+    "allowCrossMarketplaceDependenciesOn": [
+        "cc-gemini-plugin",
+        "openai-codex"
+    ],
+    "plugins": [
+        {
+            "name": "cc-executor-subagents",
+            "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a light preflight, splits work by ownership, launches independent Codex/Gemini agents when useful, integrates results and verifies without OpenSpec ceremony.",
+            "version": "0.1.0",
+            "author": {
+                "name": "allanharlen"
+            },
+            "source": "./",
+            "category": "orchestration",
+            "keywords": [
+                "executor",
+                "multi-agent",
+                "subagents",
+                "codex",
+                "gemini",
+                "fast-fix",
+                "parallel-execution",
+                "workflow",
+                "claude-code"
+            ],
+            "homepage": "https://github.com/AllanHarlen/cc-executor-subagents",
+            "repository": "https://github.com/AllanHarlen/cc-executor-subagents"
+        }
+    ]
+}
