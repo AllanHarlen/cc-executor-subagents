@@ -61,6 +61,16 @@ Depois encerre.
 
 8. Integre, rode verificacoes e feche.
 
+9. **Fase 15 — Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH ou rastreabilidade solicitada, gere na raiz de execucao:
+
+   ```text
+   workflow-log.md
+   subagents-context.md
+   implementation-report.md
+   ```
+
+   Use os templates em `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/assets/`. O `implementation-report.md` deve incluir a secao 14 com instrucoes de negocio (o que mudou, como homologar, regras, impactos operacionais e proximo passo recomendado).
+
 ## /goal autonomo
 
 Quando o usuario pedir autonomia, use:

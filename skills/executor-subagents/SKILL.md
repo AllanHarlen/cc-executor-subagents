@@ -140,22 +140,37 @@ Execute verificacoes proporcionais ao risco:
 
 Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario deve rodar depois.
 
-### Fase 7 - Fechamento
+### Fase 7 - Fechamento interno
 
-Se a tarefa usou multiplos agentes ou gerou mudanca relevante, crie ou atualize:
+Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao direta ou 1 agente de baixo risco), entregue o fechamento no chat com: o que mudou, arquivos principais, verificacoes e proximo passo. Em seguida, prossiga para a Fase 15.
+
+### Fase 15 - Relatorio final
+
+Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, ou que o usuario queira rastreabilidade, gere os tres entregaveis obrigatorios **na raiz de execucao** (diretorio de trabalho onde o /executor foi invocado — nao dentro de `.executor/`):
 
 ```text
-.executor/implementation-report.md
-.executor/subagents-context.md
+workflow-log.md
+subagents-context.md
+implementation-report.md
 ```
 
-Use os templates de `assets/`. Para tarefas pequenas, basta um fechamento no chat com:
+Use os templates de `assets/` como base. Regras:
 
-- o que mudou;
-- arquivos principais;
-- verificacoes executadas;
-- riscos ou pendencias;
-- proximo passo recomendado.
+- **workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 15), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
+- **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
+- **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks (incluindo review interno por QUOTA_EXHAUSTED), status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 11a), e secao 14 com instrucoes de negocio da Fase 15.
+- Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
+- O orquestrador calcula o total consolidado de tokens de toda a execucao.
+- Os tres arquivos ficam na raiz de execucao, **nunca** dentro de `openspec/` ou `.executor/`.
+
+**Secao 14 — Instrucoes de negocio** (parte do implementation-report.md):
+
+O orquestrador entrega, em linguagem de negocio para o usuario:
+- O que mudou para o negocio;
+- Como homologar (passo a passo);
+- Regras e limites da nova funcionalidade;
+- Impactos operacionais;
+- Proximo passo recomendado.
 
 ## Gate de pausa/cancelamento
 
@@ -195,6 +210,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/preflight-check.md` | entender/remediar preflight |
 | `assets/plan-template.md` | criar `.executor/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | acompanhar waves com 2+ agentes |
-| `assets/subagents-context-template.md` | registrar contexto dos agentes |
-| `assets/implementation-report-template.md` | fechar mudancas relevantes |
+| `assets/workflow-log-template.md` | gerar `workflow-log.md` na raiz (Fase 15) |
+| `assets/subagents-context-template.md` | gerar `subagents-context.md` na raiz (Fase 15) |
+| `assets/implementation-report-template.md` | gerar `implementation-report.md` na raiz (Fase 15) |
 | `scripts/preflight.mjs` | validar ambiente minimo |
