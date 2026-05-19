@@ -100,7 +100,7 @@ _N/A se nenhum fallback foi necessario. Inclui fallback de review interno por QU
 
 ---
 
-## 11a. Tabela de tokens por agente
+## 12. Tabela de tokens por agente
 
 | Agente/Componente | Tokens input | Tokens output | Cache read | Total |
 |---|---|---|---|---|
@@ -113,16 +113,9 @@ _Use N/A para agentes que nao reportaram tokens. O orquestrador calcula o total 
 
 ---
 
-## 12. Proximo passo tecnico
+## 13. Proximo passo tecnico
 
 - <merge / deploy / teste manual / review adicional / homologacao>
-
----
-
-## 13. Referencias
-
-- workflow-log.md — log auditavel completo da execucao
-- subagents-context.md — contexto operacional dos subagentes
 
 ---
 

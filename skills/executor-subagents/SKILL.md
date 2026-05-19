@@ -118,6 +118,8 @@ Cada prompt deve incluir:
 
 Nao use duplas fixas back-end/front-end. Se uma feature pequena tiver back e front independentes, podem ser dois agentes; se o ponto critico for um fluxo unico, prefira um agente full-stack com ownership completo.
 
+Ao montar cada prompt, inclua as instrucoes de skills: o subagente deve listar as skills disponiveis, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Veja a secao "Instrucoes de Skills para Subagentes" abaixo.
+
 ### Fase 5 - Integracao
 
 Quando agentes retornarem:
@@ -146,12 +148,14 @@ Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao dire
 
 ### Fase 10 - Monitoramento
 
+> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4–6. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 6. Esta secao documenta o protocolo.
+
 O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa — apenas supervisiona.
 
 **Ciclo de monitoramento:**
 
-1. Atualize o status de cada task no `monitoring.md` a cada evento relevante (delegacao, retorno, bloqueio, QUOTA_EXHAUSTED, DONE).
-2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** — mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo. O agente deve responder com: (a) progresso concreto concluido; (b) arquivos criados/alterados; (c) bloqueios ou riscos; (d) ETA honesto; (e) se ha falha de cota; (f) se ha falha de tool, terminal ou escrita de arquivo.
+1. Atualize o status de cada task no `monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `BLOCKED`, `DONE`, `FAILED`.
+2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** — mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo. O agente deve responder com: (a) progresso concreto concluido; (b) arquivos criados/alterados; (c) bloqueios ou riscos; (d) ETA honesto; (e) se ha falha de cota; (f) se ha falha de tool, terminal ou escrita de arquivo. Registre a resposta como evento `CHECKIN_RECEBIDO` no log do monitoring.
 3. Para cada task ativa, registre no `monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
 
 **Status disponiveis:**
@@ -192,7 +196,7 @@ Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitrari
 
 1. O orquestrador nao redelega para outro agente.
 2. Faz ele mesmo um **review interno read-only** (apenas leitura, sem editar codigo).
-3. Salva o resultado em `review-final.md`.
+3. Salva o resultado em `.executor/review-final.md`.
 4. Registra explicitamente que foi "fallback interno do orquestrador por indisponibilidade de quota do Codex".
 5. Este fallback e reportado nos tres entregaveis finais (workflow-log.md, subagents-context.md, implementation-report.md).
 
@@ -221,7 +225,7 @@ Use os templates de `assets/` como base. Regras:
 
 - **workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 15), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
 - **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
-- **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks (incluindo review interno por QUOTA_EXHAUSTED), status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 11a), e secao 14 com instrucoes de negocio da Fase 15.
+- **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks (incluindo review interno por QUOTA_EXHAUSTED), status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio da Fase 15.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam na raiz de execucao, **nunca** dentro de `openspec/` ou `.executor/`.

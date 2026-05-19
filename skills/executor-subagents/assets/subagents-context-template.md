@@ -62,7 +62,7 @@ _Adicione uma secao por agente real da execucao._
 
 | # | Agentes envolvidos | Divergencia detectada | Resolucao aplicada | Status |
 |---|---|---|---|---|
-| 1 | A + B | Backend retorna `user_id`; frontend espera `userId` | Executor normalizou no integracao | RESOLVIDO |
+| 1 | <agentes> | <divergencia detectada, ex: campo renomeado, tipo incompativel, contrato desatualizado> | <resolucao aplicada> | RESOLVIDO \| PENDENTE |
 
 _N/A se nenhuma divergencia de wire format ou logica foi detectada entre agentes._
 
