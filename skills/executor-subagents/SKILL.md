@@ -144,6 +144,69 @@ Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario 
 
 Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao direta ou 1 agente de baixo risco), entregue o fechamento no chat com: o que mudou, arquivos principais, verificacoes e proximo passo. Em seguida, prossiga para a Fase 15.
 
+### Fase 10 - Monitoramento
+
+O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa — apenas supervisiona.
+
+**Ciclo de monitoramento:**
+
+1. Atualize o status de cada task no `monitoring.md` a cada evento relevante (delegacao, retorno, bloqueio, QUOTA_EXHAUSTED, DONE).
+2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** — mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo. O agente deve responder com: (a) progresso concreto concluido; (b) arquivos criados/alterados; (c) bloqueios ou riscos; (d) ETA honesto; (e) se ha falha de cota; (f) se ha falha de tool, terminal ou escrita de arquivo.
+3. Para cada task ativa, registre no `monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
+
+**Status disponiveis:**
+
+| Status | Significado |
+|---|---|
+| `PENDING` | Task identificada, ainda nao delegada |
+| `RUNNING` | Agente rodando |
+| `PAUSED` | Usuario pediu pausa |
+| `CANCELLED` | Usuario cancelou |
+| `BLOCKED` | Precisa de decisao do orquestrador ou do usuario |
+| `NEEDS_SYNC` | Contrato divergiu entre back e front |
+| `DONE` | Agente concluiu com sucesso |
+| `FAILED` | Agente falhou |
+| `QUOTA_EXHAUSTED` | Agente parou por cota/rate limit/capacidade |
+| `REVIEWED` | Passou pelo review final |
+
+### Politica de Cota
+
+Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo. O retorno deve ser imediato: `Status: QUOTA_EXHAUSTED`.
+
+**Gemini bate a cota:**
+
+1. Registra a evidencia no `monitoring.md`.
+2. Avalia se o fallback para Codex e seguro:
+   - Se sim: redelega a task para `codex:codex-rescue` com `--effort medium`.
+   - Se a natureza da entrega muda muito (ex: componente visual complexo): usa `AskUserQuestion` para pedir decisao ao usuario antes de agir.
+
+**Codex bate a cota em implementacao, ajuste pontual ou handoff:**
+
+1. Nao tenta trocar o modelo fixo.
+2. Nao tenta retries longos.
+3. Marca a task como `BLOCKED`.
+4. Registra a evidencia no `monitoring.md`.
+5. Usa `AskUserQuestion` para pedir decisao ao usuario.
+
+**Codex bate a cota em review (Fase 12):**
+
+1. O orquestrador nao redelega para outro agente.
+2. Faz ele mesmo um **review interno read-only** (apenas leitura, sem editar codigo).
+3. Salva o resultado em `review-final.md`.
+4. Registra explicitamente que foi "fallback interno do orquestrador por indisponibilidade de quota do Codex".
+5. Este fallback e reportado nos tres entregaveis finais (workflow-log.md, subagents-context.md, implementation-report.md).
+
+### Instrucoes de Skills para Subagentes
+
+Todo subagente (Codex ou Gemini) deve, como **primeiro passo antes de implementar qualquer coisa**:
+
+1. **Listar as skills disponiveis** no ambiente (ex: `/skills` ou equivalente).
+2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` — essas sao exclusivas do orquestrador.
+3. **Identificar e usar as compativeis:** das skills restantes, usar as que se aplicam a task em execucao durante a implementacao.
+4. **Reportar no retorno:** no campo obrigatorio `Skills utilizadas`, listar quais foram usadas (ou "nenhuma").
+
+O orquestrador coleta o campo `Skills utilizadas` de todos os subagentes e consolida em `subagents-context.md`, na secao de contexto por subagente.
+
 ### Fase 15 - Relatorio final
 
 Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, ou que o usuario queira rastreabilidade, gere os tres entregaveis obrigatorios **na raiz de execucao** (diretorio de trabalho onde o /executor foi invocado — nao dentro de `.executor/`):
@@ -209,7 +272,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
 | `references/preflight-check.md` | entender/remediar preflight |
 | `assets/plan-template.md` | criar `.executor/execution-brief.md` quando util |
-| `assets/monitoring-template.md` | acompanhar waves com 2+ agentes |
+| `assets/monitoring-template.md` | manter `.executor/monitoring.md` vivo na Fase 10 |
 | `assets/workflow-log-template.md` | gerar `workflow-log.md` na raiz (Fase 15) |
 | `assets/subagents-context-template.md` | gerar `subagents-context.md` na raiz (Fase 15) |
 | `assets/implementation-report-template.md` | gerar `implementation-report.md` na raiz (Fase 15) |

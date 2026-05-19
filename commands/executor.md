@@ -55,7 +55,7 @@ Depois encerre.
    - usar 1 agente;
    - usar multiplos agentes independentes.
 
-6. Se usar 2+ agentes, crie `.executor/execution-brief.md` e, se util, `.executor/monitoring.md`.
+6. Se usar 2+ agentes, crie `.executor/execution-brief.md` e mantenha `.executor/monitoring.md` como fonte viva de eventos (Fase 10): status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase.
 
 7. Delegue em paralelo por ownership, nao por dupla fixa.
 
