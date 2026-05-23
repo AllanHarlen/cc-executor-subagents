@@ -148,15 +148,15 @@ Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao dire
 
 ### Fase 8 - Monitoramento
 
-> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4–6. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 6. Esta secao documenta o protocolo.
+> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4–6 de execucao. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
 
 O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa — apenas supervisiona.
 
 **Ciclo de monitoramento:**
 
-1. Atualize o status de cada task no `monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `BLOCKED`, `DONE`, `FAILED`.
+1. Atualize o status de cada task no `.executor/monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `BLOCKED`, `DONE`, `FAILED`.
 2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** — mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo. O agente deve responder com: (a) progresso concreto concluido; (b) arquivos criados/alterados; (c) bloqueios ou riscos; (d) ETA honesto; (e) se ha falha de cota; (f) se ha falha de tool, terminal ou escrita de arquivo. Registre a resposta como evento `CHECKIN_RECEBIDO` no log do monitoring.
-3. Para cada task ativa, registre no `monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
+3. Para cada task ativa, registre no `.executor/monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
 
 **Status disponiveis:**
 
@@ -179,7 +179,7 @@ Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitrari
 
 **Gemini bate a cota:**
 
-1. Registra a evidencia no `monitoring.md`.
+1. Registra a evidencia no `.executor/monitoring.md`.
 2. Avalia se o fallback para Codex e seguro:
    - Se sim: redelega a task para `codex:codex-rescue` com `--effort medium`.
    - Se a natureza da entrega muda muito (ex: componente visual complexo): usa `AskUserQuestion` para pedir decisao ao usuario antes de agir.
@@ -189,10 +189,10 @@ Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitrari
 1. Nao tenta trocar o modelo fixo.
 2. Nao tenta retries longos.
 3. Marca a task como `BLOCKED`.
-4. Registra a evidencia no `monitoring.md`.
+4. Registra a evidencia no `.executor/monitoring.md`.
 5. Usa `AskUserQuestion` para pedir decisao ao usuario.
 
-**Codex bate a cota em review (fase de review):**
+**Codex bate a cota em revisao:**
 
 1. O orquestrador nao redelega para outro agente.
 2. Faz ele mesmo um **review interno read-only** (apenas leitura, sem editar codigo).
@@ -223,9 +223,9 @@ Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, ou que o usuari
 
 Use os templates de `assets/` como base. Regras:
 
-- **workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 9), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
-- **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
-- **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks (incluindo review interno por QUOTA_EXHAUSTED), status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
+- **.executor/workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 9), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
+- **.executor/subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
+- **.executor/implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks (incluindo review interno por QUOTA_EXHAUSTED), status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `.executor/`, **nunca** na raiz de execucao ou em `openspec/`.
