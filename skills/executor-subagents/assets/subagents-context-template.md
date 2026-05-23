@@ -37,7 +37,7 @@
 | Decisoes tomadas | <lista> |
 | Testes executados | <comando>: <resultado> |
 | Riscos identificados | <lista ou Nenhum> |
-| Skills utilizadas | <Context7 \| N/A> |
+| Skills utilizadas | <lista ou N/A> |
 
 ### Agente B — <tipo/modelo>
 

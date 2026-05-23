@@ -119,7 +119,9 @@ _Use N/A para agentes que nao reportaram tokens. O orquestrador calcula o total 
 
 ---
 
-## 14. Instrucoes de negocio (Fase 15)
+## 14. Instrucoes de negocio
+
+_Preencha esta secao apenas quando houver contexto de negocio real; caso contrario, use `N/A`._
 
 ### O que mudou para o negocio
 

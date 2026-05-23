@@ -24,10 +24,8 @@
 | 5 | Integracao | OK \| PULADO | | | - | <falha ou N/A> |
 | 6 | Verificacao | OK \| FALHOU \| PULADO | | | - | <falha ou N/A> |
 | 7 | Fechamento interno | OK | | | - | N/A |
-| 8-9 | (reservado) | N/A | - | - | - | - |
-| 10 | Monitoramento | ATIVO \| CONCLUIDO \| N/A | | | .executor/monitoring.md | <falha ou N/A> |
-| 11-14 | (reservado) | N/A | - | - | - | - |
-| 15 | Relatorio final | OK | | | workflow-log.md, subagents-context.md, implementation-report.md | N/A |
+| 8 | Monitoramento | ATIVO \| CONCLUIDO \| N/A | | | .executor/monitoring.md | <falha ou N/A> |
+| 9 | Relatorio final | OK | | | .executor/workflow-log.md, .executor/subagents-context.md, .executor/implementation-report.md | N/A |
 
 ---
 

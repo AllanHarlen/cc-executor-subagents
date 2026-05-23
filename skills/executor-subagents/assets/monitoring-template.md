@@ -1,4 +1,4 @@
-# Monitoring — Fase 10
+# Monitoring — Fase 8
 
 > Fonte viva de todos os eventos durante a execucao dos subagentes. O orquestrador atualiza este arquivo continuamente. Nao implementa — apenas supervisiona.
 

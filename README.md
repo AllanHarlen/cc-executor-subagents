@@ -46,6 +46,7 @@ Artefatos opcionais ficam em `.executor/`:
 .executor/
 |-- execution-brief.md
 |-- monitoring.md
+|-- workflow-log.md
 |-- subagents-context.md
 `-- implementation-report.md
 ```

@@ -121,6 +121,7 @@ Em tarefas pequenas, responda no chat.
 Em tarefas com varios agentes, crie:
 
 ```text
+.executor/workflow-log.md
 .executor/subagents-context.md
 .executor/implementation-report.md
 ```
@@ -135,4 +136,4 @@ O fechamento deve ser curto:
 
 ## Retomada
 
-Se a sessao parar, use `.executor/subagents-context.md` como fonte de verdade. Ele deve conter agentes lancados, status, arquivos tocados, pendencias e recomendacao de proxima acao.
+Se a sessao parar, use `.executor/subagents-context.md` como fonte de verdade e `.executor/workflow-log.md` como auditoria. O contexto deve conter agentes lancados, status, arquivos tocados, pendencias e recomendacao de proxima acao.
