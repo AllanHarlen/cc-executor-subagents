@@ -118,6 +118,8 @@ Cada prompt deve incluir:
 
 Nao use duplas fixas back-end/front-end. Se uma feature pequena tiver back e front independentes, podem ser dois agentes; se o ponto critico for um fluxo unico, prefira um agente full-stack com ownership completo.
 
+Ao montar cada prompt, inclua as instrucoes de skills: o subagente deve listar as skills disponiveis, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Veja a secao "Instrucoes de Skills para Subagentes" abaixo.
+
 ### Fase 5 - Integracao
 
 Quando agentes retornarem:
@@ -140,22 +142,102 @@ Execute verificacoes proporcionais ao risco:
 
 Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario deve rodar depois.
 
-### Fase 7 - Fechamento
+### Fase 7 - Fechamento interno
 
-Se a tarefa usou multiplos agentes ou gerou mudanca relevante, crie ou atualize:
+Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao direta ou 1 agente de baixo risco), entregue o fechamento no chat com: o que mudou, arquivos principais, verificacoes e proximo passo. Em seguida, prossiga para a Fase 15.
+
+### Fase 10 - Monitoramento
+
+> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4–6. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 6. Esta secao documenta o protocolo.
+
+O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa — apenas supervisiona.
+
+**Ciclo de monitoramento:**
+
+1. Atualize o status de cada task no `monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `BLOCKED`, `DONE`, `FAILED`.
+2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** — mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo. O agente deve responder com: (a) progresso concreto concluido; (b) arquivos criados/alterados; (c) bloqueios ou riscos; (d) ETA honesto; (e) se ha falha de cota; (f) se ha falha de tool, terminal ou escrita de arquivo. Registre a resposta como evento `CHECKIN_RECEBIDO` no log do monitoring.
+3. Para cada task ativa, registre no `monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
+
+**Status disponiveis:**
+
+| Status | Significado |
+|---|---|
+| `PENDING` | Task identificada, ainda nao delegada |
+| `RUNNING` | Agente rodando |
+| `PAUSED` | Usuario pediu pausa |
+| `CANCELLED` | Usuario cancelou |
+| `BLOCKED` | Precisa de decisao do orquestrador ou do usuario |
+| `NEEDS_SYNC` | Contrato divergiu entre back e front |
+| `DONE` | Agente concluiu com sucesso |
+| `FAILED` | Agente falhou |
+| `QUOTA_EXHAUSTED` | Agente parou por cota/rate limit/capacidade |
+| `REVIEWED` | Passou pelo review final |
+
+### Politica de Cota
+
+Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo. O retorno deve ser imediato: `Status: QUOTA_EXHAUSTED`.
+
+**Gemini bate a cota:**
+
+1. Registra a evidencia no `monitoring.md`.
+2. Avalia se o fallback para Codex e seguro:
+   - Se sim: redelega a task para `codex:codex-rescue` com `--effort medium`.
+   - Se a natureza da entrega muda muito (ex: componente visual complexo): usa `AskUserQuestion` para pedir decisao ao usuario antes de agir.
+
+**Codex bate a cota em implementacao, ajuste pontual ou handoff:**
+
+1. Nao tenta trocar o modelo fixo.
+2. Nao tenta retries longos.
+3. Marca a task como `BLOCKED`.
+4. Registra a evidencia no `monitoring.md`.
+5. Usa `AskUserQuestion` para pedir decisao ao usuario.
+
+**Codex bate a cota em review (Fase 12):**
+
+1. O orquestrador nao redelega para outro agente.
+2. Faz ele mesmo um **review interno read-only** (apenas leitura, sem editar codigo).
+3. Salva o resultado em `.executor/review-final.md`.
+4. Registra explicitamente que foi "fallback interno do orquestrador por indisponibilidade de quota do Codex".
+5. Este fallback e reportado nos tres entregaveis finais (workflow-log.md, subagents-context.md, implementation-report.md).
+
+### Instrucoes de Skills para Subagentes
+
+Todo subagente (Codex ou Gemini) deve, como **primeiro passo antes de implementar qualquer coisa**:
+
+1. **Listar as skills disponiveis** no ambiente (ex: `/skills` ou equivalente).
+2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` — essas sao exclusivas do orquestrador.
+3. **Identificar e usar as compativeis:** das skills restantes, usar as que se aplicam a task em execucao durante a implementacao.
+4. **Reportar no retorno:** no campo obrigatorio `Skills utilizadas`, listar quais foram usadas (ou "nenhuma").
+
+O orquestrador coleta o campo `Skills utilizadas` de todos os subagentes e consolida em `subagents-context.md`, na secao de contexto por subagente.
+
+### Fase 15 - Relatorio final
+
+Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, ou que o usuario queira rastreabilidade, gere os tres entregaveis obrigatorios **na raiz de execucao** (diretorio de trabalho onde o /executor foi invocado — nao dentro de `.executor/`):
 
 ```text
-.executor/implementation-report.md
-.executor/subagents-context.md
+workflow-log.md
+subagents-context.md
+implementation-report.md
 ```
 
-Use os templates de `assets/`. Para tarefas pequenas, basta um fechamento no chat com:
+Use os templates de `assets/` como base. Regras:
 
-- o que mudou;
-- arquivos principais;
-- verificacoes executadas;
-- riscos ou pendencias;
-- proximo passo recomendado.
+- **workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 15), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
+- **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
+- **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks (incluindo review interno por QUOTA_EXHAUSTED), status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio da Fase 15.
+- Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
+- O orquestrador calcula o total consolidado de tokens de toda a execucao.
+- Os tres arquivos ficam na raiz de execucao, **nunca** dentro de `openspec/` ou `.executor/`.
+
+**Secao 14 — Instrucoes de negocio** (parte do implementation-report.md):
+
+O orquestrador entrega, em linguagem de negocio para o usuario:
+- O que mudou para o negocio;
+- Como homologar (passo a passo);
+- Regras e limites da nova funcionalidade;
+- Impactos operacionais;
+- Proximo passo recomendado.
 
 ## Gate de pausa/cancelamento
 
@@ -194,7 +276,8 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
 | `references/preflight-check.md` | entender/remediar preflight |
 | `assets/plan-template.md` | criar `.executor/execution-brief.md` quando util |
-| `assets/monitoring-template.md` | acompanhar waves com 2+ agentes |
-| `assets/subagents-context-template.md` | registrar contexto dos agentes |
-| `assets/implementation-report-template.md` | fechar mudancas relevantes |
+| `assets/monitoring-template.md` | manter `.executor/monitoring.md` vivo na Fase 10 |
+| `assets/workflow-log-template.md` | gerar `workflow-log.md` na raiz (Fase 15) |
+| `assets/subagents-context-template.md` | gerar `subagents-context.md` na raiz (Fase 15) |
+| `assets/implementation-report-template.md` | gerar `implementation-report.md` na raiz (Fase 15) |
 | `scripts/preflight.mjs` | validar ambiente minimo |

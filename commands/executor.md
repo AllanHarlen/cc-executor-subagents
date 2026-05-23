@@ -55,11 +55,21 @@ Depois encerre.
    - usar 1 agente;
    - usar multiplos agentes independentes.
 
-6. Se usar 2+ agentes, crie `.executor/execution-brief.md` e, se util, `.executor/monitoring.md`.
+6. Se usar 2+ agentes, crie `.executor/execution-brief.md` e mantenha `.executor/monitoring.md` como fonte viva de eventos (Fase 10): status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase.
 
 7. Delegue em paralelo por ownership, nao por dupla fixa.
 
 8. Integre, rode verificacoes e feche.
+
+9. **Fase 15 — Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH ou rastreabilidade solicitada, gere na raiz de execucao:
+
+   ```text
+   workflow-log.md
+   subagents-context.md
+   implementation-report.md
+   ```
+
+   Use os templates em `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/assets/`. O `implementation-report.md` deve incluir a secao 14 com instrucoes de negocio (o que mudou, como homologar, regras, impactos operacionais e proximo passo recomendado).
 
 ## /goal autonomo
 
