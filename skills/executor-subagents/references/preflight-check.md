@@ -28,14 +28,14 @@ Se qualquer item obrigatorio falhar, cancele e mostre `remediation`.
 
 | Item | Uso |
 |---|---|
-| `gemini` CLI | agente UI visual |
-| plugin `cc-gemini-plugin` | expoe `cc-gemini-plugin:gemini-agent` |
+| `agy` CLI | analise de codebase com Antigravity |
+| plugin `cc-antigravity-plugin` | expoe `cc-antigravity-plugin:antigravity-agent` |
 | `/goal` hooks | autonomia entre turnos |
 | Context7 MCP | docs atuais para libs/frameworks/APIs |
 
 Falha em item opcional nao cancela. Apenas ajuste a estrategia:
 
-- sem Gemini: use Codex para UI;
+- sem AGY: prossiga sem analise cross-file;
 - sem `/goal`: trabalhe no turno atual e entregue comando de retomada;
 - sem Context7: siga padroes locais e registre limitacao quando docs atuais importarem.
 
@@ -86,16 +86,25 @@ No projeto alvo:
 }
 ```
 
-### Gemini opcional
+### Antigravity (AGY) opcional
+
+**macOS/Linux:**
 
 ```bash
-npm install -g @google/gemini-cli
-gemini auth
+curl -fsSL https://antigravity.google/cli/install.sh | bash
 ```
 
+**Windows:**
+
+```powershell
+irm https://antigravity.google/cli/install.ps1 | iex
+```
+
+**Autenticacao:** abra `agy` uma vez interativamente e faca login.
+
 ```text
-/plugin marketplace add thepushkarp/cc-gemini-plugin
-/plugin install cc-gemini-plugin@cc-gemini-plugin
+/plugin marketplace add AllanHarlen/cc-antigravity-plugin
+/plugin install cc-antigravity-plugin@cc-antigravity-plugin
 ```
 
 ### Context7 opcional
@@ -106,4 +115,4 @@ npx ctx7 setup --claude
 
 ## Politica
 
-Nao faca fallback silencioso se Codex obrigatorio falhar. Para Gemini e Context7, continue normalmente e diga qual rota sera usada.
+Nao faca fallback silencioso se Codex obrigatorio falhar. Para AGY e Context7, continue normalmente e diga qual rota sera usada.

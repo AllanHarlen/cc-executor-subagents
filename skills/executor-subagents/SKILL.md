@@ -51,10 +51,10 @@ O preflight valida apenas o que e necessario para execucao rapida:
 | plugin `openai-codex` | Sim | subagente `codex:codex-rescue` |
 | permissao Bash do Codex companion | Sim | evita bloqueio de aprovacao em background |
 | `/goal` hooks | Opcional | autonomia entre turnos |
-| `gemini` CLI + plugin | Opcional | agentes UI/visual quando disponiveis |
+| `agy` CLI + plugin | Opcional | analise de codebase com Antigravity quando disponivel |
 | Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
 
-Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se Gemini falhar, continue com Codex para tudo e registre que UI especializada nao esta disponivel.
+Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se AGY falhar, continue sem analise Antigravity e registre a limitacao.
 
 ### Fase 1 - Triagem de 2 minutos
 
@@ -96,7 +96,8 @@ Use esta regra:
 | 1 arquivo, mudanca obvia, baixo risco | Execute direto |
 | 1 area clara, patch medio | 1 agente Codex |
 | 2-5 areas independentes | 2-5 agentes em paralelo |
-| UI visual complexa e Gemini disponivel | 1 agente Gemini para a parte visual |
+| Analise cross-file pre-execucao e AGY disponivel | 1 agente Antigravity para analise de impacto/arquitetura |
+| UI visual complexa | 1 agente Codex com prompt UI especializado |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
 | Auth, permissao, dados ou migration sensivel | Codex high para review antes/depois |
 
@@ -177,12 +178,11 @@ O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os 
 
 Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo. O retorno deve ser imediato: `Status: QUOTA_EXHAUSTED`.
 
-**Gemini bate a cota:**
+**Antigravity (AGY) bate a cota:**
 
 1. Registra a evidencia no `.executor/monitoring.md`.
-2. Avalia se o fallback para Codex e seguro:
-   - Se sim: redelega a task para `codex:codex-rescue` com `--effort medium`.
-   - Se a natureza da entrega muda muito (ex: componente visual complexo): usa `AskUserQuestion` para pedir decisao ao usuario antes de agir.
+2. Como AGY e apenas analise (nao implementacao), a task prossegue normalmente sem a analise - registre que a fase analitica foi pulada por cota.
+3. Nao redelegue analise para Codex; Codex implementa, nao analisa em contexto largo.
 
 **Codex bate a cota em implementacao, ajuste pontual ou handoff:**
 
@@ -202,7 +202,7 @@ Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitrari
 
 ### Instrucoes de Skills para Subagentes
 
-Todo subagente (Codex ou Gemini) deve, como **primeiro passo antes de implementar qualquer coisa**:
+Todo subagente (Codex ou Antigravity) deve, como **primeiro passo antes de implementar qualquer coisa**:
 
 1. **Listar as skills disponiveis** no ambiente se essa capacidade existir (ex: `/skills` ou equivalente). Se o ambiente nao expuser um inventario de skills, registre `skills nao acessiveis`.
 2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` — essas sao exclusivas do orquestrador.
@@ -256,7 +256,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Nao instale dependencias novas sem justificativa e autorizacao quando houver impacto de lockfile.
 - Nao altere auth/autorizacao/segredos sem review dedicado.
 - Nao ignore erro de build/teste; se aceitar uma falha, registre como pendencia.
-- Nao use Gemini para recuperacao de falha operacional, testes quebrados ou handoff de codigo critico; use Codex.
+- Nao use Antigravity para recuperacao de falha operacional, testes quebrados, handoff de codigo critico ou implementacao de UI; use Codex. Antigravity e exclusivo para analise em contexto largo.
 
 ## Comunicacao
 
@@ -270,7 +270,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | Arquivo | Quando ler |
 |---|---|
 | `references/workflow.md` | detalhes do fluxo rapido |
-| `references/agent-stack.md` | escolher Codex/Gemini/modelo/effort |
+| `references/agent-stack.md` | escolher Codex/Antigravity/modelo/effort |
 | `references/subagent-prompts.md` | sempre antes de delegar |
 | `references/parallelization.md` | dividir slices independentes |
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |

@@ -1,19 +1,19 @@
 {
     "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
     "name": "cc-executor-subagents",
-    "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, delegates to Codex and optional Gemini subagents in parallel, integrates patches, verifies, and reports without OpenSpec ceremony.",
+    "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, delegates to Codex with optional Antigravity (AGY) analysis when useful, integrates patches, verifies, and reports without OpenSpec ceremony.",
     "owner": {
         "name": "allanharlen",
         "email": "allanharlen@gmail.com"
     },
     "allowCrossMarketplaceDependenciesOn": [
-        "cc-gemini-plugin",
+        "cc-antigravity-plugin",
         "openai-codex"
     ],
     "plugins": [
         {
             "name": "cc-executor-subagents",
-            "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a light preflight, splits work by ownership, launches independent Codex/Gemini agents when useful, integrates results and verifies without OpenSpec ceremony.",
+            "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a light preflight, splits work by ownership, launches independent Codex agents with optional Antigravity (AGY) analysis, integrates results and verifies without OpenSpec ceremony.",
             "version": "0.1.0",
             "author": {
                 "name": "allanharlen"
@@ -25,7 +25,8 @@
                 "multi-agent",
                 "subagents",
                 "codex",
-                "gemini",
+                "antigravity",
+                "agy",
                 "fast-fix",
                 "parallel-execution",
                 "workflow",

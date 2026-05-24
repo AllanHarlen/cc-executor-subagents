@@ -55,7 +55,7 @@ _N/A se nenhuma falha ocorreu._
 | # | Fase | Decisao | Motivo | Impacto |
 |---|---|---|---|---|
 | 1 | 3 | Execucao direta (sem agentes) | Mudanca de 1 arquivo, baixo risco | Nenhum agente lancado |
-| 2 | 4 | Fallback Codex para UI (Gemini indisponivel) | Gemini CLI ausente no preflight | UI tratada por Codex gpt-5.4 |
+| 2 | 4 | Execucao sem analise Antigravity | AGY indisponivel no preflight | Implementacao seguiu apenas com Codex |
 
 _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 

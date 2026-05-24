@@ -29,7 +29,7 @@
 | Campo | Valor |
 |---|---|
 | Task | <descricao da slice> |
-| Modelo | <codex gpt-5.4 medium \| codex gpt-5.5 high \| gemini 3 pro \| gemini 3 flash> |
+| Modelo | <codex gpt-5.4 medium \| codex gpt-5.5 high \| agy gemini-3.5-flash-medium \| agy gemini-3.1-pro-low> |
 | Status | DONE \| FALHOU \| QUOTA_EXHAUSTED \| PENDENTE |
 | Tokens (in/out/cache/total) | N/A |
 | Arquivos alterados | <lista> |

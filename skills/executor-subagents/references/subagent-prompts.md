@@ -101,14 +101,14 @@ Retorne:
 5. Proximo passo minimo
 ```
 
-## 3. Gemini UI
+## 3. Codex UI
 
-**Subagent type:** `cc-gemini-plugin:gemini-agent`
+**Subagent type:** `codex:codex-rescue`
 
-Use `gemini-3-pro` para UI complexa e `gemini-3-flash` para polish simples.
+Use `gpt-5.4-codex --effort medium` para UI geral e `gpt-5.5-codex --effort high` para UI complexa com risco.
 
 ```text
---model <gemini-3-pro|gemini-3-flash> --dirs <DIRS>
+--model gpt-5.4-codex --effort medium
 
 Voce e um agente UI em uma execucao rapida multiagente.
 
@@ -131,13 +131,14 @@ Estados obrigatorios:
 - empty:
 - success:
 
+Context7:
+<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
+
 Regras:
 - Voce nao esta sozinho no codebase. Nao reverta mudancas que voce nao fez.
-- Evite comandos de terminal, salvo validacoes simples autorizadas.
 - Preserve design system existente.
 - Mantenha responsividade e acessibilidade.
 - Nao altere payload/API sem avisar.
-- Se houver falha de escrita/tool, pare e retorne Status: BLOCKED ou FAILED.
 
 Retorne:
 0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED
@@ -187,4 +188,41 @@ Responda:
 6. Falha de tool/escrita/terminal?
 
 Nao implemente trabalho novo nesta resposta.
+```
+
+## 6. Antigravity analise cross-file
+
+**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+
+Use `gemini-3.5-flash-medium` (padrao) para analise geral e `gemini-3.1-pro-low` para raciocinio profundo. Omita `--model` para usar o padrao.
+
+```text
+--dirs <DIRS>
+
+Voce e um agente de analise em uma execucao rapida multiagente.
+
+Objetivo da analise:
+<O QUE PRECISAMOS ENTENDER ANTES DE IMPLEMENTAR>
+
+Escopo:
+<MODULOS, PASTAS, ARQUIVOS RELEVANTES>
+
+Foco:
+<ARQUITETURA | IMPACTO_REFACTOR | SEGURANCA | ORIENTACAO | DOCUMENTACAO>
+
+Perguntas especificas:
+<LISTA DE PERGUNTAS CONCRETAS>
+
+Regras:
+- NAO modifique arquivos. Apenas analise.
+- Retorne achados com arquivo/linha quando possivel.
+- Priorize informacoes que impactam decisoes de implementacao.
+
+Retorne:
+0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED
+1. Resumo da analise
+2. Achados principais com arquivo/linha
+3. Riscos identificados
+4. Recomendacoes para implementacao
+5. Dependencias ou impactos cross-file
 ```

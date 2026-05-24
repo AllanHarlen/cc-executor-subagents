@@ -8,7 +8,7 @@
  * - Bash permission for the Codex companion
  *
  * Optional:
- * - gemini CLI and cc-gemini-plugin
+ * - agy CLI and cc-antigravity-plugin
  * - /goal hook compatibility
  * - Context7 MCP
  */
@@ -161,8 +161,6 @@ function checkContext7Mcp() {
     join(HOME, ".claude", "mcp.json"),
     join(HOME, ".config", "claude", "mcp.json"),
     join(HOME, ".codex", "config.toml"),
-    join(HOME, ".gemini", "settings.json"),
-    join(HOME, ".gemini", "mcp.json"),
   ];
 
   for (const file of configCandidates) {
@@ -207,10 +205,10 @@ const checks = {
   },
   optional: {
     cli: {
-      gemini: checkCli("gemini"),
+      agy: checkCli("agy"),
     },
     plugins: {
-      "cc-gemini-plugin": checkPlugin("cc-gemini-plugin", "cc-gemini-plugin"),
+      "cc-antigravity-plugin": checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin"),
     },
     permissions: {
       "goal-hooks-enabled": checkGoalHookSettings(),

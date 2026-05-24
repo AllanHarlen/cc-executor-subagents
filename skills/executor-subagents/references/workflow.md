@@ -10,7 +10,7 @@ Rode:
 node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
 ```
 
-Se `codex` ou o plugin `openai-codex` falharem, cancele. Sem Codex, o executor perde a capacidade principal de paralelizar codigo. Gemini, `/goal` e Context7 sao opcionais.
+Se `codex` ou o plugin `openai-codex` falharem, cancele. Sem Codex, o executor perde a capacidade principal de paralelizar codigo. Antigravity (AGY), `/goal` e Context7 sao opcionais.
 
 ## Fase 1 - Triagem
 

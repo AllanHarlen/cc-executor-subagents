@@ -24,7 +24,7 @@
 | codex CLI | OK \| FALHOU | <versao ou erro> |
 | openai-codex plugin | OK \| FALHOU | - |
 | Bash(node:*) | OK \| FALHOU | - |
-| gemini CLI | OK \| AVISO \| N/A | - |
+| agy CLI | OK \| AVISO \| N/A | - |
 | Context7 MCP | OK \| AVISO \| N/A | - |
 | Auto-remediacao aplicada | Sim \| Nao | <descricao ou N/A> |
 

@@ -1,5 +1,5 @@
 ---
-description: Executar uma resolucao rapida multiagente sem OpenSpec, dividindo a demanda em fatias independentes, delegando para Codex/Gemini quando acelerar, integrando e verificando.
+description: Executar uma resolucao rapida multiagente sem OpenSpec, dividindo a demanda em fatias independentes, delegando para Codex com analise opcional via Antigravity (AGY), integrando e verificando.
 argument-hint: "<demanda de resolucao rapida>"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Agent, TaskCreate, TaskUpdate, TaskList, Skill
 ---
@@ -87,7 +87,7 @@ Se a demanda for uma edicao trivial que voce consegue fazer em menos tempo do qu
 
 Use updates curtos:
 
-- "preflight OK; Gemini opcional indisponivel, vou usar Codex para UI tambem";
+- "preflight OK; AGY opcional indisponivel, prosseguindo sem analise cross-file";
 - "vou dividir em 3 slices independentes";
 - "lancei 3 agentes em paralelo; ownership: testes, service, UI";
 - "verificacao passou/falhou; estou integrando o ajuste final".

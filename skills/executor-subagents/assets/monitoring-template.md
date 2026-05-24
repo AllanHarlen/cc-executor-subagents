@@ -28,7 +28,7 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 | ID | Slice | Agente/Modelo | Status | Ownership | Ultima atualizacao |
 |---|---|---|---|---|---|
 | A | <slice> | codex gpt-5.4 medium | PENDING | <arquivos> | <HH:MM> |
-| B | <slice> | gemini 3 pro | RUNNING | <arquivos> | <HH:MM> |
+| B | <slice> | agy gemini-3.5-flash-medium | RUNNING | <arquivos> | <HH:MM> |
 
 ---
 

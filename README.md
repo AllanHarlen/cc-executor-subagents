@@ -9,7 +9,7 @@ O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor pratico
 - sem duplas fixas back-end/front-end;
 - com slices independentes por ownership;
 - com Codex como executor principal de codigo;
-- com Gemini opcional para UI visual;
+- com Antigravity (AGY) opcional para analise cross-file;
 - com verificacao e reporte enxutos.
 
 ## Quando usar
@@ -68,7 +68,7 @@ Opcionais:
 
 | Item | Uso |
 |---|---|
-| Gemini CLI + `cc-gemini-plugin` | UI visual especializada |
+| Antigravity CLI (`agy`) + `cc-antigravity-plugin` | Analise de codebase em contexto largo |
 | Context7 MCP | docs atuais de libs/frameworks/APIs |
 | `/goal` hooks | autonomia entre turnos |
 
@@ -98,16 +98,23 @@ Permissao minima no projeto alvo:
 }
 ```
 
-Gemini opcional:
+Antigravity (AGY) opcional:
 
 ```bash
-npm install -g @google/gemini-cli
-gemini auth
+curl -fsSL https://antigravity.google/cli/install.sh | bash
 ```
 
+Windows:
+
+```powershell
+irm https://antigravity.google/cli/install.ps1 | iex
+```
+
+Autenticacao: abra `agy` interativamente e faca login.
+
 ```text
-/plugin marketplace add thepushkarp/cc-gemini-plugin
-/plugin install cc-gemini-plugin@cc-gemini-plugin
+/plugin marketplace add AllanHarlen/cc-antigravity-plugin
+/plugin install cc-antigravity-plugin@cc-antigravity-plugin
 ```
 
 ## Instalacao

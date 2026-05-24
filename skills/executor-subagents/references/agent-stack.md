@@ -7,10 +7,11 @@
 | Executor principal | Claude | voce mesmo | triagem, split, integracao, verificacao, glue pequeno |
 | Executor geral | Codex gpt-5.4 medium | `codex:codex-rescue` | codigo, testes, refactor localizado, bugfix |
 | Review critico | Codex gpt-5.5 high | `codex:codex-rescue` | risco alto, auth, dados, concorrencia, review final |
-| UI visual | Gemini 3 Pro | `cc-gemini-plugin:gemini-agent` | UI/UX complexa quando Gemini estiver disponivel |
-| UI simples | Gemini 3 Flash | `cc-gemini-plugin:gemini-agent` | polish visual pequeno quando Gemini estiver disponivel |
+| UI visual | Codex gpt-5.4 medium | `codex:codex-rescue` | UI/UX complexa com prompt especializado |
+| Analise cross-file | AGY gemini-3.5-flash-medium | `cc-antigravity-plugin:antigravity-agent` | arquitetura, impacto de refactor, orientacao de codebase |
+| Analise profunda | AGY gemini-3.1-pro-low | `cc-antigravity-plugin:antigravity-agent` | analise complexa com raciocinio profundo |
 
-Codex e obrigatorio para esta skill. Gemini e opcional: se nao estiver disponivel, use Codex tambem para UI.
+Codex e obrigatorio para esta skill. Antigravity (AGY) e opcional: se nao estiver disponivel, prossiga sem a fase de analise cross-file. UI e sempre feita com Codex.
 
 ## Heuristica Codex
 
@@ -32,24 +33,24 @@ Use `gpt-5.5-codex --effort high` para:
 - refactor amplo;
 - investigacao dificil quando medium falhou.
 
-## Heuristica Gemini
+## Heuristica Antigravity (AGY)
 
-Use Gemini so quando ele acelerar UI:
+Use Antigravity quando a analise pre-execucao acelerar a entrega:
 
-- layout visual complexo;
-- responsividade;
-- estados visuais;
-- acessibilidade de tela;
-- polish com design system.
+- mapear arquitetura antes de refactor amplo;
+- analisar impacto cross-file de uma mudanca;
+- orientar-se em codebase desconhecido;
+- review de seguranca cross-file;
+- sintetizar documentacao de muitos arquivos.
 
-Nao use Gemini para:
+Nao use Antigravity para:
 
-- handoff de falha operacional;
+- implementacao de codigo (use Codex);
+- implementacao de UI (use Codex);
+- edicao localizada;
+- debugging interativo;
 - testes quebrados;
-- migrations;
-- auth;
-- refactor de negocio;
-- investigacao de build quebrado.
+- handoff de falha operacional.
 
 ## Context7
 
@@ -65,7 +66,8 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 |---|---|
 | bug simples em um modulo | 1 Codex medium |
 | bug + testes em arquivos separados | 2 Codex medium em paralelo |
-| UI polish isolado | Gemini Flash ou Codex medium |
+| UI polish isolado | Codex medium com prompt UI |
+| Mapear impacto antes de refactor | 1 Antigravity + execucao com Codex |
 | feature slice pequena full-stack | 1 Codex full-stack ou 2 agentes se ownership for disjunto |
 | investigacao incerta | 1 agente read-only + executor principal inspecionando outra area |
 | risco alto | Codex high review antes/depois |
