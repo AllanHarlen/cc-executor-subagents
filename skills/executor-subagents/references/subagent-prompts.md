@@ -201,11 +201,24 @@ Use `gemini-3.5-flash-medium` (padrao) para analise geral e `gemini-3.1-pro-low`
 
 Voce e um agente de analise em uma execucao rapida multiagente.
 
+Demanda:
+<DESCREVER A DEMANDA>
+
 Objetivo da analise:
 <O QUE PRECISAMOS ENTENDER ANTES DE IMPLEMENTAR>
 
 Escopo:
 <MODULOS, PASTAS, ARQUIVOS RELEVANTES>
+
+Ownership:
+- Pode analisar: <ARQUIVOS/PASTAS>
+- Nao analise alem de: <ARQUIVOS/PASTAS>
+
+Criterio de aceite:
+<COMO SABER QUE A ANALISE RESPONDEU O NECESSARIO PARA IMPLEMENTAR>
+
+Verificacao esperada:
+<ARQUIVOS/LINHAS/COMANDOS READ-ONLY QUE DEVEM SER CONSULTADOS, SE HOUVER>
 
 Foco:
 <ARQUITETURA | IMPACTO_REFACTOR | SEGURANCA | ORIENTACAO | DOCUMENTACAO>
@@ -215,14 +228,27 @@ Perguntas especificas:
 
 Regras:
 - NAO modifique arquivos. Apenas analise.
+- Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo.
+- Nao reverta mudancas que voce nao fez.
+- Respeite seu ownership de analise.
 - Retorne achados com arquivo/linha quando possivel.
 - Priorize informacoes que impactam decisoes de implementacao.
+
+Skills:
+- Se o ambiente suportar listagem de skills, consulte as disponiveis antes de comecar.
+- Ignore skills cujo nome comece com `openspec` ou `opsx`.
+- Use as skills compativeis com a tarefa e reporte no retorno em `Skills utilizadas`.
+- Se a listagem nao estiver disponivel, reporte `skills nao acessiveis`.
 
 Retorne:
 0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED
 1. Resumo da analise
-2. Achados principais com arquivo/linha
-3. Riscos identificados
-4. Recomendacoes para implementacao
-5. Dependencias ou impactos cross-file
+2. Arquivos analisados
+3. Achados principais com arquivo/linha
+4. Validacoes feitas
+5. Riscos identificados
+6. Pendencias
+7. Recomendacoes para implementacao
+8. Dependencias ou impactos cross-file
+9. Skills utilizadas
 ```
