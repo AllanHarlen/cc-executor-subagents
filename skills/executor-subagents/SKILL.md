@@ -131,7 +131,7 @@ Quando agentes retornarem:
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
 5. Atualize `.executor/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
 
-Se um agente falhar por cota/rate limit/capacidade, marque como `QUOTA_EXHAUSTED` no contexto e passe a fatia para Codex, outro modelo disponivel ou execucao direta, conforme seguranca.
+Se um agente falhar por cota/rate limit/capacidade, marque como `QUOTA_EXHAUSTED` no contexto e passe a fatia para Codex, outro agente disponivel ou execucao direta, conforme seguranca.
 
 ### Fase 6 - Verificacao
 
@@ -176,7 +176,7 @@ O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os 
 
 ### Politica de Cota
 
-Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo. O retorno deve ser imediato: `Status: QUOTA_EXHAUSTED`.
+Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo. Para AGY, mantenha o default do Antigravity/plugin. O retorno deve ser imediato: `Status: QUOTA_EXHAUSTED`.
 
 **Antigravity (AGY) bate a cota:**
 
@@ -186,7 +186,7 @@ Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitrari
 
 **Codex bate a cota em implementacao, ajuste pontual ou handoff:**
 
-1. Nao tenta trocar o modelo fixo.
+1. Nao tenta trocar o modelo/effort fixo.
 2. Nao tenta retries longos.
 3. Marca a task como `BLOCKED`.
 4. Registra a evidencia no `.executor/monitoring.md`.
@@ -270,7 +270,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | Arquivo | Quando ler |
 |---|---|
 | `references/workflow.md` | detalhes do fluxo rapido |
-| `references/agent-stack.md` | escolher Codex/Antigravity/modelo/effort |
+| `references/agent-stack.md` | escolher Codex/Antigravity/effort |
 | `references/subagent-prompts.md` | sempre antes de delegar |
 | `references/parallelization.md` | dividir slices independentes |
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |

@@ -14,7 +14,7 @@
         {
             "name": "cc-executor-subagents",
             "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a light preflight, splits work by ownership, launches independent Codex agents with optional Antigravity (AGY) analysis, integrates results and verifies without OpenSpec ceremony.",
-            "version": "0.2.0",
+            "version": "0.2.1",
             "author": {
                 "name": "allanharlen"
             },

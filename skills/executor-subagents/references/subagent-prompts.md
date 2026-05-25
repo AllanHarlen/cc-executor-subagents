@@ -194,7 +194,9 @@ Nao implemente trabalho novo nesta resposta.
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-agent`
 
-Use `gemini-3.5-flash-medium` (padrao) para analise geral e `gemini-3.1-pro-low` para raciocinio profundo. Omita `--model` para usar o padrao.
+Use o modelo default anterior configurado pelo Antigravity/plugin. O prompt AGY
+deve conter apenas diretorios e instrucoes de analise; diferencie analise geral
+de analise profunda apenas pelo objetivo, escopo e perguntas do prompt.
 
 ```text
 --dirs <DIRS>

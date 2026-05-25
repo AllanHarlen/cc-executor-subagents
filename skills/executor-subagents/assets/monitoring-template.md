@@ -28,7 +28,7 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 | ID | Slice | Agente/Modelo | Status | Ownership | Ultima atualizacao |
 |---|---|---|---|---|---|
 | A | <slice> | codex gpt-5.4 medium | PENDING | <arquivos> | <HH:MM> |
-| B | <slice> | agy gemini-3.5-flash-medium | RUNNING | <arquivos> | <HH:MM> |
+| B | <slice> | agy default | RUNNING | <arquivos> | <HH:MM> |
 
 ---
 
@@ -50,7 +50,7 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 | Motivo atual | <o que o agente esta fazendo agora> |
 | Evidencia | <arquivo parcial, log ou saida observada> |
 | Arquivos parciais detectados | <lista ou Nenhum> |
-| Fallback escolhido | <modelo alternativo ou execucao direta — ou N/A> |
+| Fallback escolhido | <agente alternativo ou execucao direta — ou N/A> |
 | Proxima acao do orquestrador | <acao concreta> |
 
 **Log de eventos:**

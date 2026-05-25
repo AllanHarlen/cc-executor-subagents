@@ -8,8 +8,8 @@
 | Executor geral | Codex gpt-5.4 medium | `codex:codex-rescue` | codigo, testes, refactor localizado, bugfix |
 | Review critico | Codex gpt-5.5 high | `codex:codex-rescue` | risco alto, auth, dados, concorrencia, review final |
 | UI visual | Codex gpt-5.4 medium | `codex:codex-rescue` | UI/UX complexa com prompt especializado |
-| Analise cross-file | AGY gemini-3.5-flash-medium | `cc-antigravity-plugin:antigravity-agent` | arquitetura, impacto de refactor, orientacao de codebase |
-| Analise profunda | AGY gemini-3.1-pro-low | `cc-antigravity-plugin:antigravity-agent` | analise complexa com raciocinio profundo |
+| Analise cross-file | AGY default | `cc-antigravity-plugin:antigravity-agent` | arquitetura, impacto de refactor, orientacao de codebase |
+| Analise profunda | AGY default | `cc-antigravity-plugin:antigravity-agent` | analise complexa com prompt focado |
 
 Codex e obrigatorio para esta skill. Antigravity (AGY) e opcional: se nao estiver disponivel, prossiga sem a fase de analise cross-file. UI e sempre feita com Codex.
 
@@ -34,6 +34,10 @@ Use `gpt-5.5-codex --effort high` para:
 - investigacao dificil quando medium falhou.
 
 ## Heuristica Antigravity (AGY)
+
+Use sempre o modelo default configurado no Antigravity/plugin. O terminal `agy`
+deve receber apenas diretorios e instrucoes de analise, sem selecao direta de
+modelo.
 
 Use Antigravity quando a analise pre-execucao acelerar a entrega:
 
