@@ -21,10 +21,10 @@ node skills/executor-subagents/scripts/preflight.mjs
 | `codex` CLI | executa agentes de backend, testes e review |
 | `agy` CLI | executa agentes de front-end, imagem e analise em contexto largo |
 | plugin `openai-codex` | expoe `codex:codex-rescue` |
-| plugin `cc-antigravity-plugin` `>= 3.5.4` | expoe `cc-antigravity-plugin:antigravity-agent` e o bridge com flags atuais |
+| plugin `cc-antigravity-plugin` `>= 3.6.0` | expoe `cc-antigravity-plugin:antigravity-agent` e o bridge com flags atuais (incluindo `--parallel` e `--subagent-model`) |
 | permissao Bash para Codex companion | evita aprovacoes no meio de agentes em background |
 | `agy --help` com flags essenciais | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
-| bridge do AGY com flags atuais | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
+| bridge do AGY com flags atuais | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
 
 Falha de Codex continua bloqueando direto. Falha somente de AGY deve pausar o fluxo e pedir decisao do usuario: remediar, continuar so com Codex, ou cancelar.
 

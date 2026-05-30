@@ -2,6 +2,39 @@
 
 Paralelizar e bom quando reduz tempo sem criar conflito. O objetivo nao e usar muitos agentes; e fazer trabalho independente acontecer ao mesmo tempo.
 
+## Duas camadas de paralelismo
+
+O executor opera em duas camadas distintas. Escolha a certa para cada situacao.
+
+### Camada Claude — waves
+
+Lanca varios subagentes `antigravity-agent` e/ou `codex:codex-rescue` em paralelo no mesmo bloco de ferramentas.
+
+Use quando:
+
+- a wave mistura dominios (AGY + Codex);
+- voce precisa de ownership, monitoramento e formato de retorno por fatia;
+- cada slice tem criterio de aceite independente que voce quer rastrear.
+
+### Fan-out nativo do AGY (`--parallel`)
+
+Um unico `antigravity-agent` com `--parallel`. O AGY decompoe a tarefa em subtarefas Gemini nativas (`DefineSubagent`/`invoke_subagent`/`ManageSubagents`), executa em paralelo, agrega os resultados e reporta os Conversation IDs de cada subagente.
+
+Use quando:
+
+- todos os entregaveis sao de dominio AGY;
+- os entregaveis sao independentes entre si (ex.: varios relatorios HTML, tres componentes React sem interface compartilhada);
+- nao ha dependencia de estado ou arquivo entre os entregaveis;
+- voce quer economizar spawns e potencialmente usar `--subagent-model` mais barato.
+
+Nao use quando:
+
+- a wave mistura AGY e Codex — use waves na camada Claude;
+- os entregaveis compartilham estado ou dependem uns dos outros;
+- voce precisa de monitoramento ou formato de retorno por fatia (o relatorio vira do AGY agregado).
+
+`--parallel` e mutuamente exclusivo com `--generate-imagem` (o bridge ignora `--parallel` nesse caso, com log).
+
 ## Unidade de paralelismo
 
 A unidade padrao e um **slice com ownership claro**:

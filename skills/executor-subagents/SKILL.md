@@ -19,7 +19,7 @@ Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce
 - **Agentes por ownership, nao por dupla.** Cada agente recebe arquivos/modulos responsaveis e um resultado verificavel.
 - **Paralelismo pragmastico.** Rode em paralelo apenas tarefas independentes; serialize arquivos centrais compartilhados.
 - **Executor pode integrar.** O executor principal pode fazer pequenos ajustes de integracao, documentacao e glue code quando for mais rapido e seguro do que redelegar.
-- **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 3.5.4+.
+- **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 3.6.0+. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
 - **Context7 quando houver docs de libs.** Se a task envolver biblioteca, framework, SDK, API, CLI ou cloud service, use Context7 quando disponivel.
 - **Sem OpenSpec.** Nao crie `openspec/`, nao chame `/openspec-*`, nao bloqueie por ausencia de OpenSpec.
 - **Sem teatralidade.** Updates curtos, decisao rapida, evidencia final.
@@ -51,7 +51,7 @@ O preflight valida apenas o que e necessario para execucao rapida:
 | `codex` CLI | Sim | agentes Codex para backend, testes, review e recuperacao |
 | `agy` CLI | Sim | agentes AGY para front-end, imagem e contexto largo |
 | plugin `openai-codex` | Sim | subagente `codex:codex-rescue` |
-| plugin `cc-antigravity-plugin` `>= 3.5.4` | Sim | subagente `cc-antigravity-plugin:antigravity-agent` |
+| plugin `cc-antigravity-plugin` `>= 3.6.0` | Sim | subagente `cc-antigravity-plugin:antigravity-agent` (inclui `--parallel` e `--subagent-model` para fan-out nativo) |
 | permissao Bash do Codex companion | Sim | evita bloqueio de aprovacao em background |
 | `/goal` hooks | Opcional | autonomia entre turnos |
 | Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
@@ -99,9 +99,10 @@ Use esta regra:
 | 1 area backend clara, patch medio | 1 agente Codex |
 | UI/front-end isolado | 1 agente AGY agentic |
 | UI/front-end complexa | 1 agente AGY com `--model gemini-3.1-pro-high` |
+| Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY com `--parallel`; adicione `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
 | Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` |
 | Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
-| 2-5 areas independentes | 2-5 agentes em paralelo |
+| 2-5 areas independentes de dominios diferentes (AGY + Codex) | 2-5 agentes em paralelo (waves na camada Claude) |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
 | Auth, permissao, dados ou migration sensivel | Codex high para review antes/depois |
 
@@ -124,9 +125,12 @@ Cada prompt deve incluir:
 Roteamento padrao:
 
 - front-end/UI: `cc-antigravity-plugin:antigravity-agent` em modo agentic;
+- varios entregaveis AGY independentes sem Codex: `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo de subagentes Gemini; opcional `--subagent-model` para subagentes mais baratos);
 - imagem/asset explicito: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
 - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
 - backend/testes/review: Codex.
+
+**Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-imagem`.
 
 Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar listagem de skills, o subagente deve consultalas, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Se nao houver listagem disponivel, o subagente deve seguir com `skills nao acessiveis`.
 

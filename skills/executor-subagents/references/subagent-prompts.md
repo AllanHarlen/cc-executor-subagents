@@ -255,6 +255,53 @@ Retorne:
 9. Skills utilizadas
 ```
 
+## 8. AGY fan-out paralelo
+
+**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+
+Use quando todos os entregaveis sao de dominio AGY, sao independentes entre si e nao envolvem Codex. O AGY decompoe e executa com subagentes Gemini nativos.
+
+```text
+--parallel --subagent-model gemini-3.5-flash-medium --dirs <DIRS>
+
+Voce e um agente AGY em modo fan-out paralelo numa execucao rapida multiagente.
+
+Demanda:
+<DESCREVER A DEMANDA GERAL>
+
+Entregaveis independentes:
+1. <ENTREGAVEL 1 — nome, destino e descricao do conteudo>
+2. <ENTREGAVEL 2 — nome, destino e descricao do conteudo>
+(adicione linhas conforme necessario)
+
+Cada entregavel e independente dos demais: nao compartilham estado, nao dependem um do outro.
+
+Ownership:
+- Pode criar/editar: <DIRETORIOS/ARQUIVOS ALVO>
+- Nao edite: <ARQUIVOS DA BASE DE CODIGO DA APLICACAO, exceto se o prompt disser para conectar>
+
+Context7:
+<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de gerar. Use resolve-library-id -> query-docs. SENAO: siga padroes locais.>
+
+Regras:
+- Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo.
+- Nao reverta mudancas que voce nao fez.
+- Use --parallel: o AGY pode decidir a quantidade de subagentes Gemini nativos.
+- Ao finalizar, reporte os Conversation IDs de cada subagente nativo.
+- Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
+- Nao amplie escopo alem dos entregaveis listados.
+
+Retorne:
+0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED | AUTH_REQUIRED | TIMEOUT | AGY_MISSING
+1. Resumo dos entregaveis gerados
+2. Arquivos criados/alterados
+3. Conversation IDs dos subagentes nativos (um por entregavel, quando disponivel)
+4. Decisoes de conteudo ou formato
+5. Pendencias
+6. Riscos
+7. Skills utilizadas
+```
+
 ## 7. AGY imagem/asset
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-agent`

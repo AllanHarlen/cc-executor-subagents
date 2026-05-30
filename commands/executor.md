@@ -64,6 +64,7 @@ Depois encerre.
 7. Roteie por padrao:
 
    - front-end/UI: `cc-antigravity-plugin:antigravity-agent`;
+   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex): `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo); adicione `--subagent-model gemini-3.5-flash-medium` para subagentes mais baratos;
    - imagem explicita: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
    - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
    - backend/testes/review: Codex.
@@ -100,7 +101,7 @@ Se a demanda for uma edicao trivial que voce consegue fazer em menos tempo do qu
 
 Use updates curtos:
 
-- "preflight OK; AGY 3.5.4+ validado para front-end e analise";
+- "preflight OK; AGY 3.6.0+ validado para front-end, fan-out nativo e analise";
 - "vou dividir em 3 slices independentes";
 - "lancei 3 agentes em paralelo; ownership: testes, service, front-end";
 - "verificacao passou/falhou; estou integrando o ajuste final".

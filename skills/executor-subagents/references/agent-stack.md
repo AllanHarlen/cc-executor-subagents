@@ -12,7 +12,7 @@
 | Analise cross-file | AGY read-only | `cc-antigravity-plugin:antigravity-agent` | arquitetura, impacto de refactor, orientacao de codebase |
 | Imagem/asset | AGY nano-banana | `cc-antigravity-plugin:antigravity-agent` | mockups, assets, ilustracoes e pedidos explicitos de imagem |
 
-Codex e AGY sao obrigatorios para esta skill. O executor depende de Codex para backend, testes e review, e depende de AGY 3.5.4+ para front-end, imagem e contexto largo.
+Codex e AGY sao obrigatorios para esta skill. O executor depende de Codex para backend, testes e review, e depende de AGY 3.6.0+ para front-end, imagem, contexto largo e fan-out nativo de subagentes Gemini (`--parallel`).
 
 ## Heuristica Codex
 
@@ -63,6 +63,21 @@ Use `--generate-imagem` para:
 - imagens guiadas por arquivos de referencia via `--files`;
 - saida em diretorio especifico via `--output-dir` quando houver destino claro.
 
+Use `--parallel` para:
+
+- varios entregaveis AGY independentes (relatorios, componentes, arquivos) sem dependencia entre si e sem Codex na wave;
+- o AGY decide a contagem de subagentes Gemini nativos, executa em paralelo e agrega os resultados;
+- combine com `--subagent-model gemini-3.5-flash-medium` para usar subagentes mais baratos sob um planejador mais capaz;
+- ao final o AGY reporta os Conversation IDs de cada subagente nativo.
+
+Nao use `--parallel` quando:
+
+- a wave mistura AGY e Codex (use waves na camada Claude);
+- os entregaveis dependem uns dos outros ou compartilham estado;
+- o task precisar de monitoramento ou formato de retorno por fatia.
+
+Nao combine `--parallel` com `--generate-imagem` (o bridge ignora `--parallel` nesse caso).
+
 ## Falhas do AGY
 
 O bridge do `cc-antigravity-plugin` pode emitir sinais brutos `QUOTA_EXAUSTED`, `AUTH_REQUIRED`, `TIMEOUT` e `AGY_MISSING`. No contexto do executor:
@@ -89,6 +104,7 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 | UI/front-end complexa | 1 AGY pro-high |
 | Mapear impacto antes de refactor | 1 AGY read-only + execucao com Codex |
 | asset visual pedido explicitamente | 1 AGY `--generate-imagem` |
+| varios relatorios/componentes AGY independentes | 1 AGY `--parallel` (fan-out nativo); `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
 | feature slice pequena full-stack | AGY no front + Codex no backend se ownership for disjunto |
 | risco alto | Codex high review antes/depois |
 

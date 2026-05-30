@@ -45,9 +45,12 @@ Fluxo resumido:
 Roteamento padrao:
 
 - front-end/UI: AGY em modo agentic;
+- varios entregaveis AGY independentes (relatorios, componentes): AGY com `--parallel` (fan-out nativo de subagentes Gemini; `--subagent-model` opcional para subagentes mais baratos);
 - imagem/asset explicito: AGY com `--generate-imagem`;
 - analise cross-file: AGY com `--read-only`;
 - backend, testes e review: Codex.
+
+O paralelismo pode acontecer em duas camadas: waves na camada do Claude Code (slices de domínios diferentes, ex.: AGY + Codex) ou fan-out nativo dentro de um único agente AGY (`--parallel`) quando todos os entregáveis sao de domínio AGY.
 
 Artefatos opcionais ficam em `.executor/`:
 
@@ -72,7 +75,7 @@ Obrigatorios:
 | Codex CLI | `codex --version` |
 | Antigravity CLI (`agy`) | `agy --version` |
 | plugin `openai-codex` | instalado no Claude Code |
-| plugin `cc-antigravity-plugin` `>= 3.5.4` | instalado no Claude Code |
+| plugin `cc-antigravity-plugin` `>= 3.6.0` | instalado no Claude Code |
 | permissao `Bash(node:*)` | `.claude/settings.json` |
 
 Opcionais:

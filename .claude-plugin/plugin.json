@@ -1,7 +1,7 @@
 {
   "name": "cc-executor-subagents",
-  "version": "0.3.0",
-  "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, uses AGY 3.5.4+ as the required front-end and large-context agent, keeps Codex for backend, tests, and review, and reports without OpenSpec ceremony.",
+  "version": "0.4.0",
+  "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, uses AGY 3.6.0+ as the required front-end and large-context agent (with native Gemini subagent fan-out via --parallel), keeps Codex for backend, tests, and review, and reports without OpenSpec ceremony.",
   "author": {
     "name": "allanharlen"
   },

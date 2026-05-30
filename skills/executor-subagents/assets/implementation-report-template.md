@@ -25,7 +25,7 @@
 | openai-codex plugin | OK \| FALHOU | - |
 | Bash(node:*) | OK \| FALHOU | - |
 | agy CLI | OK \| FALHOU | <versao ou erro> |
-| cc-antigravity-plugin >= 3.5.4 | OK \| FALHOU | <versao ou erro> |
+| cc-antigravity-plugin >= 3.6.0 | OK \| FALHOU | <versao ou erro> |
 | Context7 MCP | OK \| AVISO \| N/A | - |
 | Auto-remediacao aplicada | Sim \| Nao | <descricao ou N/A> |
 

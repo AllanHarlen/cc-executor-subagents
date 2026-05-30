@@ -6,7 +6,7 @@
  * - codex CLI
  * - agy CLI
  * - openai-codex Claude Code plugin
- * - cc-antigravity-plugin >= 3.5.4
+ * - cc-antigravity-plugin >= 3.6.0
  * - Bash permission for the Codex companion
  *
  * Optional:
@@ -22,7 +22,7 @@ import { join } from "node:path";
 const HOME = homedir();
 const PLUGINS_CACHE = join(HOME, ".claude", "plugins", "cache");
 const PROJECT_CLAUDE_DIR = join(process.cwd(), ".claude");
-const MIN_ANTIGRAVITY_PLUGIN_VERSION = "3.5.4";
+const MIN_ANTIGRAVITY_PLUGIN_VERSION = "3.6.0";
 const REQUIRED_AGY_FLAGS = [
   "--print",
   "--add-dir",
@@ -35,6 +35,8 @@ const REQUIRED_BRIDGE_FLAGS = [
   "--model",
   "--generate-imagem",
   "--generate-image",
+  "--parallel",
+  "--subagent-model",
   "--timeout",
   "--continue",
   "--conversation",

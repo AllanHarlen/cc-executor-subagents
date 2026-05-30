@@ -55,7 +55,7 @@ _N/A se nenhuma falha ocorreu._
 | # | Fase | Decisao | Motivo | Impacto |
 |---|---|---|---|---|
 | 1 | 3 | Execucao direta (sem agentes) | Mudanca de 1 arquivo, baixo risco | Nenhum agente lancado |
-| 2 | 4 | Front-end roteado para AGY | AGY 3.5.4+ validado no preflight | Fluxo UI seguiu com antigravity-agent |
+| 2 | 4 | Front-end roteado para AGY | AGY 3.6.0+ validado no preflight | Fluxo UI seguiu com antigravity-agent |
 
 _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 
