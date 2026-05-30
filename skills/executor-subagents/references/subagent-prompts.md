@@ -9,7 +9,7 @@ Inclua em todos os prompts:
 ```text
 Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo. Nao reverta mudancas que voce nao fez. Respeite seu ownership e adapte sua implementacao aos diffs existentes.
 
-Se encontrar cota/rate limit/capacidade, pare e retorne Status: QUOTA_EXHAUSTED com evidencia curta e arquivos parciais.
+Se encontrar o sinal bruto QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e retorne esse sinal como evidencia curta. O executor principal vai normalizar QUOTA_EXAUSTED para QUOTA_EXHAUSTED no contexto final.
 
 Se ficar bloqueado, retorne Status: BLOCKED com a menor pergunta ou decisao necessaria.
 
@@ -63,6 +63,7 @@ Retorne:
 4. Testes/verificacoes executadas
 5. Pendencias
 6. Riscos
+7. Skills utilizadas
 ```
 
 ## 2. Codex review high
@@ -101,16 +102,16 @@ Retorne:
 5. Proximo passo minimo
 ```
 
-## 3. Codex UI
+## 3. AGY front-end/UI
 
-**Subagent type:** `codex:codex-rescue`
+**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
 
-Use `gpt-5.4-codex --effort medium` para UI geral e `gpt-5.5-codex --effort high` para UI complexa com risco.
+Use `--model gemini-3.5-flash-medium` para UI do dia a dia e `--model gemini-3.1-pro-high` para UI complexa.
 
 ```text
---model gpt-5.4-codex --effort medium
+--model gemini-3.5-flash-medium --dirs <DIRS>
 
-Voce e um agente UI em uma execucao rapida multiagente.
+Voce e um agente AGY responsavel por implementar front-end/UI em uma execucao rapida multiagente.
 
 Demanda:
 <DESCREVER A DEMANDA>
@@ -135,13 +136,14 @@ Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
 
 Regras:
-- Voce nao esta sozinho no codebase. Nao reverta mudancas que voce nao fez.
+- Modo agentic ativo: implemente a UI diretamente; nao use --read-only.
 - Preserve design system existente.
 - Mantenha responsividade e acessibilidade.
 - Nao altere payload/API sem avisar.
+- Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
 
 Retorne:
-0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED
+0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED | AUTH_REQUIRED | TIMEOUT | AGY_MISSING
 1. Resumo visual
 2. Arquivos alterados
 3. Decisoes UI/UX
@@ -149,6 +151,7 @@ Retorne:
 5. Validacoes feitas
 6. Pendencias
 7. Riscos
+8. Skills utilizadas
 ```
 
 ## 4. Investigacao read-only
@@ -190,16 +193,14 @@ Responda:
 Nao implemente trabalho novo nesta resposta.
 ```
 
-## 6. Antigravity analise cross-file
+## 6. AGY analise cross-file
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-agent`
 
-Use o modelo default anterior configurado pelo Antigravity/plugin. O prompt AGY
-deve conter apenas diretorios e instrucoes de analise; diferencie analise geral
-de analise profunda apenas pelo objetivo, escopo e perguntas do prompt.
+Use `--read-only` sempre. Use `--model gemini-3.5-flash-medium` para analise geral e `--model gemini-3.1-pro-high` quando o raciocinio precisar ser mais profundo.
 
 ```text
---dirs <DIRS>
+--read-only --model gemini-3.5-flash-medium --dirs <DIRS>
 
 Voce e um agente de analise em uma execucao rapida multiagente.
 
@@ -230,11 +231,10 @@ Perguntas especificas:
 
 Regras:
 - NAO modifique arquivos. Apenas analise.
-- Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo.
-- Nao reverta mudancas que voce nao fez.
-- Respeite seu ownership de analise.
+- Respeite o ownership de analise.
 - Retorne achados com arquivo/linha quando possivel.
 - Priorize informacoes que impactam decisoes de implementacao.
+- Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
 
 Skills:
 - Se o ambiente suportar listagem de skills, consulte as disponiveis antes de comecar.
@@ -243,7 +243,7 @@ Skills:
 - Se a listagem nao estiver disponivel, reporte `skills nao acessiveis`.
 
 Retorne:
-0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED
+0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED | AUTH_REQUIRED | TIMEOUT | AGY_MISSING
 1. Resumo da analise
 2. Arquivos analisados
 3. Achados principais com arquivo/linha
@@ -253,4 +253,43 @@ Retorne:
 7. Recomendacoes para implementacao
 8. Dependencias ou impactos cross-file
 9. Skills utilizadas
+```
+
+## 7. AGY imagem/asset
+
+**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+
+Use quando o usuario pedir explicitamente asset, mockup, ilustracao, banner, logo ou imagem.
+
+```text
+--generate-imagem --files <ARQUIVOS_DE_REFERENCIA> --output-dir <DESTINO>
+
+Voce e um agente AGY responsavel por gerar um asset visual em uma execucao rapida multiagente.
+
+Demanda:
+<DESCREVER O PEDIDO DE IMAGEM>
+
+Objetivo visual:
+<ESTILO, USO, FORMATO E CONTEXTO>
+
+Arquivos de referencia:
+<GUIDE, TOKENS, BRAND, MOCKUPS OU N/A>
+
+Destino:
+<PASTA OU ARQUIVO ESPERADO>
+
+Regras:
+- Use `--generate-imagem` como flag canonica.
+- Use `--files` quando houver guias de estilo, paleta, texto ou referencias locais.
+- Nao edite codigo da aplicacao, exceto se o prompt disser para conectar o asset gerado.
+- Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
+
+Retorne:
+0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED | AUTH_REQUIRED | TIMEOUT | AGY_MISSING
+1. Resumo do asset
+2. Arquivos gerados
+3. Decisoes visuais
+4. Validacoes feitas
+5. Pendencias
+6. Skills utilizadas
 ```

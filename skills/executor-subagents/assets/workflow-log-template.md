@@ -34,7 +34,7 @@
 | Onda | ID | Tipo/Modelo | Slice/Ownership | Status | Tokens (in/out/cache/total) | Arquivos alterados |
 |---|---|---|---|---|---|---|
 | 1 | A | codex gpt-5.4 medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED | N/A | <arquivos> |
-| 1 | B | codex gpt-5.4 medium | <slice> | DONE | N/A | <arquivos> |
+| 1 | B | agy gemini-3.5-flash-medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING | N/A | <arquivos> |
 
 _Adicione linhas conforme as ondas e agentes reais da execucao._
 
@@ -44,7 +44,7 @@ _Adicione linhas conforme as ondas e agentes reais da execucao._
 
 | # | Fase | Agente/Componente | Tipo de falha | Acao de recuperacao | Resultado |
 |---|---|---|---|---|---|
-| 1 | <fase> | <agente ou executor> | QUOTA_EXHAUSTED \| TIMEOUT \| ERRO_LOGICO \| BUILD_FALHOU | <acao tomada> | RECUPERADO \| PENDENTE \| BLOQUEADO |
+| 1 | <fase> | <agente ou executor> | QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING \| ERRO_LOGICO \| BUILD_FALHOU | <acao tomada> | RECUPERADO \| PENDENTE \| BLOQUEADO |
 
 _N/A se nenhuma falha ocorreu._
 
@@ -55,7 +55,7 @@ _N/A se nenhuma falha ocorreu._
 | # | Fase | Decisao | Motivo | Impacto |
 |---|---|---|---|---|
 | 1 | 3 | Execucao direta (sem agentes) | Mudanca de 1 arquivo, baixo risco | Nenhum agente lancado |
-| 2 | 4 | Execucao sem analise Antigravity | AGY indisponivel no preflight | Implementacao seguiu apenas com Codex |
+| 2 | 4 | Front-end roteado para AGY | AGY 3.5.4+ validado no preflight | Fluxo UI seguiu com antigravity-agent |
 
 _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 

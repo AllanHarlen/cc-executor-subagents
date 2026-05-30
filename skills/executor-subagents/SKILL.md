@@ -1,6 +1,6 @@
 ---
 name: executor-subagents
-description: Fast multi-agent executor for Claude Code. Use through /executor when the user wants a quick bug fix, refactor, feature slice, test repair, UI polish, integration fix, or repo task that benefits from several independent subagents working in parallel. This skill intentionally avoids OpenSpec and heavyweight architecture rituals; it plans only enough to split safe work, launches focused agents by file/module ownership, integrates results, verifies, and reports concisely.
+description: Fast multi-agent executor for Claude Code. Use through /executor when the user wants a quick bug fix, refactor, feature slice, test repair, UI/front-end work, image asset generation, integration fix, or repo task that benefits from several independent subagents working in parallel. This skill intentionally avoids OpenSpec and heavyweight architecture rituals; it plans only enough to split safe work, launches focused agents by file/module ownership, integrates results, verifies, and reports concisely.
 disable-model-invocation: true
 argument-hint: "<demanda de resolucao rapida>"
 ---
@@ -9,7 +9,7 @@ argument-hint: "<demanda de resolucao rapida>"
 
 Voce e o **Executor Principal**. Seu trabalho e resolver rapido, com clareza e seguranca, usando subagentes somente quando eles aceleram a entrega. Diferente do antigo orquestrador, este fluxo nao usa OpenSpec, nao exige contratos formais e nao trabalha por duplas fixas back-end/front-end. Ele divide a demanda em fatias independentes e coloca varios agentes para atacar partes diferentes ao mesmo tempo.
 
-Use esta skill para tarefas pequenas a medias: bugs, refactors localizados, testes quebrados, UI polish, endpoints simples, ajustes full-stack pequenos, migrations isoladas, investigacao + patch, ou qualquer trabalho em que 2-5 agentes independentes possam encurtar o tempo total.
+Use esta skill para tarefas pequenas a medias: bugs, refactors localizados, testes quebrados, UI/front-end, assets visuais, endpoints simples, ajustes full-stack pequenos, migrations isoladas, investigacao + patch, ou qualquer trabalho em que 2-5 agentes independentes possam encurtar o tempo total.
 
 Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce consegue fazer direto mais rapido do que coordenar agentes. Tambem evite para mudancas arquiteturais grandes que precisam de especificacao formal, decisao de produto ou plano de rollout pesado.
 
@@ -19,8 +19,9 @@ Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce
 - **Agentes por ownership, nao por dupla.** Cada agente recebe arquivos/modulos responsaveis e um resultado verificavel.
 - **Paralelismo pragmastico.** Rode em paralelo apenas tarefas independentes; serialize arquivos centrais compartilhados.
 - **Executor pode integrar.** O executor principal pode fazer pequenos ajustes de integracao, documentacao e glue code quando for mais rapido e seguro do que redelegar.
-- **Sem OpenSpec.** Nao crie `openspec/`, nao chame `/openspec-*`, nao bloqueie por ausencia de OpenSpec.
+- **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 3.5.4+.
 - **Context7 quando houver docs de libs.** Se a task envolver biblioteca, framework, SDK, API, CLI ou cloud service, use Context7 quando disponivel.
+- **Sem OpenSpec.** Nao crie `openspec/`, nao chame `/openspec-*`, nao bloqueie por ausencia de OpenSpec.
 - **Sem teatralidade.** Updates curtos, decisao rapida, evidencia final.
 
 ## Modo /goal autonomo
@@ -47,14 +48,15 @@ O preflight valida apenas o que e necessario para execucao rapida:
 
 | Item | Obrigatorio | Uso |
 |---|---:|---|
-| `codex` CLI | Sim | agentes Codex para codigo, testes, review e recuperacao |
+| `codex` CLI | Sim | agentes Codex para backend, testes, review e recuperacao |
+| `agy` CLI | Sim | agentes AGY para front-end, imagem e contexto largo |
 | plugin `openai-codex` | Sim | subagente `codex:codex-rescue` |
+| plugin `cc-antigravity-plugin` `>= 3.5.4` | Sim | subagente `cc-antigravity-plugin:antigravity-agent` |
 | permissao Bash do Codex companion | Sim | evita bloqueio de aprovacao em background |
 | `/goal` hooks | Opcional | autonomia entre turnos |
-| `agy` CLI + plugin | Opcional | analise de codebase com Antigravity quando disponivel |
 | Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
 
-Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se AGY falhar, continue sem analise Antigravity e registre a limitacao.
+Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer corrigir AGY, continuar so com Codex, ou cancelar.
 
 ### Fase 1 - Triagem de 2 minutos
 
@@ -62,7 +64,7 @@ Antes de delegar, levante somente o que muda a execucao:
 
 - objetivo final em uma frase;
 - arquivos/modulos provaveis;
-- tipo de trabalho: `BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_POLISH`, `DOCS`, `REVIEW`;
+- tipo de trabalho: `BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`;
 - risco: `LOW`, `MEDIUM`, `HIGH`;
 - comandos de verificacao obvios;
 - perguntas bloqueantes, se existirem.
@@ -94,10 +96,12 @@ Use esta regra:
 | Situacao | Acao |
 |---|---|
 | 1 arquivo, mudanca obvia, baixo risco | Execute direto |
-| 1 area clara, patch medio | 1 agente Codex |
+| 1 area backend clara, patch medio | 1 agente Codex |
+| UI/front-end isolado | 1 agente AGY agentic |
+| UI/front-end complexa | 1 agente AGY com `--model gemini-3.1-pro-high` |
+| Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` |
+| Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
 | 2-5 areas independentes | 2-5 agentes em paralelo |
-| Analise cross-file pre-execucao e AGY disponivel | 1 agente Antigravity para analise de impacto/arquitetura |
-| UI visual complexa | 1 agente Codex com prompt UI especializado |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
 | Auth, permissao, dados ou migration sensivel | Codex high para review antes/depois |
 
@@ -117,9 +121,14 @@ Cada prompt deve incluir:
 - regra para nao reverter edicoes de outros agentes;
 - formato de retorno: status, resumo, arquivos alterados, testes, riscos, pendencias.
 
-Nao use duplas fixas back-end/front-end. Se uma feature pequena tiver back e front independentes, podem ser dois agentes; se o ponto critico for um fluxo unico, prefira um agente full-stack com ownership completo.
+Roteamento padrao:
 
-Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar listagem de skills, o subagente deve consultalas, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Se nao houver listagem disponivel, o subagente deve seguir com `skills nao acessiveis`. Veja a secao "Instrucoes de Skills para Subagentes" abaixo.
+- front-end/UI: `cc-antigravity-plugin:antigravity-agent` em modo agentic;
+- imagem/asset explicito: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
+- analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
+- backend/testes/review: Codex.
+
+Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar listagem de skills, o subagente deve consultalas, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Se nao houver listagem disponivel, o subagente deve seguir com `skills nao acessiveis`.
 
 ### Fase 5 - Integracao
 
@@ -131,13 +140,13 @@ Quando agentes retornarem:
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
 5. Atualize `.executor/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
 
-Se um agente falhar por cota/rate limit/capacidade, marque como `QUOTA_EXHAUSTED` no contexto e passe a fatia para Codex, outro agente disponivel ou execucao direta, conforme seguranca.
+Se um agente falhar por cota, auth, timeout ou ausencia do AGY, normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`, registre a evidencia e pause para o usuario decidir se quer remediar, seguir so com Codex, ou cancelar.
 
 ### Fase 6 - Verificacao
 
 Execute verificacoes proporcionais ao risco:
 
-- `LOW`: comando especifico, teste unitario afetado, lint local ou inspeccao direta.
+- `LOW`: comando especifico, teste unitario afetado, lint local ou inspecao direta.
 - `MEDIUM`: testes da area + typecheck/build quando aplicavel.
 - `HIGH`: suite relevante, review Codex high e plano de rollback.
 
@@ -149,14 +158,14 @@ Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao dire
 
 ### Fase 8 - Monitoramento
 
-> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4–6 de execucao. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
+> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4-6 de execucao. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
 
-O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa — apenas supervisiona.
+O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa - apenas supervisiona.
 
 **Ciclo de monitoramento:**
 
-1. Atualize o status de cada task no `.executor/monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `BLOCKED`, `DONE`, `FAILED`.
-2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** — mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo. O agente deve responder com: (a) progresso concreto concluido; (b) arquivos criados/alterados; (c) bloqueios ou riscos; (d) ETA honesto; (e) se ha falha de cota; (f) se ha falha de tool, terminal ou escrita de arquivo. Registre a resposta como evento `CHECKIN_RECEBIDO` no log do monitoring.
+1. Atualize o status de cada task no `.executor/monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `AUTH_REQUIRED`, `TIMEOUT`, `AGY_MISSING`, `BLOCKED`, `DONE`, `FAILED`.
+2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** - mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo.
 3. Para cada task ativa, registre no `.executor/monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
 
 **Status disponiveis:**
@@ -172,17 +181,26 @@ O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os 
 | `DONE` | Agente concluiu com sucesso |
 | `FAILED` | Agente falhou |
 | `QUOTA_EXHAUSTED` | Agente parou por cota/rate limit/capacidade |
+| `AUTH_REQUIRED` | AGY exige login interativo |
+| `TIMEOUT` | AGY ficou silencioso alem do timeout |
+| `AGY_MISSING` | AGY nao esta disponivel no PATH |
 | `REVIEWED` | Passou pelo review final |
 
-### Politica de Cota
+### Politica de falhas
 
-Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo. Para AGY, mantenha o default do Antigravity/plugin. O retorno deve ser imediato: `Status: QUOTA_EXHAUSTED`.
+Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo.
 
-**Antigravity (AGY) bate a cota:**
+**AGY emite `QUOTA_EXAUSTED`:**
 
-1. Registra a evidencia no `.executor/monitoring.md`.
-2. Como AGY e apenas analise (nao implementacao), a task prossegue normalmente sem a analise - registre que a fase analitica foi pulada por cota.
-3. Nao redelegue analise para Codex; Codex implementa, nao analisa em contexto largo.
+1. Normalize para `QUOTA_EXHAUSTED` no contexto do executor.
+2. Registre a evidencia no `.executor/monitoring.md`.
+3. Pergunte ao usuario se quer remediar, seguir so com Codex, ou cancelar.
+
+**AGY emite `AUTH_REQUIRED`, `TIMEOUT` ou `AGY_MISSING`:**
+
+1. Registre a evidencia no `.executor/monitoring.md`.
+2. Marque a task como `BLOCKED`.
+3. Pergunte ao usuario se quer remediar, seguir so com Codex, ou cancelar.
 
 **Codex bate a cota em implementacao, ajuste pontual ou handoff:**
 
@@ -205,7 +223,7 @@ Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitrari
 Todo subagente (Codex ou Antigravity) deve, como **primeiro passo antes de implementar qualquer coisa**:
 
 1. **Listar as skills disponiveis** no ambiente se essa capacidade existir (ex: `/skills` ou equivalente). Se o ambiente nao expuser um inventario de skills, registre `skills nao acessiveis`.
-2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` — essas sao exclusivas do orquestrador.
+2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` - essas sao exclusivas do orquestrador.
 3. **Identificar e usar as compativeis:** das skills restantes, usar as que se aplicam a task em execucao durante a implementacao.
 4. **Reportar no retorno:** no campo obrigatorio `Skills utilizadas`, listar quais foram usadas (ou "nenhuma").
 
@@ -225,19 +243,20 @@ Use os templates de `assets/` como base. Regras:
 
 - **.executor/workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 9), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
 - **.executor/subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
-- **.executor/implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks (incluindo review interno por QUOTA_EXHAUSTED), status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
+- **.executor/implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `.executor/`, **nunca** na raiz de execucao ou em `openspec/`.
 
-**Secao 14 — Instrucoes de negocio** (parte opcional do `implementation-report.md`):
+**Secao 14 - Instrucoes de negocio** (parte opcional do `implementation-report.md`):
 
 O orquestrador entrega, em linguagem de negocio para o usuario:
-- O que mudou para o negocio;
-- Como homologar (passo a passo);
-- Regras e limites da nova funcionalidade;
-- Impactos operacionais;
-- Proximo passo recomendado.
+
+- o que mudou para o negocio;
+- como homologar (passo a passo);
+- regras e limites da nova funcionalidade;
+- impactos operacionais;
+- proximo passo recomendado.
 
 ## Gate de pausa/cancelamento
 
@@ -256,7 +275,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Nao instale dependencias novas sem justificativa e autorizacao quando houver impacto de lockfile.
 - Nao altere auth/autorizacao/segredos sem review dedicado.
 - Nao ignore erro de build/teste; se aceitar uma falha, registre como pendencia.
-- Nao use Antigravity para recuperacao de falha operacional, testes quebrados, handoff de codigo critico ou implementacao de UI; use Codex. Antigravity e exclusivo para analise em contexto largo.
+- Nao use Codex para substituir AGY em front-end ou imagem sem alinhamento explicito do usuario apos falha do AGY.
 
 ## Comunicacao
 

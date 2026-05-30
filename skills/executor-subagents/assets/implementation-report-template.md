@@ -11,7 +11,7 @@
 | Campo | Valor |
 |---|---|
 | Demanda | <objetivo em uma frase> |
-| Tipo de trabalho | BUG \| REFACTOR \| FEATURE_SLICE \| TEST_FIX \| UI_POLISH \| DOCS \| REVIEW |
+| Tipo de trabalho | BUG \| REFACTOR \| FEATURE_SLICE \| TEST_FIX \| UI_FRONTEND \| IMAGE_ASSET \| DOCS \| REVIEW |
 | Risco | LOW \| MEDIUM \| HIGH |
 | Modo de execucao | DIRETO \| 1-AGENTE \| MULTI-AGENTE |
 
@@ -24,7 +24,8 @@
 | codex CLI | OK \| FALHOU | <versao ou erro> |
 | openai-codex plugin | OK \| FALHOU | - |
 | Bash(node:*) | OK \| FALHOU | - |
-| agy CLI | OK \| AVISO \| N/A | - |
+| agy CLI | OK \| FALHOU | <versao ou erro> |
+| cc-antigravity-plugin >= 3.5.4 | OK \| FALHOU | <versao ou erro> |
 | Context7 MCP | OK \| AVISO \| N/A | - |
 | Auto-remediacao aplicada | Sim \| Nao | <descricao ou N/A> |
 
@@ -86,7 +87,7 @@ _Se nao executado, indique o comando que o usuario deve rodar e o motivo._
 
 | Agente | Tipo de falha | Acao aplicada | Resultado |
 |---|---|---|---|
-| <agente> | QUOTA_EXHAUSTED \| TIMEOUT \| ERRO | <acao> | RECUPERADO \| PENDENTE |
+| <agente> | QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING \| ERRO | <acao> | RECUPERADO \| PENDENTE |
 
 _N/A se nenhum fallback foi necessario. Inclui fallback de review interno por QUOTA_EXHAUSTED quando aplicavel._
 

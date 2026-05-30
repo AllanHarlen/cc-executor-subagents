@@ -19,6 +19,9 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 | `DONE` | Agente concluiu com sucesso |
 | `FAILED` | Agente falhou |
 | `QUOTA_EXHAUSTED` | Agente parou por cota/rate limit/capacidade |
+| `AUTH_REQUIRED` | AGY exige login interativo |
+| `TIMEOUT` | AGY ficou silencioso alem do timeout |
+| `AGY_MISSING` | AGY nao esta disponivel no PATH |
 | `REVIEWED` | Passou pelo review final |
 
 ---
@@ -28,7 +31,7 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 | ID | Slice | Agente/Modelo | Status | Ownership | Ultima atualizacao |
 |---|---|---|---|---|---|
 | A | <slice> | codex gpt-5.4 medium | PENDING | <arquivos> | <HH:MM> |
-| B | <slice> | agy default | RUNNING | <arquivos> | <HH:MM> |
+| B | <slice> | agy gemini-3.5-flash-medium | RUNNING | <arquivos> | <HH:MM> |
 
 ---
 
@@ -38,7 +41,7 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 
 | Campo | Valor |
 |---|---|
-| Categoria | BUG \| FEATURE_SLICE \| REFACTOR \| TEST_FIX \| UI_POLISH \| REVIEW |
+| Categoria | BUG \| FEATURE_SLICE \| REFACTOR \| TEST_FIX \| UI_FRONTEND \| IMAGE_ASSET \| REVIEW |
 | Contrato exigido (`contractRequired`) | sim \| nao |
 | Agentes responsaveis | A |
 | Wire format validado | sim \| nao \| pendente |
@@ -60,7 +63,10 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 | <HH:MM> | DELEGADO | agente A lancado com ownership: <arquivos> |
 | <HH:MM> | SLOW_CHECKIN | sem resposta apos <n> min; checkin enviado |
 | <HH:MM> | CHECKIN_RECEBIDO | progresso: <resumo>; ETA: <n> min |
-| <HH:MM> | QUOTA_EXHAUSTED | evidencia: <mensagem do agente>; acao: <fallback> |
+| <HH:MM> | QUOTA_EXHAUSTED | evidencia: sinal bruto `QUOTA_EXAUSTED`; acao: <fallback> |
+| <HH:MM> | AUTH_REQUIRED | evidencia: agy pediu login; acao: <remediacao> |
+| <HH:MM> | TIMEOUT | evidencia: silencio alem do timeout; acao: <remediacao> |
+| <HH:MM> | AGY_MISSING | evidencia: binario ausente; acao: <remediacao> |
 | <HH:MM> | DONE | arquivos alterados: <lista> |
 
 ### Task B — <nome da slice>

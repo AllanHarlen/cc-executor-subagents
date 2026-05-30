@@ -4,11 +4,12 @@
  *
  * Required:
  * - codex CLI
+ * - agy CLI
  * - openai-codex Claude Code plugin
+ * - cc-antigravity-plugin >= 3.5.4
  * - Bash permission for the Codex companion
  *
  * Optional:
- * - agy CLI and cc-antigravity-plugin
  * - /goal hook compatibility
  * - Context7 MCP
  */
@@ -21,6 +22,24 @@ import { join } from "node:path";
 const HOME = homedir();
 const PLUGINS_CACHE = join(HOME, ".claude", "plugins", "cache");
 const PROJECT_CLAUDE_DIR = join(process.cwd(), ".claude");
+const MIN_ANTIGRAVITY_PLUGIN_VERSION = "3.5.4";
+const REQUIRED_AGY_FLAGS = [
+  "--print",
+  "--add-dir",
+  "--dangerously-skip-permissions",
+  "--print-timeout",
+  "--prompt-interactive",
+];
+const REQUIRED_BRIDGE_FLAGS = [
+  "--read-only",
+  "--model",
+  "--generate-imagem",
+  "--generate-image",
+  "--timeout",
+  "--continue",
+  "--conversation",
+  "--print-command",
+];
 
 function checkCli(cli) {
   try {
@@ -46,8 +65,110 @@ function checkPlugin(marketplace, pluginName) {
   }
 
   if (versions.length === 0) return { ok: false, error: `no versions installed in ${dir}` };
-  versions.sort();
-  return { ok: true, version: versions[versions.length - 1], path: dir };
+  versions.sort(compareVersions);
+  const version = versions[versions.length - 1];
+  return {
+    ok: true,
+    version,
+    path: dir,
+    versionPath: join(dir, version),
+  };
+}
+
+function compareVersions(a, b) {
+  const aParts = String(a).split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const bParts = String(b).split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const max = Math.max(aParts.length, bParts.length);
+  for (let index = 0; index < max; index += 1) {
+    const delta = (aParts[index] ?? 0) - (bParts[index] ?? 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
+function checkAgyHelp() {
+  try {
+    const out = execSync("agy --help 2>&1", {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 10_000,
+    }).toString();
+    const missingFlags = REQUIRED_AGY_FLAGS.filter((flag) => !out.includes(flag));
+    return {
+      ok: missingFlags.length === 0,
+      flags: REQUIRED_AGY_FLAGS,
+      missingFlags,
+      error:
+        missingFlags.length > 0
+          ? `agy --help is missing required flags: ${missingFlags.join(", ")}`
+          : null,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      flags: REQUIRED_AGY_FLAGS,
+      missingFlags: REQUIRED_AGY_FLAGS,
+      error: err.message?.split(/\r?\n/)[0] ?? "failed to inspect agy --help",
+    };
+  }
+}
+
+function checkAntigravityBridge() {
+  const plugin = checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin");
+  if (!plugin.ok) {
+    return {
+      ok: false,
+      error: plugin.error,
+    };
+  }
+
+  if (compareVersions(plugin.version, MIN_ANTIGRAVITY_PLUGIN_VERSION) < 0) {
+    return {
+      ok: false,
+      version: plugin.version,
+      minVersion: MIN_ANTIGRAVITY_PLUGIN_VERSION,
+      error: `cc-antigravity-plugin ${plugin.version} is below required ${MIN_ANTIGRAVITY_PLUGIN_VERSION}`,
+    };
+  }
+
+  const bridgePath = join(plugin.versionPath, "scripts", "antigravity-bridge.js");
+  if (!existsSync(bridgePath)) {
+    return {
+      ok: false,
+      version: plugin.version,
+      bridgePath,
+      error: `missing bridge script at ${bridgePath}`,
+    };
+  }
+
+  try {
+    const out = execSync(`node "${bridgePath}" --help`, {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 10_000,
+    }).toString();
+    const missingFlags = REQUIRED_BRIDGE_FLAGS.filter((flag) => !out.includes(flag));
+    return {
+      ok: missingFlags.length === 0,
+      version: plugin.version,
+      minVersion: MIN_ANTIGRAVITY_PLUGIN_VERSION,
+      bridgePath,
+      flags: REQUIRED_BRIDGE_FLAGS,
+      missingFlags,
+      error:
+        missingFlags.length > 0
+          ? `bridge help is missing required flags: ${missingFlags.join(", ")}`
+          : null,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      version: plugin.version,
+      minVersion: MIN_ANTIGRAVITY_PLUGIN_VERSION,
+      bridgePath,
+      flags: REQUIRED_BRIDGE_FLAGS,
+      missingFlags: REQUIRED_BRIDGE_FLAGS,
+      error: err.message?.split(/\r?\n/)[0] ?? "failed to inspect antigravity bridge",
+    };
+  }
 }
 
 function checkCodexCompanionBashPermission() {
@@ -195,21 +316,21 @@ const checks = {
   required: {
     cli: {
       codex: checkCli("codex"),
+      agy: checkCli("agy"),
     },
     plugins: {
       "openai-codex": checkPlugin("openai-codex", "codex"),
+      "cc-antigravity-plugin": checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin"),
     },
     permissions: {
       "codex-companion-bash": checkCodexCompanionBashPermission(),
     },
+    capabilities: {
+      "agy-help": checkAgyHelp(),
+      "cc-antigravity-bridge": checkAntigravityBridge(),
+    },
   },
   optional: {
-    cli: {
-      agy: checkCli("agy"),
-    },
-    plugins: {
-      "cc-antigravity-plugin": checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin"),
-    },
     permissions: {
       "goal-hooks-enabled": checkGoalHookSettings(),
     },
@@ -260,6 +381,18 @@ function remediationFor(f) {
         ],
         docs: "https://github.com/openai/codex",
       };
+    case "cli:agy":
+      return {
+        target: "agy-cli",
+        steps: [
+          "Install Antigravity CLI:",
+          "  macOS/Linux: curl -fsSL https://antigravity.google/cli/install.sh | bash",
+          "  Windows: irm https://antigravity.google/cli/install.ps1 | iex",
+          "Authenticate once in an interactive terminal:",
+          "  agy",
+        ],
+        docs: "https://antigravity.google/docs/cli-using",
+      };
     case "plugins:openai-codex":
       return {
         target: "Claude Code plugin: openai-codex",
@@ -270,6 +403,17 @@ function remediationFor(f) {
         ],
         docs: "https://github.com/openai/codex-plugin-cc",
       };
+    case "plugins:cc-antigravity-plugin":
+      return {
+        target: "Claude Code plugin: cc-antigravity-plugin",
+        steps: [
+          "Inside Claude Code:",
+          "  /plugin marketplace add AllanHarlen/cc-antigravity-plugin",
+          "  /plugin install cc-antigravity-plugin@cc-antigravity-plugin",
+          "  /reload-plugins",
+        ],
+        docs: "https://github.com/AllanHarlen/cc-antigravity-plugin",
+      };
     case "permissions:codex-companion-bash":
       return {
         target: "Claude Code permission: codex-companion via Bash",
@@ -279,6 +423,28 @@ function remediationFor(f) {
           "Reload Claude Code before running /executor again.",
         ],
         docs: "https://docs.anthropic.com/en/docs/claude-code/settings",
+      };
+    case "capabilities:agy-help":
+      return {
+        target: "agy CLI capability set",
+        steps: [
+          "Update Antigravity CLI to a current version:",
+          "  agy update",
+          "Confirm the required flags are available in `agy --help`.",
+        ],
+        docs: "https://antigravity.google/docs/cli-using",
+      };
+    case "capabilities:cc-antigravity-bridge":
+      return {
+        target: "cc-antigravity-plugin bridge compatibility",
+        steps: [
+          `Install or update cc-antigravity-plugin to at least ${MIN_ANTIGRAVITY_PLUGIN_VERSION}:`,
+          "  /plugin marketplace add AllanHarlen/cc-antigravity-plugin",
+          "  /plugin install cc-antigravity-plugin@cc-antigravity-plugin",
+          "  /reload-plugins",
+          "Confirm the bridge help exposes the required flags.",
+        ],
+        docs: "https://github.com/AllanHarlen/cc-antigravity-plugin",
       };
     default:
       return {

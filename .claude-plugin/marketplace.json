@@ -1,7 +1,7 @@
 {
     "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
     "name": "cc-executor-subagents",
-    "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, delegates to Codex with optional Antigravity (AGY) analysis when useful, integrates patches, verifies, and reports without OpenSpec ceremony.",
+    "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, uses AGY 3.5.4+ as the required front-end and large-context agent, keeps Codex for backend, tests, and review, and reports without OpenSpec ceremony.",
     "owner": {
         "name": "allanharlen",
         "email": "allanharlen@gmail.com"
@@ -13,8 +13,8 @@
     "plugins": [
         {
             "name": "cc-executor-subagents",
-            "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a light preflight, splits work by ownership, launches independent Codex agents with optional Antigravity (AGY) analysis, integrates results and verifies without OpenSpec ceremony.",
-            "version": "0.2.1",
+            "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a light preflight, routes front-end and image work to AGY, keeps Codex on backend, tests, and review, then integrates and verifies without OpenSpec ceremony.",
+            "version": "0.3.0",
             "author": {
                 "name": "allanharlen"
             },
@@ -27,6 +27,8 @@
                 "codex",
                 "antigravity",
                 "agy",
+                "frontend",
+                "agentic-ui",
                 "fast-fix",
                 "parallel-execution",
                 "workflow",

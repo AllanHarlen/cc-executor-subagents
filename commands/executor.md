@@ -1,5 +1,5 @@
 ---
-description: Executar uma resolucao rapida multiagente sem OpenSpec, dividindo a demanda em fatias independentes, delegando para Codex com analise opcional via Antigravity (AGY), integrando e verificando.
+description: Executar uma resolucao rapida multiagente sem OpenSpec, dividindo a demanda em fatias independentes, roteando front-end e imagem para AGY e backend/testes/review para Codex, integrando e verificando.
 argument-hint: "<demanda de resolucao rapida>"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Agent, TaskCreate, TaskUpdate, TaskList, Skill
 ---
@@ -37,9 +37,15 @@ Depois encerre.
    node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
    ```
 
-2. Se `status: "failed"`, cancele e mostre `remediation`.
+2. Se `status: "failed"` e a falha envolver Codex obrigatorio, cancele e mostre `remediation`.
 
-3. Carregue a skill:
+3. Se `status: "failed"` e somente AGY ou o `cc-antigravity-plugin` falharem, mostre `remediation` e pergunte ao usuario se quer:
+
+   - corrigir AGY e tentar de novo;
+   - continuar so com Codex;
+   - cancelar.
+
+4. Carregue a skill:
 
    ```text
    Skill(skill="cc-executor-subagents:executor-subagents")
@@ -47,21 +53,28 @@ Depois encerre.
 
    Se a tool de Skill recusar por `disable-model-invocation: true`, leia `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/SKILL.md` e siga diretamente.
 
-4. Faca triagem curta da demanda.
+5. Faca triagem curta da demanda.
 
-5. Decida:
+6. Decida:
 
    - executar direto;
    - usar 1 agente;
    - usar multiplos agentes independentes.
 
-6. Se usar 2+ agentes, crie `.executor/execution-brief.md` e mantenha `.executor/monitoring.md` como fonte viva de eventos (Fase 8): status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase.
+7. Roteie por padrao:
 
-7. Delegue em paralelo por ownership, nao por dupla fixa.
+   - front-end/UI: `cc-antigravity-plugin:antigravity-agent`;
+   - imagem explicita: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
+   - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
+   - backend/testes/review: Codex.
 
-8. Integre, rode verificacoes e feche.
+8. Se usar 2+ agentes, crie `.executor/execution-brief.md` e mantenha `.executor/monitoring.md` como fonte viva de eventos (Fase 8): status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase.
 
-9. **Fase 9 — Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH ou rastreabilidade solicitada, gere em `.executor/`:
+9. Delegue em paralelo por ownership, nao por dupla fixa.
+
+10. Integre, rode verificacoes e feche.
+
+11. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH ou rastreabilidade solicitada, gere em `.executor/`:
 
    ```text
    .executor/workflow-log.md
@@ -87,9 +100,9 @@ Se a demanda for uma edicao trivial que voce consegue fazer em menos tempo do qu
 
 Use updates curtos:
 
-- "preflight OK; AGY opcional indisponivel, prosseguindo sem analise cross-file";
+- "preflight OK; AGY 3.5.4+ validado para front-end e analise";
 - "vou dividir em 3 slices independentes";
-- "lancei 3 agentes em paralelo; ownership: testes, service, UI";
+- "lancei 3 agentes em paralelo; ownership: testes, service, front-end";
 - "verificacao passou/falhou; estou integrando o ajuste final".
 
 No fim, entregue resumo conciso com arquivos, verificacoes e riscos.

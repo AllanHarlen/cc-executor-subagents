@@ -8,8 +8,8 @@ O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor pratico
 - sem contratos longos por padrao;
 - sem duplas fixas back-end/front-end;
 - com slices independentes por ownership;
-- com Codex como executor principal de codigo;
-- com Antigravity (AGY) opcional para analise cross-file;
+- com Codex como executor principal de backend, testes e review;
+- com Antigravity (AGY) obrigatorio para front-end/UI, imagem e contexto largo;
 - com verificacao e reporte enxutos.
 
 ## Quando usar
@@ -19,7 +19,8 @@ Use `/executor` para:
 - corrigir bugs;
 - refatorar uma area localizada;
 - reparar testes;
-- fazer UI polish;
+- implementar ou ajustar front-end/UI;
+- gerar mockups, banners, logos ou outros assets visuais;
 - implementar uma feature slice pequena;
 - ajustar endpoints/servicos/telas com escopo curto;
 - investigar causa raiz enquanto outro agente prepara patch;
@@ -34,11 +35,19 @@ Fluxo resumido:
 1. preflight leve;
 2. triagem rapida da demanda;
 3. decisao entre execucao direta, 1 agente ou varios agentes;
-4. split por ownership de arquivos/modulos;
-5. agentes independentes em paralelo;
-6. integracao pelo executor principal;
-7. verificacoes proporcionais ao risco;
-8. resumo final.
+4. roteamento por tipo de trabalho;
+5. split por ownership de arquivos/modulos;
+6. agentes independentes em paralelo;
+7. integracao pelo executor principal;
+8. verificacoes proporcionais ao risco;
+9. resumo final.
+
+Roteamento padrao:
+
+- front-end/UI: AGY em modo agentic;
+- imagem/asset explicito: AGY com `--generate-imagem`;
+- analise cross-file: AGY com `--read-only`;
+- backend, testes e review: Codex.
 
 Artefatos opcionais ficam em `.executor/`:
 
@@ -61,14 +70,15 @@ Obrigatorios:
 |---|---|
 | Node.js | `node --version` |
 | Codex CLI | `codex --version` |
+| Antigravity CLI (`agy`) | `agy --version` |
 | plugin `openai-codex` | instalado no Claude Code |
+| plugin `cc-antigravity-plugin` `>= 3.5.4` | instalado no Claude Code |
 | permissao `Bash(node:*)` | `.claude/settings.json` |
 
 Opcionais:
 
 | Item | Uso |
 |---|---|
-| Antigravity CLI (`agy`) + `cc-antigravity-plugin` | Analise de codebase em contexto largo |
 | Context7 MCP | docs atuais de libs/frameworks/APIs |
 | `/goal` hooks | autonomia entre turnos |
 
@@ -98,7 +108,7 @@ Permissao minima no projeto alvo:
 }
 ```
 
-Antigravity (AGY) opcional:
+Instalar Antigravity (AGY):
 
 ```bash
 curl -fsSL https://antigravity.google/cli/install.sh | bash
@@ -115,7 +125,15 @@ Autenticacao: abra `agy` interativamente e faca login.
 ```text
 /plugin marketplace add AllanHarlen/cc-antigravity-plugin
 /plugin install cc-antigravity-plugin@cc-antigravity-plugin
+/reload-plugins
 ```
+
+O preflight tambem valida:
+
+- `agy --help` com `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout` e `--prompt-interactive`;
+- o bridge do `cc-antigravity-plugin` com `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--timeout`, `--continue`, `--conversation` e `--print-command`.
+
+Se Codex falhar no preflight, o `/executor` cancela. Se somente AGY falhar, o executor mostra a remediacao e pede decisao: corrigir AGY, continuar so com Codex, ou cancelar.
 
 ## Instalacao
 
@@ -152,6 +170,26 @@ Validar:
 ```text
 /executor deixe a tela de onboarding responsiva e corrija os estados de loading/empty/error
 ```
+
+```text
+/executor crie um mockup de hero e salve o asset em assets/onboarding usando AGY --generate-imagem
+```
+
+```text
+/executor analise o impacto de refatorar o modulo auth antes de mexer no backend
+```
+
+## Como o executor decide
+
+Casos comuns:
+
+- bug ou patch backend localizado: Codex
+- testes quebrados e glue code: Codex
+- review de risco: Codex high
+- front-end/UI do dia a dia: AGY `gemini-3.5-flash-medium`
+- front-end/UI complexa: AGY `gemini-3.1-pro-high`
+- analise de arquitetura ou impacto: AGY `--read-only`
+- asset visual explicito: AGY `--generate-imagem`
 
 ## Modo autonomo
 
@@ -198,5 +236,7 @@ cc-executor-subagents/
 - **Ownership claro.** Cada agente sabe o que pode e o que nao pode editar.
 - **Paralelismo seletivo.** Use varios agentes quando houver fatias independentes.
 - **Executor integra.** Pequenos ajustes de glue podem ser feitos diretamente.
+- **Front-end com AGY.** UI e assets visuais seguem pelo `cc-antigravity-plugin`.
+- **Fallback explicito.** Falha de AGY nao vira fallback silencioso; o executor pede decisao ao usuario.
 - **Verificacao proporcional.** Teste o suficiente para o risco da mudanca.
 - **Sem OpenSpec.** Este plugin nao depende de OpenSpec.

@@ -18,24 +18,25 @@ node skills/executor-subagents/scripts/preflight.mjs
 
 | Item | Por que importa |
 |---|---|
-| `codex` CLI | executa agentes de codigo, teste e review |
+| `codex` CLI | executa agentes de backend, testes e review |
+| `agy` CLI | executa agentes de front-end, imagem e analise em contexto largo |
 | plugin `openai-codex` | expoe `codex:codex-rescue` |
+| plugin `cc-antigravity-plugin` `>= 3.5.4` | expoe `cc-antigravity-plugin:antigravity-agent` e o bridge com flags atuais |
 | permissao Bash para Codex companion | evita aprovacoes no meio de agentes em background |
+| `agy --help` com flags essenciais | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
+| bridge do AGY com flags atuais | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
 
-Se qualquer item obrigatorio falhar, cancele e mostre `remediation`.
+Falha de Codex continua bloqueando direto. Falha somente de AGY deve pausar o fluxo e pedir decisao do usuario: remediar, continuar so com Codex, ou cancelar.
 
 ## Opcional
 
 | Item | Uso |
 |---|---|
-| `agy` CLI | analise de codebase com Antigravity |
-| plugin `cc-antigravity-plugin` | expoe `cc-antigravity-plugin:antigravity-agent` |
 | `/goal` hooks | autonomia entre turnos |
 | Context7 MCP | docs atuais para libs/frameworks/APIs |
 
 Falha em item opcional nao cancela. Apenas ajuste a estrategia:
 
-- sem AGY: prossiga sem analise cross-file;
 - sem `/goal`: trabalhe no turno atual e entregue comando de retomada;
 - sem Context7: siga padroes locais e registre limitacao quando docs atuais importarem.
 
@@ -54,7 +55,7 @@ Falha em item opcional nao cancela. Apenas ajuste a estrategia:
 }
 ```
 
-`status` e `failed` consideram somente itens obrigatorios. `warnings` lista opcionais ausentes.
+`status` e `failed` consideram os itens obrigatorios. `warnings` lista apenas opcionais ausentes.
 
 ## Remediacao comum
 
@@ -86,7 +87,7 @@ No projeto alvo:
 }
 ```
 
-### Antigravity (AGY) opcional
+### Antigravity (AGY)
 
 **macOS/Linux:**
 
@@ -105,6 +106,7 @@ irm https://antigravity.google/cli/install.ps1 | iex
 ```text
 /plugin marketplace add AllanHarlen/cc-antigravity-plugin
 /plugin install cc-antigravity-plugin@cc-antigravity-plugin
+/reload-plugins
 ```
 
 ### Context7 opcional
@@ -115,4 +117,4 @@ npx ctx7 setup --claude
 
 ## Politica
 
-Nao faca fallback silencioso se Codex obrigatorio falhar. Para AGY e Context7, continue normalmente e diga qual rota sera usada.
+Nao faca fallback silencioso se Codex obrigatorio falhar. Para AGY, exponha a falha, mostre a remediacao e peca uma decisao explicita antes de seguir so com Codex.

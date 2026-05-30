@@ -10,7 +10,12 @@ Rode:
 node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
 ```
 
-Se `codex` ou o plugin `openai-codex` falharem, cancele. Sem Codex, o executor perde a capacidade principal de paralelizar codigo. Antigravity (AGY), `/goal` e Context7 sao opcionais.
+Se `codex`, `agy`, o plugin `openai-codex` ou o `cc-antigravity-plugin` falharem, nao siga no piloto automatico:
+
+- falha de Codex: cancele com remediacao;
+- falha somente de AGY: pause e pergunte se o usuario quer remediar, continuar so com Codex, ou cancelar.
+
+Context7 e `/goal` continuam opcionais.
 
 ## Fase 1 - Triagem
 
@@ -31,11 +36,11 @@ Para tarefas com 2+ agentes, crie `.executor/execution-brief.md` usando `assets/
 
 O plano deve responder:
 
-- Quais slices existem?
-- Quem possui quais arquivos/modulos?
-- O que nao pode ser tocado?
-- Qual ordem ou wave?
-- Como vamos verificar?
+- quais slices existem;
+- quem possui quais arquivos/modulos;
+- o que nao pode ser tocado;
+- qual ordem ou wave;
+- como vamos verificar.
 
 Nao transforme isso em documento de arquitetura. Uma tela basta.
 
@@ -74,7 +79,12 @@ Cada agente precisa receber:
 - instrucao para nao reverter trabalho alheio;
 - formato de retorno.
 
-Lance agentes independentes em paralelo. Nao crie duplas fixas por padrao. Uma task full-stack pequena pode ser melhor com um unico agente full-stack; duas areas independentes podem ser dois agentes.
+Roteamento padrao:
+
+- front-end/UI: AGY agentic;
+- imagem/asset explicito: AGY `--generate-imagem`;
+- analise pura: AGY `--read-only`;
+- backend, testes, integracao e review: Codex.
 
 ## Fase 5 - Monitoramento leve
 
@@ -88,9 +98,12 @@ Status sugeridos:
 - `BLOCKED`
 - `FAILED`
 - `QUOTA_EXHAUSTED`
+- `AUTH_REQUIRED`
+- `TIMEOUT`
+- `AGY_MISSING`
 - `NEEDS_SYNC`
 
-Use check-in apenas quando uma task bloquear a wave ou parecer parada por tempo desproporcional.
+Normalize `QUOTA_EXAUSTED` do bridge para `QUOTA_EXHAUSTED` no contexto do executor.
 
 ## Fase 6 - Integracao
 
@@ -102,7 +115,7 @@ Ao receber retornos:
 4. Corrija glue pequeno diretamente se for seguro.
 5. Redelegue correcoes grandes ou arriscadas.
 
-Se houver conflito entre agentes, escolha a convencao do projeto, registre a decisao e aplique um ajuste unico. Evite ping-pong.
+Se houver falha de AGY em task obrigatoria, pause para alinhamento com o usuario antes de fallback para Codex.
 
 ## Fase 7 - Review e verificacao
 

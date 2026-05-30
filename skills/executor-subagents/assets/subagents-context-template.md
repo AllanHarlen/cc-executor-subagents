@@ -18,7 +18,7 @@
 |---|---|---|---|
 | <HH:MM> | A | LANCADO | slice: <slice>, modelo: <modelo> |
 | <HH:MM> | A | CONCLUIDO | arquivos: <lista> |
-| <HH:MM> | B | QUOTA_EXHAUSTED | fatia redelegada para Codex |
+| <HH:MM> | B | QUOTA_EXHAUSTED | sinal bruto `QUOTA_EXAUSTED`; fatia pausada para decisao do usuario |
 
 ---
 
@@ -29,8 +29,8 @@
 | Campo | Valor |
 |---|---|
 | Task | <descricao da slice> |
-| Modelo | <codex gpt-5.4 medium \| codex gpt-5.5 high \| agy default> |
-| Status | DONE \| FALHOU \| QUOTA_EXHAUSTED \| PENDENTE |
+| Modelo | <codex gpt-5.4 medium \| codex gpt-5.5 high \| agy gemini-3.5-flash-medium \| agy gemini-3.1-pro-high \| agy --generate-imagem> |
+| Status | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING \| PENDENTE |
 | Tokens (in/out/cache/total) | N/A |
 | Arquivos alterados | <lista> |
 | Arquivos fora de ownership | Nenhum \| <lista com flag de violacao> |
@@ -45,7 +45,7 @@
 |---|---|
 | Task | <descricao da slice> |
 | Modelo | <modelo> |
-| Status | DONE \| FALHOU \| QUOTA_EXHAUSTED \| PENDENTE |
+| Status | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING \| PENDENTE |
 | Tokens (in/out/cache/total) | N/A |
 | Arquivos alterados | <lista> |
 | Arquivos fora de ownership | Nenhum |
