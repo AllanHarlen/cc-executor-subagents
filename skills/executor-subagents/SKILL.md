@@ -38,6 +38,10 @@ Sob `/goal`, nao devolva controle so porque uma etapa acabou. Continue ate haver
 
 ### Fase 0 - Preflight leve
 
+**Verificar checkpoint antes de tudo:**
+
+Se `.executor/checkpoint.json` existir, leia-o. Se `status` for `RUNNING` e `fase_atual >= 1`, pergunte ao usuario se quer retomar da fase `fase_atual` ou reiniciar do zero. Em caso de retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes` e `arquivos_alterados` do checkpoint. Em caso de reinicio, apague o checkpoint e siga normalmente.
+
 Execute:
 
 ```bash
@@ -56,7 +60,9 @@ O preflight valida apenas o que e necessario para execucao rapida:
 | `/goal` hooks | Opcional | autonomia entre turnos |
 | Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
 
-Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer corrigir AGY, continuar so com Codex, ou cancelar.
+Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
+
+Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp`.
 
 ### Fase 1 - Triagem de 2 minutos
 
@@ -87,6 +93,16 @@ Use `assets/plan-template.md` como base. O plano deve caber em uma tela e conter
 - comandos de verificacao;
 - risco e rollback simples.
 
+**Contrato de interface (obrigatorio para full-stack):**
+
+Se a task envolver dois ou mais agentes onde um produz dados/API consumidos pelo outro (ex: Codex no backend + AGY no front-end), crie `.executor/interface-contract.md` antes de delegar. Use o template de `references/contracts.md`. O contrato deve caber em uma tela. Inclua o caminho do contrato no campo `interface_contract: true` do checkpoint.
+
+Todos os agentes afetados recebem o contrato no prompt e ficam proibidos de alterar os campos acordados unilateralmente. Se um agente precisar mudar o contrato, ele deve registrar a divergencia e pausar para o executor decidir antes de seguir.
+
+Nao crie o contrato se a task for puramente visual, teste-only, docs-only, ou consumir API ja existente sem mudar shape.
+
+**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `slices`, `waves`, `tipo_trabalho`, `risco` e `interface_contract`.
+
 Nao crie artefatos formais se a demanda couber em execucao direta ou em um unico agente.
 
 ### Fase 3 - Decidir execucao direta vs agentes
@@ -102,7 +118,7 @@ Use esta regra:
 | Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY com `--parallel`; adicione `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
 | Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` |
 | Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
-| 2-5 areas independentes de dominios diferentes (AGY + Codex) | 2-5 agentes em paralelo (waves na camada Claude) |
+| N areas independentes de dominios diferentes (AGY + Codex) | N agentes em paralelo (waves na camada Claude); sem limite fixo — o criterio e ownership disjunto |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
 | Auth, permissao, dados ou migration sensivel | Codex high para review antes/depois |
 
@@ -134,6 +150,8 @@ Roteamento padrao:
 
 Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar listagem de skills, o subagente deve consultalas, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Se nao houver listagem disponivel, o subagente deve seguir com `skills nao acessiveis`.
 
+**Checkpoint apos Fase 4:** atualize `.executor/checkpoint.json` com `fase_atual: 4` e o status inicial de cada agente em `agentes`.
+
 ### Fase 5 - Integracao
 
 Quando agentes retornarem:
@@ -144,7 +162,9 @@ Quando agentes retornarem:
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
 5. Atualize `.executor/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
 
-Se um agente falhar por cota, auth, timeout ou ausencia do AGY, normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`, registre a evidencia e pause para o usuario decidir se quer remediar, seguir so com Codex, ou cancelar.
+Se um agente falhar por cota, auth, timeout ou ausencia do AGY, normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`, registre a evidencia e aplique o fallback gradual (ver "Politica de falhas" abaixo) antes de pausar para o usuario.
+
+**Checkpoint apos Fase 5:** atualize `.executor/checkpoint.json` com `fase_atual: 5`, `arquivos_alterados` e `fallbacks_acionados`.
 
 ### Fase 6 - Verificacao
 
@@ -194,25 +214,54 @@ O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os 
 
 Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitraria de modelo.
 
+#### Fallback gradual de modelo
+
+Antes de pausar para o usuario, aplique automaticamente a escada de fallback abaixo. Registre cada degrau acionado em `fallbacks_acionados` no checkpoint e no `.executor/monitoring.md`. Informe o usuario no resumo final qual modelo foi realmente usado.
+
+**Escada AGY:**
+
+```
+AGY gemini-3.1-pro-high
+  → AGY gemini-3.5-flash-medium  (retry automatico, sem perguntar)
+  → Executor (Claude) direto     (se flash-medium tambem falhar)
+```
+
+**Escada Codex:**
+
+```
+Codex gpt-5.5-codex high
+  → Codex gpt-5.4-codex medium  (retry automatico, sem perguntar)
+  → Executor (Claude) direto     (se medium tambem falhar em implementacao)
+```
+
+O executor (Claude) assume a task diretamente quando todos os degraus acima falharem: le os arquivos, implementa, verifica e reporta. Registre como `FALLBACK_EXECUTOR` no monitoring e no subagents-context.
+
+**Quando pausar para o usuario (nao usar fallback automatico):**
+
+- Falha e em auth/autorizacao, dados criticos, migration destrutiva ou segredo.
+- O usuario pediu modelo especifico explicitamente.
+- O executor direto nao tem contexto suficiente para a task (ex: task de imagem sem AGY).
+
+---
+
 **AGY emite `QUOTA_EXAUSTED`:**
 
 1. Normalize para `QUOTA_EXHAUSTED` no contexto do executor.
 2. Registre a evidencia no `.executor/monitoring.md`.
-3. Pergunte ao usuario se quer remediar, seguir so com Codex, ou cancelar.
+3. Aplique a escada AGY: tente `flash-medium`; se falhar, executor direto.
+4. Se a task for de imagem/asset e o executor nao puder substituir, pergunte ao usuario se quer remediar, pular o asset, ou cancelar.
 
 **AGY emite `AUTH_REQUIRED`, `TIMEOUT` ou `AGY_MISSING`:**
 
 1. Registre a evidencia no `.executor/monitoring.md`.
-2. Marque a task como `BLOCKED`.
-3. Pergunte ao usuario se quer remediar, seguir so com Codex, ou cancelar.
+2. Aplique a escada AGY: tente proximo degrau disponivel.
+3. Se `AGY_MISSING` e nao ha degrau disponivel: marque como `BLOCKED` e pergunte ao usuario se quer instalar AGY, deixar o executor assumir, ou cancelar.
 
 **Codex bate a cota em implementacao, ajuste pontual ou handoff:**
 
-1. Nao tenta trocar o modelo/effort fixo.
-2. Nao tenta retries longos.
-3. Marca a task como `BLOCKED`.
-4. Registra a evidencia no `.executor/monitoring.md`.
-5. Usa `AskUserQuestion` para pedir decisao ao usuario.
+1. Aplique a escada Codex: tente proximo degrau.
+2. Se todos os degraus falharem, o executor assume diretamente.
+3. Registra como `FALLBACK_EXECUTOR` no `.executor/monitoring.md`.
 
 **Codex bate a cota em revisao:**
 
@@ -252,6 +301,8 @@ Use os templates de `assets/` como base. Regras:
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `.executor/`, **nunca** na raiz de execucao ou em `openspec/`.
 
+**Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9` e `status: "DONE"`. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` sem criar o arquivo se ele nao existia.
+
 **Secao 14 - Instrucoes de negocio** (parte opcional do `implementation-report.md`):
 
 O orquestrador entrega, em linguagem de negocio para o usuario:
@@ -279,7 +330,8 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Nao instale dependencias novas sem justificativa e autorizacao quando houver impacto de lockfile.
 - Nao altere auth/autorizacao/segredos sem review dedicado.
 - Nao ignore erro de build/teste; se aceitar uma falha, registre como pendencia.
-- Nao use Codex para substituir AGY em front-end ou imagem sem alinhamento explicito do usuario apos falha do AGY.
+- Para front-end/UI: aplique a escada de fallback (AGY pro-high → AGY flash-medium → executor direto) antes de usar Codex. Use Codex em front-end somente se o usuario autorizar explicitamente apos todos os degraus falharem.
+- Para imagem/asset: sem AGY nao ha fallback automatico; registre como `BLOCKED` e pergunte ao usuario.
 
 ## Comunicacao
 

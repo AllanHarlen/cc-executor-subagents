@@ -1,22 +1,31 @@
-# Notas de Interface
+# Contrato de Interface
 
-Este executor nao exige contrato API/UI formal. Para resolucoes rapidas, use **notas de interface** somente quando houver risco real de back-end e UI divergirem.
+Em tasks full-stack onde um agente produz dados/API e outro os consome, o risco de divergencia de contrato e real. O executor cria `.executor/interface-contract.md` **antes de delegar** nesse caso. Todos os agentes recebem o contrato no prompt e nao podem alterar os campos acordados unilateralmente.
 
-## Quando escrever notas
+## Quando criar o contrato (obrigatorio)
 
-Escreva uma nota curta em `.executor/interface-notes.md` quando:
+Crie `.executor/interface-contract.md` quando **todas** as condicoes abaixo forem verdadeiras:
 
-- uma mudanca full-stack define endpoint, payload ou status code novo;
-- dois agentes vao tocar produtor e consumidor de dados;
-- ha risco de divergencia de nome de campo;
-- permissoes, erros ou loading states importam para o aceite.
+- dois ou mais agentes participam da wave;
+- ao menos um deles produz dados (endpoint, payload, tipo) que outro consome;
+- o shape da interface nao esta inteiramente pre-existente no codigo.
 
-Nao escreva se a task e puramente visual, teste-only, docs-only, ou consome API ja existente sem mudar shape.
+## Quando nao criar
+
+Nao crie se a task e puramente visual, teste-only, docs-only, ou consome API ja existente sem mudar shape.
+
+## Regra de alteracao durante execucao
+
+Se um agente precisar divergir do contrato, ele deve:
+
+1. registrar a divergencia com justificativa no retorno;
+2. **nao implementar** a mudanca de contrato sem aprovacao do executor;
+3. aguardar o executor decidir se atualiza o contrato e notifica os outros agentes afetados.
 
 ## Template curto
 
 ```markdown
-# Interface Notes - <demanda>
+# Interface Contract - <demanda>
 
 ## Endpoint / fluxo
 - Metodo e rota:
