@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "demanda": "",
+  "fase_atual": 0,
+  "timestamp": "",
+  "status": "RUNNING",
+  "agy_disponivel": true,
+  "tipo_trabalho": "",
+  "risco": "LOW",
+  "slices": [],
+  "waves": [],
+  "interface_contract": false,
+  "agentes": [],
+  "arquivos_alterados": [],
+  "fallbacks_acionados": [],
+  "proxima_acao": ""
+}

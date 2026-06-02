@@ -22,6 +22,7 @@ RUNNING | PAUSED | BLOCKED | CANCELLED | DONE
 | `AUTH_REQUIRED` | AGY exige login interativo |
 | `TIMEOUT` | AGY ficou silencioso alem do timeout |
 | `AGY_MISSING` | AGY nao esta disponivel no PATH |
+| `FALLBACK_EXECUTOR` | Executor (Claude) assumiu a task apos escada de fallback |
 | `REVIEWED` | Passou pelo review final |
 
 ---
