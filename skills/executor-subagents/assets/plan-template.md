@@ -22,6 +22,10 @@ LOW | MEDIUM | HIGH
 ## Verificacao
 - <comando/teste>
 
+## Contrato de interface
+- Necessario: sim | nao
+- Arquivo: `.executor/interface-contract.md` (se necessario)
+
 ## Riscos e rollback
 - Risco:
 - Rollback:

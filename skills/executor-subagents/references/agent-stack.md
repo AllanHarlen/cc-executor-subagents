@@ -78,13 +78,37 @@ Nao use `--parallel` quando:
 
 Nao combine `--parallel` com `--generate-imagem` (o bridge ignora `--parallel` nesse caso).
 
+## Fallback gradual de modelo
+
+Antes de pausar para o usuario, percorra a escada automaticamente e registre cada degrau em `fallbacks_acionados` no checkpoint.
+
+**AGY:**
+
+| Degrau | Modelo/modo | Condicao de ativacao |
+|---|---|---|
+| 1 | `gemini-3.1-pro-high` | tentativa inicial |
+| 2 | `gemini-3.5-flash-medium` | pro-high falhou por cota/timeout |
+| 3 | Executor (Claude) direto | flash-medium tambem falhou |
+| — | Pausa para usuario | task e de imagem/asset (sem fallback possivel) |
+
+**Codex:**
+
+| Degrau | Modelo/modo | Condicao de ativacao |
+|---|---|---|
+| 1 | `gpt-5.5-codex high` | tentativa inicial (risco alto) |
+| 2 | `gpt-5.4-codex medium` | high falhou por cota |
+| 3 | Executor (Claude) direto | medium tambem falhou em implementacao |
+| — | Review interno pelo executor | medium falhou em revisao (nao delega) |
+
+**Executor (Claude) direto:** o executor le os arquivos, implementa as mudancas, verifica e reporta como `FALLBACK_EXECUTOR`. E a ultima opcao antes de parar e perguntar ao usuario. Nao aplica a tasks de imagem/asset (sem substituto viavel).
+
 ## Falhas do AGY
 
 O bridge do `cc-antigravity-plugin` pode emitir sinais brutos `QUOTA_EXAUSTED`, `AUTH_REQUIRED`, `TIMEOUT` e `AGY_MISSING`. No contexto do executor:
 
 - normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`;
 - registre o sinal bruto como evidencia;
-- pause antes de fallback e pergunte ao usuario se quer remediar, seguir so com Codex, ou cancelar.
+- aplique a escada de fallback antes de pausar para o usuario.
 
 ## Context7
 
@@ -105,9 +129,10 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 | Mapear impacto antes de refactor | 1 AGY read-only + execucao com Codex |
 | asset visual pedido explicitamente | 1 AGY `--generate-imagem` |
 | varios relatorios/componentes AGY independentes | 1 AGY `--parallel` (fan-out nativo); `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
-| feature slice pequena full-stack | AGY no front + Codex no backend se ownership for disjunto |
+| feature slice pequena full-stack | AGY no front + Codex no backend se ownership for disjunto; criar `interface-contract.md` antes de delegar |
 | N modulos/dominios independentes | N agentes em paralelo; sem teto — cada slice disjunto vira um agente |
 | risco alto | Codex high review antes/depois |
+| AGY indisponivel, task de UI | executor (Claude) direto apos escada de fallback |
 
 ## Regra de ownership
 
