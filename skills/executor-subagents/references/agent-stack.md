@@ -106,6 +106,7 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 | asset visual pedido explicitamente | 1 AGY `--generate-imagem` |
 | varios relatorios/componentes AGY independentes | 1 AGY `--parallel` (fan-out nativo); `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
 | feature slice pequena full-stack | AGY no front + Codex no backend se ownership for disjunto |
+| N modulos/dominios independentes | N agentes em paralelo; sem teto — cada slice disjunto vira um agente |
 | risco alto | Codex high review antes/depois |
 
 ## Regra de ownership

@@ -102,7 +102,7 @@ Use esta regra:
 | Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY com `--parallel`; adicione `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
 | Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` |
 | Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
-| 2-5 areas independentes de dominios diferentes (AGY + Codex) | 2-5 agentes em paralelo (waves na camada Claude) |
+| N areas independentes de dominios diferentes (AGY + Codex) | N agentes em paralelo (waves na camada Claude); sem limite fixo — o criterio e ownership disjunto |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
 | Auth, permissao, dados ou migration sensivel | Codex high para review antes/depois |
 

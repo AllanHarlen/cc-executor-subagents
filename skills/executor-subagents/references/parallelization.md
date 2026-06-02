@@ -69,28 +69,36 @@ Evite dividir por "back-end vs front-end" automaticamente. Divida pelo que pode 
 
 ## Tamanho da wave
 
-Use como padrao:
+Nao ha limite fixo de agentes por wave. O limite e o ownership: lance tantos agentes quantas forem as fatias verdadeiramente independentes.
+
+Orientacoes praticas:
 
 - 1 agente: patch medio em area unica;
 - 2 agentes: melhor custo/beneficio para bug + teste, front + backend independente, investigacao + patch;
-- 3 agentes: bom para repos medios com slices claros;
-- 4-5 agentes: apenas se ownership for realmente disjunto;
-- 6+ agentes: raramente vale, divida em waves.
+- 3-5 agentes: bom para repos com slices claros em multiplos modulos;
+- 6-10 agentes: adequado para repos grandes com dominios disjuntos bem definidos (ex.: microservicos, monorepos com pacotes separados);
+- 10+ agentes: use waves sequenciais quando houver dependencia entre grupos de slices, ou lance tudo em paralelo se ownership for totalmente disjunto;
+- sem teto: se a tarefa tiver N slices independentes, lance N agentes. O criterio e ausencia de conflito de arquivo, nao um numero maximo.
 
 ## Padrao recomendado
 
 ```text
-Wave 1:
+Wave 1 (todos os agentes independentes em paralelo):
 - Agent A: investigar causa raiz e propor patch, read-only ou ownership modulo X
 - Agent B: implementar correcao no modulo Y
 - Agent C: ajustar testes especificos
+- Agent D: atualizar documentacao tecnica afetada
+- Agent E: revisar impacto cross-file em modulo Z
+- ... (quantos slices disjuntos existirem)
 
 Executor principal:
 - acompanha diffs;
 - integra glue;
 - roda verificacoes;
-- decide se precisa Wave 2.
+- decide se precisa Wave 2 para slices dependentes da Wave 1.
 ```
+
+Para tarefas grandes, o padrao e: identificar todos os slices independentes → lancar todos na Wave 1 → apos integracao, identificar slices que dependiam dos resultados da Wave 1 → lancar Wave 2 → repetir.
 
 ## Sinais de que paralelizou demais
 
