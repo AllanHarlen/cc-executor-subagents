@@ -32,7 +32,9 @@ Use pesquisa local (`rg`, `rg --files`, leitura de arquivos) antes de perguntar.
 
 ## Fase 2 - Plano curto
 
-Para tarefas com 2+ agentes, crie `.executor/execution-brief.md` usando `assets/plan-template.md`.
+Para tarefas com 2+ agentes, crie `{artefatos_dir}/execution-brief.md` usando `assets/plan-template.md`.
+
+Onde `{artefatos_dir}` e o valor de `artefatos_dir` lido do `.executor/checkpoint.json`. Se o checkpoint ainda nao existir, determine o numero da demanda (count de `.executor/demanda-passada-n*` + 1) e defina `artefatos_dir = .executor/demanda-passada-nN/artefatos`.
 
 O plano deve responder:
 
@@ -88,7 +90,7 @@ Roteamento padrao:
 
 ## Fase 5 - Monitoramento leve
 
-Nao faca polling continuo. Registre status em `.executor/monitoring.md` somente para execucoes com 2+ agentes ou sessoes longas.
+Nao faca polling continuo. Registre status em `{artefatos_dir}/monitoring.md` somente para execucoes com 2+ agentes ou sessoes longas.
 
 Status sugeridos:
 
@@ -134,9 +136,9 @@ Em tarefas pequenas, responda no chat.
 Em tarefas com varios agentes, crie:
 
 ```text
-.executor/workflow-log.md
-.executor/subagents-context.md
-.executor/implementation-report.md
+{artefatos_dir}/workflow-log.md
+{artefatos_dir}/subagents-context.md
+{artefatos_dir}/implementation-report.md
 ```
 
 O fechamento deve ser curto:
@@ -149,4 +151,4 @@ O fechamento deve ser curto:
 
 ## Retomada
 
-Se a sessao parar, use `.executor/subagents-context.md` como fonte de verdade e `.executor/workflow-log.md` como auditoria. O contexto deve conter agentes lancados, status, arquivos tocados, pendencias e recomendacao de proxima acao.
+Se a sessao parar, leia `.executor/checkpoint.json` para recuperar `artefatos_dir`, depois use `{artefatos_dir}/subagents-context.md` como fonte de verdade e `{artefatos_dir}/workflow-log.md` como auditoria. O contexto deve conter agentes lancados, status, arquivos tocados, pendencias e recomendacao de proxima acao.

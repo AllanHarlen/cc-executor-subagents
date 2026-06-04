@@ -1,5 +1,5 @@
 {
-  "version": "1",
+  "version": "2",
   "demanda": "",
   "fase_atual": 0,
   "timestamp": "",
@@ -13,5 +13,6 @@
   "agentes": [],
   "arquivos_alterados": [],
   "fallbacks_acionados": [],
-  "proxima_acao": ""
+  "proxima_acao": "",
+  "artefatos_dir": ".executor/demanda-passada-n1/artefatos"
 }

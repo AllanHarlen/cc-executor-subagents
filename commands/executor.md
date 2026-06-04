@@ -69,18 +69,18 @@ Depois encerre.
    - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
    - backend/testes/review: Codex.
 
-8. Se usar 2+ agentes, crie `.executor/execution-brief.md` e mantenha `.executor/monitoring.md` como fonte viva de eventos (Fase 8): status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase.
+8. Se usar 2+ agentes, determine `artefatos_dir` (`.executor/demanda-passada-nN/artefatos` onde N = numero de subpastas existentes + 1), salve no checkpoint, e crie todos os artefatos dentro de `artefatos_dir`. Mantenha `{artefatos_dir}/monitoring.md` como fonte viva de eventos (Fase 8): status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase. **Nunca crie artefatos .md na raiz do projeto.**
 
 9. Delegue em paralelo por ownership, nao por dupla fixa.
 
 10. Integre, rode verificacoes e feche.
 
-11. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH ou rastreabilidade solicitada, gere em `.executor/`:
+11. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH ou rastreabilidade solicitada, gere em `{artefatos_dir}/`:
 
    ```text
-   .executor/workflow-log.md
-   .executor/subagents-context.md
-   .executor/implementation-report.md
+   {artefatos_dir}/workflow-log.md
+   {artefatos_dir}/subagents-context.md
+   {artefatos_dir}/implementation-report.md
    ```
 
    Use os templates em `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/assets/`. O `implementation-report.md` deve incluir a secao 14 com instrucoes de negocio quando houver contexto de negocio real (o que mudou, como homologar, regras, impactos operacionais e proximo passo recomendado).

@@ -40,7 +40,7 @@ Sob `/goal`, nao devolva controle so porque uma etapa acabou. Continue ate haver
 
 **Verificar checkpoint antes de tudo:**
 
-Se `.executor/checkpoint.json` existir, leia-o. Se `status` for `RUNNING` e `fase_atual >= 1`, pergunte ao usuario se quer retomar da fase `fase_atual` ou reiniciar do zero. Em caso de retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes` e `arquivos_alterados` do checkpoint. Em caso de reinicio, apague o checkpoint e siga normalmente.
+Se `.executor/checkpoint.json` existir, leia-o. Se `status` for `RUNNING` e `fase_atual >= 1`, pergunte ao usuario se quer retomar da fase `fase_atual` ou reiniciar do zero. Em caso de retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint. Em caso de reinicio, apague o checkpoint e siga normalmente (um novo `artefatos_dir` sera calculado).
 
 Execute:
 
@@ -64,6 +64,16 @@ Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se somente AGY fa
 
 Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp`.
 
+**Determinar `artefatos_dir` (obrigatorio antes da Fase 2):**
+
+1. Conte quantos subdiretorios `.executor/demanda-passada-n*` ja existem (use `ls .executor/ | grep demanda-passada-n` ou equivalente).
+2. O proximo numero = contagem + 1.
+3. Defina `artefatos_dir = .executor/demanda-passada-nN/artefatos` onde `N` e o proximo numero.
+4. Salve `artefatos_dir` no `.executor/checkpoint.json`.
+5. Nao crie a pasta ainda — crie somente ao escrever o primeiro artefato.
+
+**Regra absoluta:** nenhum artefato `.md` deve ser criado na raiz do projeto ou em qualquer caminho fora de `artefatos_dir`. Qualquer arquivo gerado pelo executor (plano, monitoring, logs, relatorios, contratos) vai exclusivamente dentro de `artefatos_dir`.
+
 ### Fase 1 - Triagem de 2 minutos
 
 Antes de delegar, levante somente o que muda a execucao:
@@ -82,7 +92,7 @@ Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte u
 Crie um plano mental ou, se a tarefa passar de 2 agentes, um arquivo leve:
 
 ```text
-.executor/execution-brief.md
+{artefatos_dir}/execution-brief.md
 ```
 
 Use `assets/plan-template.md` como base. O plano deve caber em uma tela e conter:
@@ -95,13 +105,13 @@ Use `assets/plan-template.md` como base. O plano deve caber em uma tela e conter
 
 **Contrato de interface (obrigatorio para full-stack):**
 
-Se a task envolver dois ou mais agentes onde um produz dados/API consumidos pelo outro (ex: Codex no backend + AGY no front-end), crie `.executor/interface-contract.md` antes de delegar. Use o template de `references/contracts.md`. O contrato deve caber em uma tela. Inclua o caminho do contrato no campo `interface_contract: true` do checkpoint.
+Se a task envolver dois ou mais agentes onde um produz dados/API consumidos pelo outro (ex: Codex no backend + AGY no front-end), crie `{artefatos_dir}/interface-contract.md` antes de delegar. Use o template de `references/contracts.md`. O contrato deve caber em uma tela. Inclua o caminho do contrato no campo `interface_contract: true` do checkpoint.
 
 Todos os agentes afetados recebem o contrato no prompt e ficam proibidos de alterar os campos acordados unilateralmente. Se um agente precisar mudar o contrato, ele deve registrar a divergencia e pausar para o executor decidir antes de seguir.
 
 Nao crie o contrato se a task for puramente visual, teste-only, docs-only, ou consumir API ja existente sem mudar shape.
 
-**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `slices`, `waves`, `tipo_trabalho`, `risco` e `interface_contract`.
+**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `slices`, `waves`, `tipo_trabalho`, `risco`, `interface_contract` e `artefatos_dir`.
 
 Nao crie artefatos formais se a demanda couber em execucao direta ou em um unico agente.
 
@@ -160,7 +170,7 @@ Quando agentes retornarem:
 2. Verifique se houve toque fora do ownership.
 3. Resolva conflitos pequenos diretamente quando for seguro.
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
-5. Atualize `.executor/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
+5. Atualize `{artefatos_dir}/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
 
 Se um agente falhar por cota, auth, timeout ou ausencia do AGY, normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`, registre a evidencia e aplique o fallback gradual (ver "Politica de falhas" abaixo) antes de pausar para o usuario.
 
@@ -184,13 +194,13 @@ Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao dire
 
 > **Concorrencia:** o monitoramento corre em paralelo com as Fases 4-6 de execucao. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
 
-O orquestrador mantem `.executor/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa - apenas supervisiona.
+O orquestrador mantem `{artefatos_dir}/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa - apenas supervisiona.
 
 **Ciclo de monitoramento:**
 
-1. Atualize o status de cada task no `.executor/monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `AUTH_REQUIRED`, `TIMEOUT`, `AGY_MISSING`, `BLOCKED`, `DONE`, `FAILED`.
+1. Atualize o status de cada task no `{artefatos_dir}/monitoring.md` a cada evento relevante: `DELEGADO`, `CHECKIN_RECEBIDO`, `SLOW_CHECKIN`, `QUOTA_EXHAUSTED`, `AUTH_REQUIRED`, `TIMEOUT`, `AGY_MISSING`, `BLOCKED`, `DONE`, `FAILED`.
 2. Se um agente demora mais do que o esperado, envie um **SLOW_CHECKIN** - mensagem curta pedindo atualizacao operacional sem solicitar trabalho novo.
-3. Para cada task ativa, registre no `.executor/monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
+3. Para cada task ativa, registre no `{artefatos_dir}/monitoring.md`: categoria, se tem contrato (`contractRequired`), agentes responsaveis, wire format validado (`sim | nao | pendente`), supervisao operacional (motivo atual, evidencia, arquivos parciais, fallback escolhido, proxima acao) e log de eventos com timestamp.
 
 **Status disponiveis:**
 
@@ -261,15 +271,15 @@ O executor (Claude) assume a task diretamente quando todos os degraus acima falh
 
 1. Aplique a escada Codex: tente proximo degrau.
 2. Se todos os degraus falharem, o executor assume diretamente.
-3. Registra como `FALLBACK_EXECUTOR` no `.executor/monitoring.md`.
+3. Registra como `FALLBACK_EXECUTOR` no `{artefatos_dir}/monitoring.md`.
 
 **Codex bate a cota em revisao:**
 
 1. O orquestrador nao redelega para outro agente.
 2. Faz ele mesmo um **review interno read-only** (apenas leitura, sem editar codigo).
-3. Salva o resultado em `.executor/review-final.md`.
+3. Salva o resultado em `{artefatos_dir}/review-final.md`.
 4. Registra explicitamente que foi "fallback interno do orquestrador por indisponibilidade de quota do Codex".
-5. Este fallback e reportado nos tres entregaveis finais (`.executor/workflow-log.md`, `.executor/subagents-context.md`, `.executor/implementation-report.md`).
+5. Este fallback e reportado nos tres entregaveis finais (`{artefatos_dir}/workflow-log.md`, `{artefatos_dir}/subagents-context.md`, `{artefatos_dir}/implementation-report.md`).
 
 ### Instrucoes de Skills para Subagentes
 
@@ -280,26 +290,26 @@ Todo subagente (Codex ou Antigravity) deve, como **primeiro passo antes de imple
 3. **Identificar e usar as compativeis:** das skills restantes, usar as que se aplicam a task em execucao durante a implementacao.
 4. **Reportar no retorno:** no campo obrigatorio `Skills utilizadas`, listar quais foram usadas (ou "nenhuma").
 
-O orquestrador coleta o campo `Skills utilizadas` de todos os subagentes e consolida em `.executor/subagents-context.md`, na secao de contexto por subagente.
+O orquestrador coleta o campo `Skills utilizadas` de todos os subagentes e consolida em `{artefatos_dir}/subagents-context.md`, na secao de contexto por subagente.
 
 ### Fase 9 - Relatorio final
 
-Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, ou que o usuario queira rastreabilidade, gere os tres entregaveis obrigatorios em `.executor/`:
+Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, ou que o usuario queira rastreabilidade, gere os tres entregaveis obrigatorios em `{artefatos_dir}/`:
 
 ```text
-.executor/workflow-log.md
-.executor/subagents-context.md
-.executor/implementation-report.md
+{artefatos_dir}/workflow-log.md
+{artefatos_dir}/subagents-context.md
+{artefatos_dir}/implementation-report.md
 ```
 
 Use os templates de `assets/` como base. Regras:
 
-- **.executor/workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 9), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
-- **.executor/subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
-- **.executor/implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
+- **workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 9), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
+- **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
+- **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
-- Os tres arquivos ficam dentro de `.executor/`, **nunca** na raiz de execucao ou em `openspec/`.
+- Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
 
 **Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9` e `status: "DONE"`. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` sem criar o arquivo se ele nao existia.
 
@@ -319,7 +329,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 
 1. nao lance novos agentes;
 2. nao avance de fase;
-3. preserve o estado em `.executor/subagents-context.md` quando existir;
+3. preserve o estado em `{artefatos_dir}/subagents-context.md` quando existir;
 4. responda com estado atual, arquivos alterados, agentes pendentes/concluidos e condicao para retomar.
 
 ## Regras de seguranca operacional
@@ -350,9 +360,9 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/parallelization.md` | dividir slices independentes |
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
 | `references/preflight-check.md` | entender/remediar preflight |
-| `assets/plan-template.md` | criar `.executor/execution-brief.md` quando util |
-| `assets/monitoring-template.md` | manter `.executor/monitoring.md` vivo na Fase 8 |
-| `assets/workflow-log-template.md` | gerar `.executor/workflow-log.md` (Fase 9) |
-| `assets/subagents-context-template.md` | gerar `.executor/subagents-context.md` (Fase 9) |
-| `assets/implementation-report-template.md` | gerar `.executor/implementation-report.md` (Fase 9) |
+| `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
+| `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
+| `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |
+| `assets/subagents-context-template.md` | gerar `{artefatos_dir}/subagents-context.md` (Fase 9) |
+| `assets/implementation-report-template.md` | gerar `{artefatos_dir}/implementation-report.md` (Fase 9) |
 | `scripts/preflight.mjs` | validar ambiente minimo |
