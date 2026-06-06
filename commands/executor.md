@@ -37,7 +37,7 @@ Depois encerre.
    node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
    ```
 
-2. Se `status: "failed"` e a falha envolver Codex obrigatorio, cancele e mostre `remediation`.
+2. Se `status: "failed"` e a falha envolver Codex, verifique o `$ARGUMENTS` antes de cancelar: se a demanda for claramente front-end puro (UI, componente, layout, imagem, asset visual), prossiga sem Codex — Codex nao e necessario para tasks `UI_FRONTEND` ou `IMAGE_ASSET`. Para qualquer outra natureza de task, cancele e mostre `remediation`.
 
 3. Se `status: "failed"` e somente AGY ou o `cc-antigravity-plugin` falharem, mostre `remediation` e pergunte ao usuario se quer:
 

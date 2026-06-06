@@ -26,7 +26,9 @@ node skills/executor-subagents/scripts/preflight.mjs
 | `agy --help` com flags essenciais | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
 | bridge do AGY com flags atuais | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
 
-Falha de Codex continua bloqueando direto. Falha somente de AGY deve pausar o fluxo e pedir decisao do usuario: remediar, continuar so com Codex, ou cancelar.
+Falha de Codex bloqueia apenas para tasks que nao sejam puramente front-end. Se a demanda for `UI_FRONTEND` ou `IMAGE_ASSET`, falha de Codex nao cancela — prossiga sem ele. Para qualquer outra natureza de task, falha de Codex cancela com remediacao.
+
+Falha somente de AGY deve pausar o fluxo e pedir decisao do usuario: remediar, continuar so com Codex, ou cancelar.
 
 ## Opcional
 
@@ -117,4 +119,4 @@ npx ctx7 setup --claude
 
 ## Politica
 
-Nao faca fallback silencioso se Codex obrigatorio falhar. Para AGY, exponha a falha, mostre a remediacao e peca uma decisao explicita antes de seguir so com Codex.
+Nao faca fallback silencioso se Codex falhar em tasks que nao sejam front-end puro. Para tasks `UI_FRONTEND` ou `IMAGE_ASSET`, falha de Codex e ignorada silenciosamente (registre no checkpoint como `codex_excluido: true`). Para AGY, exponha a falha, mostre a remediacao e peca uma decisao explicita antes de seguir so com Codex.

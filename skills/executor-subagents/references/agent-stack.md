@@ -12,7 +12,7 @@
 | Analise cross-file | AGY read-only | `cc-antigravity-plugin:antigravity-agent` | arquitetura, impacto de refactor, orientacao de codebase |
 | Imagem/asset | AGY nano-banana | `cc-antigravity-plugin:antigravity-agent` | mockups, assets, ilustracoes e pedidos explicitos de imagem |
 
-Codex e AGY sao obrigatorios para esta skill. O executor depende de Codex para backend, testes e review, e depende de AGY 3.6.0+ para front-end, imagem, contexto largo e fan-out nativo de subagentes Gemini (`--parallel`).
+Codex e obrigatorio para tasks de backend, testes e review. Para tasks puramente front-end (`UI_FRONTEND`, `IMAGE_ASSET`), somente AGY e necessario — Codex nao participa dessas tasks. AGY 3.6.0+ e obrigatorio para front-end, imagem, contexto largo e fan-out nativo de subagentes Gemini (`--parallel`).
 
 ## Heuristica Codex
 
@@ -124,10 +124,10 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 |---|---|
 | bug simples em um modulo backend | 1 Codex medium |
 | bug + testes em arquivos separados | 2 Codex medium em paralelo |
-| UI/front-end isolado | 1 AGY flash-medium |
-| UI/front-end complexa | 1 AGY pro-high |
+| UI/front-end isolado | 1 AGY flash-medium (sem Codex) |
+| UI/front-end complexa | 1 AGY pro-high (sem Codex) |
 | Mapear impacto antes de refactor | 1 AGY read-only + execucao com Codex |
-| asset visual pedido explicitamente | 1 AGY `--generate-imagem` |
+| asset visual pedido explicitamente | 1 AGY `--generate-imagem` (sem Codex) |
 | varios relatorios/componentes AGY independentes | 1 AGY `--parallel` (fan-out nativo); `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
 | feature slice pequena full-stack | AGY no front + Codex no backend se ownership for disjunto; criar `interface-contract.md` antes de delegar |
 | N modulos/dominios independentes | N agentes em paralelo; sem teto — cada slice disjunto vira um agente |

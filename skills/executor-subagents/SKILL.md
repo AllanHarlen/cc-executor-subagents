@@ -60,7 +60,9 @@ O preflight valida apenas o que e necessario para execucao rapida:
 | `/goal` hooks | Opcional | autonomia entre turnos |
 | Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
 
-Se Codex obrigatorio falhar, cancele com a remediacao do JSON. Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
+Se Codex falhar, verifique o tipo da demanda antes de cancelar: faca uma pre-triagem rapida (leia o enunciado da tarefa) para checar se e puramente `UI_FRONTEND` ou `IMAGE_ASSET`. Se for, prossiga sem Codex e registre `codex_excluido: true` no checkpoint — Codex nao e necessario para tasks puramente front-end. Se nao for front-end puro, cancele com a remediacao do JSON.
+
+Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
 
 Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp`.
 
@@ -81,6 +83,7 @@ Antes de delegar, levante somente o que muda a execucao:
 - objetivo final em uma frase;
 - arquivos/modulos provaveis;
 - tipo de trabalho: `BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`;
+- se `tipo_trabalho` for `UI_FRONTEND` ou `IMAGE_ASSET`, marque `codex_excluido: true` — Codex nao participa do fluxo para tasks puramente front-end;
 - risco: `LOW`, `MEDIUM`, `HIGH`;
 - comandos de verificacao obvios;
 - perguntas bloqueantes, se existirem.
@@ -123,10 +126,10 @@ Use esta regra:
 |---|---|
 | 1 arquivo, mudanca obvia, baixo risco | Execute direto |
 | 1 area backend clara, patch medio | 1 agente Codex |
-| UI/front-end isolado | 1 agente AGY agentic |
-| UI/front-end complexa | 1 agente AGY com `--model gemini-3.1-pro-high` |
+| UI/front-end isolado | 1 agente AGY agentic — Codex nao participa |
+| UI/front-end complexa | 1 agente AGY com `--model gemini-3.1-pro-high` — Codex nao participa |
 | Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY com `--parallel`; adicione `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
-| Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` |
+| Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` — Codex nao participa |
 | Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
 | N areas independentes de dominios diferentes (AGY + Codex) | N agentes em paralelo (waves na camada Claude); sem limite fixo — o criterio e ownership disjunto |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
@@ -340,7 +343,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Nao instale dependencias novas sem justificativa e autorizacao quando houver impacto de lockfile.
 - Nao altere auth/autorizacao/segredos sem review dedicado.
 - Nao ignore erro de build/teste; se aceitar uma falha, registre como pendencia.
-- Para front-end/UI: aplique a escada de fallback (AGY pro-high → AGY flash-medium → executor direto) antes de usar Codex. Use Codex em front-end somente se o usuario autorizar explicitamente apos todos os degraus falharem.
+- Para front-end/UI puro (`UI_FRONTEND`, `IMAGE_ASSET`): Codex nao participa do fluxo — nem como agente, nem como fallback. Aplique somente a escada AGY (pro-high → flash-medium → executor direto). Nunca lance Codex para estas tasks.
 - Para imagem/asset: sem AGY nao ha fallback automatico; registre como `BLOCKED` e pergunte ao usuario.
 
 ## Comunicacao
