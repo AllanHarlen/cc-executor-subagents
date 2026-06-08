@@ -84,7 +84,7 @@ Foco:
 Leia:
 - diff git atual
 - arquivos relevantes: <LISTA>
-- .executor/subagents-context.md, se existir
+- {artefatos_dir}/subagents-context.md, se existir
 
 Verifique:
 - bugs ou regressao;

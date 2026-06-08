@@ -14,5 +14,5 @@
   "arquivos_alterados": [],
   "fallbacks_acionados": [],
   "proxima_acao": "",
-  "artefatos_dir": ".executor/demanda-passada-n1/artefatos"
+  "artefatos_dir": ".executor/<demanda-slug>/artefatos"
 }

@@ -69,7 +69,7 @@ Depois encerre.
    - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
    - backend/testes/review: Codex.
 
-8. Se usar 2+ agentes, determine `artefatos_dir` (`.executor/demanda-passada-nN/artefatos` onde N = numero de subpastas existentes + 1), salve no checkpoint, e crie todos os artefatos dentro de `artefatos_dir`. Artefatos obrigatorios desta fase:
+8. Se usar 2+ agentes, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
 
    ```text
    {artefatos_dir}/execution-brief.md     (plano de slices/waves — use assets/plan-template.md)

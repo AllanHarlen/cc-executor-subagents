@@ -68,11 +68,12 @@ Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/che
 
 **Determinar `artefatos_dir` (obrigatorio antes da Fase 2):**
 
-1. Conte quantos subdiretorios `.executor/demanda-passada-n*` ja existem (use `ls .executor/ | grep demanda-passada-n` ou equivalente).
-2. O proximo numero = contagem + 1.
-3. Defina `artefatos_dir = .executor/demanda-passada-nN/artefatos` onde `N` e o proximo numero.
-4. Salve `artefatos_dir` no `.executor/checkpoint.json`.
-5. Nao crie a pasta ainda — crie somente ao escrever o primeiro artefato.
+1. Gere `demanda_slug` a partir da demanda passada no `/executor` (ou do campo `demanda` do checkpoint): minusculas, sem acentos, sem artigos/preposicoes curtas que nao ajudem (`a`, `o`, `um`, `uma`, `de`, `da`, `do`, `para`), somente letras/numeros separados por hifen, hifens colapsados, no maximo 60 caracteres.
+2. Exemplo: `/executor desenvolva uma pagina clientes` vira `desenvolva-pagina-clientes`.
+3. Se `.executor/{demanda_slug}` nao existir, defina `artefatos_dir = .executor/{demanda_slug}/artefatos`.
+4. Se ja existir, acrescente o primeiro sufixo livre: `.executor/{demanda_slug}-n2/artefatos`, depois `-n3`, e assim por diante.
+5. Salve `artefatos_dir` no `.executor/checkpoint.json`.
+6. Nao crie a pasta ainda - crie somente ao escrever o primeiro artefato.
 
 **Regra absoluta:** nenhum artefato `.md` deve ser criado na raiz do projeto ou em qualquer caminho fora de `artefatos_dir`. Qualquer arquivo gerado pelo executor (plano, monitoring, logs, relatorios, contratos) vai exclusivamente dentro de `artefatos_dir`.
 
@@ -195,7 +196,7 @@ Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao dire
 
 ### Fase 8 - Monitoramento
 
-> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4-6 de execucao. Crie `.executor/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
+> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4-6 de execucao. Crie `{artefatos_dir}/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
 
 O orquestrador mantem `{artefatos_dir}/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa - apenas supervisiona.
 
@@ -229,7 +230,7 @@ Nenhum agente deve tentar contornar cota com retries longos ou mudanca arbitrari
 
 #### Fallback gradual de modelo
 
-Antes de pausar para o usuario, aplique automaticamente a escada de fallback abaixo. Registre cada degrau acionado em `fallbacks_acionados` no checkpoint e no `.executor/monitoring.md`. Informe o usuario no resumo final qual modelo foi realmente usado.
+Antes de pausar para o usuario, aplique automaticamente a escada de fallback abaixo. Registre cada degrau acionado em `fallbacks_acionados` no checkpoint e no `{artefatos_dir}/monitoring.md`. Informe o usuario no resumo final qual modelo foi realmente usado.
 
 **Escada AGY:**
 
@@ -260,13 +261,13 @@ O executor (Claude) assume a task diretamente quando todos os degraus acima falh
 **AGY emite `QUOTA_EXAUSTED`:**
 
 1. Normalize para `QUOTA_EXHAUSTED` no contexto do executor.
-2. Registre a evidencia no `.executor/monitoring.md`.
+2. Registre a evidencia no `{artefatos_dir}/monitoring.md`.
 3. Aplique a escada AGY: tente `flash-medium`; se falhar, executor direto.
 4. Se a task for de imagem/asset e o executor nao puder substituir, pergunte ao usuario se quer remediar, pular o asset, ou cancelar.
 
 **AGY emite `AUTH_REQUIRED`, `TIMEOUT` ou `AGY_MISSING`:**
 
-1. Registre a evidencia no `.executor/monitoring.md`.
+1. Registre a evidencia no `{artefatos_dir}/monitoring.md`.
 2. Aplique a escada AGY: tente proximo degrau disponivel.
 3. Se `AGY_MISSING` e nao ha degrau disponivel: marque como `BLOCKED` e pergunte ao usuario se quer instalar AGY, deixar o executor assumir, ou cancelar.
 

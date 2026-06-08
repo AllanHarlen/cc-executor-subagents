@@ -24,8 +24,8 @@
 | 5 | Integracao | OK \| PULADO | | | - | <falha ou N/A> |
 | 6 | Verificacao | OK \| FALHOU \| PULADO | | | - | <falha ou N/A> |
 | 7 | Fechamento interno | OK | | | - | N/A |
-| 8 | Monitoramento | ATIVO \| CONCLUIDO \| N/A | | | .executor/monitoring.md | <falha ou N/A> |
-| 9 | Relatorio final | OK | | | .executor/workflow-log.md, .executor/subagents-context.md, .executor/implementation-report.md | N/A |
+| 8 | Monitoramento | ATIVO \| CONCLUIDO \| N/A | | | {artefatos_dir}/monitoring.md | <falha ou N/A> |
+| 9 | Relatorio final | OK | | | {artefatos_dir}/workflow-log.md, {artefatos_dir}/subagents-context.md, {artefatos_dir}/implementation-report.md | N/A |
 
 ---
 

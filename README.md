@@ -52,15 +52,17 @@ Roteamento padrao:
 
 O paralelismo pode acontecer em duas camadas: waves na camada do Claude Code (slices de domínios diferentes, ex.: AGY + Codex) ou fan-out nativo dentro de um único agente AGY (`--parallel`) quando todos os entregáveis sao de domínio AGY.
 
-Artefatos opcionais ficam em `.executor/`:
+Artefatos opcionais ficam em `.executor/{slug-da-demanda}/artefatos/`:
 
 ```text
 .executor/
-|-- execution-brief.md
-|-- monitoring.md
-|-- workflow-log.md
-|-- subagents-context.md
-`-- implementation-report.md
+`-- desenvolva-pagina-clientes/
+    `-- artefatos/
+        |-- execution-brief.md
+        |-- monitoring.md
+        |-- workflow-log.md
+        |-- subagents-context.md
+        `-- implementation-report.md
 ```
 
 Eles so sao criados quando ajudam, normalmente em execucoes com 2+ agentes ou risco medio/alto.

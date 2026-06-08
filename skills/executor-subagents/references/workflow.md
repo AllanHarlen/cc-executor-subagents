@@ -34,7 +34,7 @@ Use pesquisa local (`rg`, `rg --files`, leitura de arquivos) antes de perguntar.
 
 Para tarefas com 2+ agentes, crie `{artefatos_dir}/execution-brief.md` usando `assets/plan-template.md`.
 
-Onde `{artefatos_dir}` e o valor de `artefatos_dir` lido do `.executor/checkpoint.json`. Se o checkpoint ainda nao existir, determine o numero da demanda (count de `.executor/demanda-passada-n*` + 1) e defina `artefatos_dir = .executor/demanda-passada-nN/artefatos`.
+Onde `{artefatos_dir}` e o valor de `artefatos_dir` lido do `.executor/checkpoint.json`. Se o checkpoint ainda nao existir, gere um slug curto a partir da demanda do `/executor` e defina `artefatos_dir = .executor/{demanda_slug}/artefatos`; exemplo: `/executor desenvolva uma pagina clientes` vira `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...).
 
 O plano deve responder:
 
