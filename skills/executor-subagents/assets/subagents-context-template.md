@@ -9,6 +9,9 @@
 | Total de subagentes | <n> |
 | Fallbacks acionados | <n ou N/A> |
 | Status geral | RUNNING \| DONE \| BLOCKED \| CANCELLED |
+| Plano pre-definido | Sim \| Nao |
+| Baseline do plano | `{artefatos_dir}/initial-plan-baseline.md` \| N/A |
+| Review plano vs entrega | PENDENTE \| REVIEWED \| N/A |
 
 ---
 
@@ -65,6 +68,19 @@ _Adicione uma secao por agente real da execucao._
 | 1 | <agentes> | <divergencia detectada, ex: campo renomeado, tipo incompativel, contrato desatualizado> | <resolucao aplicada> | RESOLVIDO \| PENDENTE |
 
 _N/A se nenhuma divergencia de wire format ou logica foi detectada entre agentes._
+
+---
+
+## Review plano vs entrega
+
+_Preencha somente quando a execucao partiu de um plano pre-definido._
+
+| Campo | Valor |
+|---|---|
+| Agente/modelo | Codex gpt-5.5-codex high \| fallback interno por quota \| N/A |
+| Artefato | `{artefatos_dir}/plan-vs-output-review.md` \| N/A |
+| Decisao | ALINHADO \| ALINHADO COM DESVIOS ACEITOS \| DESALINHADO \| N/A |
+| Pendencias geradas | Nenhuma \| <lista> |
 
 ---
 

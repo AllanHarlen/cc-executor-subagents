@@ -12,7 +12,7 @@ node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
 
 Se `codex`, `agy`, o plugin `openai-codex` ou o `cc-antigravity-plugin` falharem, nao siga no piloto automatico:
 
-- falha de Codex: cancele com remediacao;
+- falha de Codex: cancele com remediacao para backend/testes/review; para UI/asset puro sem plano pre-definido, prossiga sem Codex; se houver plano pre-definido, remedeie Codex ou obtenha aceite explicito do usuario para seguir sem review plano-vs-entrega;
 - falha somente de AGY: pause e pergunte se o usuario quer remediar, continuar so com Codex, ou cancelar.
 
 Context7 e `/goal` continuam opcionais.
@@ -23,6 +23,7 @@ Extraia em poucos minutos:
 
 - objetivo final;
 - arquivos/modulos provaveis;
+- se existe plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente);
 - risco (`LOW`, `MEDIUM`, `HIGH`);
 - tipo de trabalho;
 - verificacoes obvias;
@@ -30,9 +31,11 @@ Extraia em poucos minutos:
 
 Use pesquisa local (`rg`, `rg --files`, leitura de arquivos) antes de perguntar. Pergunte somente quando uma suposicao errada geraria retrabalho relevante.
 
+Se houver plano pre-definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md`, registre `plano_predefinido: true` no checkpoint e trate esse baseline como fonte de verdade para slices, criterios de aceite e verificacao final.
+
 ## Fase 2 - Plano curto
 
-Para tarefas com 2+ agentes, crie `{artefatos_dir}/execution-brief.md` usando `assets/plan-template.md`.
+Para tarefas com 2+ agentes ou com plano pre-definido, crie `{artefatos_dir}/execution-brief.md` usando `assets/plan-template.md`.
 
 Onde `{artefatos_dir}` e o valor de `artefatos_dir` lido do `.executor/checkpoint.json`. Se o checkpoint ainda nao existir, gere um slug curto a partir da demanda do `/executor` e defina `artefatos_dir = .executor/{demanda_slug}/artefatos`; exemplo: `/executor desenvolva uma pagina clientes` vira `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...).
 
@@ -43,6 +46,8 @@ O plano deve responder:
 - o que nao pode ser tocado;
 - qual ordem ou wave;
 - como vamos verificar.
+
+Se houver plano pre-definido, o `execution-brief.md` e apenas o mapa operacional derivado do baseline. Nao substitua o plano inicial; registre qualquer adaptacao e mantenha obrigatorio o review Codex high plano-vs-entrega.
 
 Nao transforme isso em documento de arquitetura. Uma tela basta.
 
@@ -127,6 +132,8 @@ Para risco medio, rode testes da area, typecheck/build quando aplicavel e revise
 
 Para risco alto, peca review Codex high antes de fechar.
 
+Para plano pre-definido, sempre peca review Codex high read-only antes de fechar, mesmo em UI/front-end puro. O review deve comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e a entrega gerada, cobrindo requisitos, criterios de aceite, entregaveis, contratos, arquivos planejados/alterados e verificacoes planejadas/executadas. Salve em `{artefatos_dir}/plan-vs-output-review.md`. Se houver `DESALINHADO`, corrija ou bloqueie com evidencia.
+
 Se uma verificacao falhar, tente corrigir no mesmo ciclo. Se nao der, feche como `BLOCKED` com causa e proximo comando.
 
 ## Fase 8 - Fechamento
@@ -140,6 +147,8 @@ Em tarefas com varios agentes, crie:
 {artefatos_dir}/subagents-context.md
 {artefatos_dir}/implementation-report.md
 ```
+
+Em tarefas com plano pre-definido, crie tambem `{artefatos_dir}/plan-vs-output-review.md` e referencie `{artefatos_dir}/initial-plan-baseline.md` nos tres relatorios finais.
 
 O fechamento deve ser curto:
 

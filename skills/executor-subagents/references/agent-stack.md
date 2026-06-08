@@ -14,6 +14,8 @@
 
 Codex e obrigatorio para tasks de backend, testes e review. Para tasks puramente front-end (`UI_FRONTEND`, `IMAGE_ASSET`), somente AGY e necessario — Codex nao participa dessas tasks. AGY 3.6.0+ e obrigatorio para front-end, imagem, contexto largo e fan-out nativo de subagentes Gemini (`--parallel`).
 
+Excecao: quando a execucao partir de um plano pre-definido, Codex high entra como review read-only de plano-vs-entrega, inclusive para UI/front-end puro. Ele nao implementa UI/asset nem faz fallback dessas tasks; apenas compara o baseline inicial com o resultado gerado.
+
 ## Heuristica Codex
 
 Use `gpt-5.4-codex --effort medium` para:
@@ -27,6 +29,7 @@ Use `gpt-5.4-codex --effort medium` para:
 Use `gpt-5.5-codex --effort high` para:
 
 - revisar diffs com risco;
+- comparar plano pre-definido com entrega gerada;
 - auth/autorizacao;
 - migrations e integridade de dados;
 - concorrencia/performance sensivel;
@@ -132,6 +135,7 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 | feature slice pequena full-stack | AGY no front + Codex no backend se ownership for disjunto; criar `interface-contract.md` antes de delegar |
 | N modulos/dominios independentes | N agentes em paralelo; sem teto — cada slice disjunto vira um agente |
 | risco alto | Codex high review antes/depois |
+| plano pre-definido | executar sobre o baseline + Codex high read-only em `{artefatos_dir}/plan-vs-output-review.md` |
 | AGY indisponivel, task de UI | executor (Claude) direto apos escada de fallback |
 
 ## Regra de ownership

@@ -18,6 +18,7 @@ Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce
 - **Rapidez com bordas claras.** Planeje o minimo suficiente para evitar conflito de arquivo e retrabalho.
 - **Agentes por ownership, nao por dupla.** Cada agente recebe arquivos/modulos responsaveis e um resultado verificavel.
 - **Paralelismo pragmastico.** Rode em paralelo apenas tarefas independentes; serialize arquivos centrais compartilhados.
+- **Plano pre-definido vira baseline.** Quando o usuario trouxer um plano pronto, trabalhe sobre ele, preserve-o como fonte de verdade e revise a entrega contra esse baseline.
 - **Executor pode integrar.** O executor principal pode fazer pequenos ajustes de integracao, documentacao e glue code quando for mais rapido e seguro do que redelegar.
 - **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 3.6.0+. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
 - **Context7 quando houver docs de libs.** Se a task envolver biblioteca, framework, SDK, API, CLI ou cloud service, use Context7 quando disponivel.
@@ -60,7 +61,9 @@ O preflight valida apenas o que e necessario para execucao rapida:
 | `/goal` hooks | Opcional | autonomia entre turnos |
 | Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
 
-Se Codex falhar, verifique o tipo da demanda antes de cancelar: faca uma pre-triagem rapida (leia o enunciado da tarefa) para checar se e puramente `UI_FRONTEND` ou `IMAGE_ASSET`. Se for, prossiga sem Codex e registre `codex_excluido: true` no checkpoint — Codex nao e necessario para tasks puramente front-end. Se nao for front-end puro, cancele com a remediacao do JSON.
+Se Codex falhar, verifique o tipo da demanda antes de cancelar: faca uma pre-triagem rapida (leia o enunciado da tarefa) para checar se e puramente `UI_FRONTEND` ou `IMAGE_ASSET` e se ha plano pre-definido. Se for front-end puro sem plano pre-definido, prossiga sem Codex e registre `codex_excluido: true` no checkpoint — Codex nao e necessario para implementacao de tasks puramente front-end. Se houver plano pre-definido, Codex continua necessario para o review read-only da Fase 6.5. Se nao for front-end puro, cancele com a remediacao do JSON.
+
+Se a demanda tiver plano pre-definido, Codex high e necessario para o review plano-vs-entrega, mesmo quando a implementacao for puramente front-end/UI ou imagem. Se Codex falhar nesse caso, mostre a remediacao e pergunte se o usuario quer corrigir Codex, continuar assumindo o risco sem esse review comparativo, ou cancelar.
 
 Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
 
@@ -85,15 +88,19 @@ Antes de delegar, levante somente o que muda a execucao:
 - arquivos/modulos provaveis;
 - tipo de trabalho: `BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`;
 - se `tipo_trabalho` for `UI_FRONTEND` ou `IMAGE_ASSET`, marque `codex_excluido: true` — Codex nao participa do fluxo para tasks puramente front-end;
+- se a demanda trouxer plano pre-definido (texto estruturado, arquivo citado, artefato existente, checkpoint, ou termos como "siga este plano", "plano aprovado", "plano ja definido"), marque `plano_predefinido: true`;
+- se `plano_predefinido: true`, Codex fica excluido da implementacao de UI/asset, mas nao do review read-only de plano-vs-entrega;
 - risco: `LOW`, `MEDIUM`, `HIGH`;
 - comandos de verificacao obvios;
 - perguntas bloqueantes, se existirem.
 
 Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte uma vez, com opcoes concretas.
 
+**Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
+
 ### Fase 2 - Mapa de execucao curto
 
-Crie um plano mental ou, se a tarefa passar de 2 agentes, um arquivo leve:
+Crie um plano mental ou, se a tarefa passar de 2 agentes ou houver plano pre-definido, um arquivo leve:
 
 ```text
 {artefatos_dir}/execution-brief.md
@@ -107,6 +114,8 @@ Use `assets/plan-template.md` como base. O plano deve caber em uma tela e conter
 - comandos de verificacao;
 - risco e rollback simples.
 
+Se houver plano pre-definido, use `{artefatos_dir}/execution-brief.md` como mapa operacional derivado do baseline, nao como novo plano de produto. Inclua referencia a `{artefatos_dir}/initial-plan-baseline.md`, destaque qualquer adaptacao necessaria e mantenha o review final obrigatorio.
+
 **Contrato de interface (obrigatorio para full-stack):**
 
 Se a task envolver dois ou mais agentes onde um produz dados/API consumidos pelo outro (ex: Codex no backend + AGY no front-end), crie `{artefatos_dir}/interface-contract.md` antes de delegar. Use o template de `references/contracts.md`. O contrato deve caber em uma tela. Inclua o caminho do contrato no campo `interface_contract: true` do checkpoint.
@@ -115,9 +124,9 @@ Todos os agentes afetados recebem o contrato no prompt e ficam proibidos de alte
 
 Nao crie o contrato se a task for puramente visual, teste-only, docs-only, ou consumir API ja existente sem mudar shape.
 
-**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `slices`, `waves`, `tipo_trabalho`, `risco`, `interface_contract` e `artefatos_dir`.
+**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `slices`, `waves`, `tipo_trabalho`, `risco`, `interface_contract`, `artefatos_dir`, `plano_predefinido`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega`.
 
-Nao crie artefatos formais se a demanda couber em execucao direta ou em um unico agente.
+Nao crie artefatos formais se a demanda couber em execucao direta ou em um unico agente, exceto quando houver plano pre-definido. Nesse caso, crie pelo menos `{artefatos_dir}/initial-plan-baseline.md` e, no fim, `{artefatos_dir}/plan-vs-output-review.md`.
 
 ### Fase 3 - Decidir execucao direta vs agentes
 
@@ -135,6 +144,7 @@ Use esta regra:
 | N areas independentes de dominios diferentes (AGY + Codex) | N agentes em paralelo (waves na camada Claude); sem limite fixo — o criterio e ownership disjunto |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
 | Auth, permissao, dados ou migration sensivel | Codex high para review antes/depois |
+| Plano pre-definido detectado | Execute sobre o baseline e rode Codex high read-only para comparar plano inicial vs entrega gerada |
 
 Evite agentes ociosos. Agente bom tem ownership claro e saida testavel.
 
@@ -149,6 +159,7 @@ Cada prompt deve incluir:
 - arquivos que nao pode tocar;
 - criterio de aceite;
 - comandos de verificacao esperados;
+- quando houver plano pre-definido: caminho de `{artefatos_dir}/initial-plan-baseline.md` e criterios do baseline que afetam a fatia;
 - regra para nao reverter edicoes de outros agentes;
 - formato de retorno: status, resumo, arquivos alterados, testes, riscos, pendencias.
 
@@ -190,13 +201,26 @@ Execute verificacoes proporcionais ao risco:
 
 Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario deve rodar depois.
 
+### Fase 6.5 - Review plano vs entrega
+
+Execute esta fase somente quando `plano_predefinido: true`.
+
+1. Leia `{artefatos_dir}/initial-plan-baseline.md`, o diff atual, `execution-brief.md`, `subagents-context.md` e os arquivos alterados.
+2. Delegue um review read-only para Codex high usando o prompt `2.1 Codex review plano vs entrega high` de `references/subagent-prompts.md`.
+3. O review deve comparar o plano inicial com o que foi gerado: requisitos, criterios de aceite, entregaveis, contratos, arquivos planejados/alterados e verificacoes planejadas/executadas.
+4. Salve o parecer em `{artefatos_dir}/plan-vs-output-review.md`.
+5. Se a decisao for `DESALINHADO`, corrija o que for pequeno e seguro ou marque `BLOCKED` com os desvios. Nao feche como concluido sem tratar ou registrar cada desvio.
+6. Atualize `.executor/checkpoint.json` em `review_plano_vs_entrega` com `status: REVIEWED | BLOCKED | FALLBACK_INTERNAL` e `path`.
+
+Se Codex high falhar por quota nessa fase, siga a politica de "Codex bate a cota em revisao": faca review interno read-only, salve no mesmo `{artefatos_dir}/plan-vs-output-review.md` e registre o fallback explicitamente.
+
 ### Fase 7 - Fechamento interno
 
 Conclua integracao, verificacao e decisoes. Para tarefas pequenas (execucao direta ou 1 agente de baixo risco), entregue o fechamento no chat com: o que mudou, arquivos principais, verificacoes e proximo passo. Em seguida, prossiga para a etapa de relatorio final.
 
 ### Fase 8 - Monitoramento
 
-> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4-6 de execucao. Crie `{artefatos_dir}/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
+> **Concorrencia:** o monitoramento corre em paralelo com as Fases 4-6.5 de execucao e review condicional. Crie `{artefatos_dir}/monitoring.md` na Fase 4 ao lancar os primeiros agentes e mantenha-o atualizado ate o fim da Fase 8. Esta secao documenta o protocolo.
 
 O orquestrador mantem `{artefatos_dir}/monitoring.md` como **fonte viva** de todos os eventos durante a execucao dos subagentes. Use `assets/monitoring-template.md` como base. Nao implementa - apenas supervisiona.
 
@@ -281,7 +305,7 @@ O executor (Claude) assume a task diretamente quando todos os degraus acima falh
 
 1. O orquestrador nao redelega para outro agente.
 2. Faz ele mesmo um **review interno read-only** (apenas leitura, sem editar codigo).
-3. Salva o resultado em `{artefatos_dir}/review-final.md`.
+3. Salva o resultado em `{artefatos_dir}/review-final.md`; se a revisao for da Fase 6.5, salva em `{artefatos_dir}/plan-vs-output-review.md`.
 4. Registra explicitamente que foi "fallback interno do orquestrador por indisponibilidade de quota do Codex".
 5. Este fallback e reportado nos tres entregaveis finais (`{artefatos_dir}/workflow-log.md`, `{artefatos_dir}/subagents-context.md`, `{artefatos_dir}/implementation-report.md`).
 
@@ -298,7 +322,7 @@ O orquestrador coleta o campo `Skills utilizadas` de todos os subagentes e conso
 
 ### Fase 9 - Relatorio final
 
-Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, ou que o usuario queira rastreabilidade, gere os tres entregaveis obrigatorios em `{artefatos_dir}/`:
+Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, tiver plano pre-definido, ou que o usuario queira rastreabilidade, gere os tres entregaveis obrigatorios em `{artefatos_dir}/`:
 
 ```text
 {artefatos_dir}/workflow-log.md
@@ -311,11 +335,12 @@ Use os templates de `assets/` como base. Regras:
 - **workflow-log.md**: log auditavel completo com metadados, linha do tempo por fase (0 a 9), tabela de subagentes por onda, registro de falhas e recuperacoes, decisoes do orquestrador com motivo e impacto, e tabela consolidada de tokens.
 - **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
 - **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
+- Se houver plano pre-definido, os tres entregaveis devem referenciar `{artefatos_dir}/initial-plan-baseline.md` e `{artefatos_dir}/plan-vs-output-review.md`.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
 
-**Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9` e `status: "DONE"`. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` sem criar o arquivo se ele nao existia.
+**Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9` e `status: "DONE"`. Se `plano_predefinido: true`, confirme tambem `review_plano_vs_entrega.status: REVIEWED` ou registre o bloqueio. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` sem criar o arquivo se ele nao existia, exceto quando houver plano pre-definido.
 
 **Secao 14 - Instrucoes de negocio** (parte opcional do `implementation-report.md`):
 
@@ -345,6 +370,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Nao altere auth/autorizacao/segredos sem review dedicado.
 - Nao ignore erro de build/teste; se aceitar uma falha, registre como pendencia.
 - Para front-end/UI puro (`UI_FRONTEND`, `IMAGE_ASSET`): Codex nao participa do fluxo — nem como agente, nem como fallback. Aplique somente a escada AGY (pro-high → flash-medium → executor direto). Nunca lance Codex para estas tasks.
+- Excecao: se `plano_predefinido: true`, Codex high participa apenas como review read-only na Fase 6.5 para comparar o plano inicial com a entrega gerada; ele nao implementa nem faz fallback de UI/asset.
 - Para imagem/asset: sem AGY nao ha fallback automatico; registre como `BLOCKED` e pergunte ao usuario.
 
 ## Comunicacao

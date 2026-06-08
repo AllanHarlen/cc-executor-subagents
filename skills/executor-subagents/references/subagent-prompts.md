@@ -102,6 +102,46 @@ Retorne:
 5. Proximo passo minimo
 ```
 
+## 2.1 Codex review plano vs entrega high
+
+**Subagent type:** `codex:codex-rescue`
+
+Use quando a execucao partiu de um plano pre-definido pelo usuario, por arquivo ou por checkpoint.
+
+```text
+--model gpt-5.5-codex --effort high
+
+NAO modifique arquivos. Apenas compare plano e entrega.
+
+Demanda original:
+<DEMANDA>
+
+Plano pre-definido baseline:
+- Fonte: <MENSAGEM, ARQUIVO, CHECKPOINT>
+- Arquivo preservado: {artefatos_dir}/initial-plan-baseline.md
+
+Entrega gerada:
+- diff git atual
+- arquivos alterados: <LISTA>
+- artefatos de execucao: {artefatos_dir}/execution-brief.md, {artefatos_dir}/subagents-context.md, {artefatos_dir}/implementation-report.md, quando existirem
+
+Compare:
+- requisitos e criterios de aceite do plano inicial;
+- entregaveis previstos versus entregaveis gerados;
+- arquivos/modulos planejados versus arquivos/modulos alterados;
+- desvios de escopo, omissoes, alteracoes de contrato e suposicoes novas;
+- testes/verificacoes planejados versus executados.
+
+Retorne:
+1. Decisao: ALINHADO | ALINHADO COM DESVIOS ACEITOS | DESALINHADO
+2. Matriz plano vs entrega: item do plano, evidencia gerada, status
+3. Desvios bloqueantes com arquivo/linha quando possivel
+4. Desvios nao bloqueantes
+5. Verificacoes faltantes
+6. Proximo passo minimo para alinhar ao plano
+7. Tokens usados, se disponivel
+```
+
 ## 3. AGY front-end/UI
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-agent`

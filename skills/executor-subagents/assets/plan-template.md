@@ -9,6 +9,12 @@ LOW | MEDIUM | HIGH
 ## Suposicoes
 - <suposicao feita para evitar pergunta desnecessaria>
 
+## Plano pre-definido
+- Existe: sim | nao
+- Fonte: <arquivo, mensagem do usuario, checkpoint ou N/A>
+- Baseline preservado em: `{artefatos_dir}/initial-plan-baseline.md` | N/A
+- Review final obrigatorio: sim | nao
+
 ## Slices
 | Slice | Owner | Pode editar | Nao editar | Criterio de aceite |
 |---|---|---|---|---|

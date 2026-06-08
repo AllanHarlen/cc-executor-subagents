@@ -8,6 +8,7 @@ O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor pratico
 - sem contratos longos por padrao;
 - sem duplas fixas back-end/front-end;
 - com slices independentes por ownership;
+- com suporte a plano pre-definido, preservando baseline e comparando entrega final com Codex high;
 - com Codex como executor principal de backend, testes e review;
 - com Antigravity (AGY) obrigatorio para front-end/UI, imagem e contexto largo;
 - com verificacao e reporte enxutos.
@@ -40,7 +41,8 @@ Fluxo resumido:
 6. agentes independentes em paralelo;
 7. integracao pelo executor principal;
 8. verificacoes proporcionais ao risco;
-9. resumo final.
+9. review Codex high plano-vs-entrega quando houver plano pre-definido;
+10. resumo final.
 
 Roteamento padrao:
 
@@ -59,13 +61,17 @@ Artefatos opcionais ficam em `.executor/{slug-da-demanda}/artefatos/`:
 `-- desenvolva-pagina-clientes/
     `-- artefatos/
         |-- execution-brief.md
+        |-- initial-plan-baseline.md
+        |-- plan-vs-output-review.md
         |-- monitoring.md
         |-- workflow-log.md
         |-- subagents-context.md
         `-- implementation-report.md
 ```
 
-Eles so sao criados quando ajudam, normalmente em execucoes com 2+ agentes ou risco medio/alto.
+Eles so sao criados quando ajudam, normalmente em execucoes com 2+ agentes, risco medio/alto ou quando a demanda vem com plano pre-definido.
+
+Quando o usuario passa um plano pronto (por texto, arquivo, checkpoint ou "siga este plano"), o executor preserva esse conteudo em `initial-plan-baseline.md`, executa sobre ele e, antes de fechar, usa Codex high em modo read-only para gerar `plan-vs-output-review.md`, comparando o definido inicialmente com o que foi gerado.
 
 ## Pre-requisitos
 
@@ -138,7 +144,7 @@ O preflight tambem valida:
 - `agy --help` com `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout` e `--prompt-interactive`;
 - o bridge do `cc-antigravity-plugin` com `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--timeout`, `--continue`, `--conversation` e `--print-command`.
 
-Se Codex falhar no preflight, o `/executor` cancela. Se somente AGY falhar, o executor mostra a remediacao e pede decisao: corrigir AGY, continuar so com Codex, ou cancelar.
+Se Codex falhar no preflight, o `/executor` cancela para backend/testes/review. Para UI ou asset puro sem plano pre-definido, pode seguir sem Codex. Se houver plano pre-definido, Codex high volta a ser necessario para o review read-only plano-vs-entrega. Se somente AGY falhar, o executor mostra a remediacao e pede decisao: corrigir AGY, continuar so com Codex, deixar o executor assumir UI diretamente, ou cancelar.
 
 ## Instalacao
 
@@ -184,6 +190,10 @@ Validar:
 /executor analise o impacto de refatorar o modulo auth antes de mexer no backend
 ```
 
+```text
+/executor siga o plano em .executor/minha-demanda/artefatos/initial-plan-baseline.md e implemente; ao final compare plano vs entrega com Codex high
+```
+
 ## Como o executor decide
 
 Casos comuns:
@@ -191,6 +201,7 @@ Casos comuns:
 - bug ou patch backend localizado: Codex
 - testes quebrados e glue code: Codex
 - review de risco: Codex high
+- plano pre-definido: executar sobre o baseline + Codex high read-only em `plan-vs-output-review.md`
 - front-end/UI do dia a dia: AGY `gemini-3.5-flash-medium`
 - front-end/UI complexa: AGY `gemini-3.1-pro-high`
 - analise de arquitetura ou impacto: AGY `--read-only`
@@ -241,6 +252,7 @@ cc-executor-subagents/
 - **Ownership claro.** Cada agente sabe o que pode e o que nao pode editar.
 - **Paralelismo seletivo.** Use varios agentes quando houver fatias independentes.
 - **Executor integra.** Pequenos ajustes de glue podem ser feitos diretamente.
+- **Plano pronto vira baseline.** Se ja existe plano, o executor trabalha sobre ele e revisa a entrega final contra esse baseline.
 - **Front-end com AGY.** UI e assets visuais seguem pelo `cc-antigravity-plugin`.
 - **Fallback explicito.** Falha de AGY nao vira fallback silencioso; o executor pede decisao ao usuario.
 - **Verificacao proporcional.** Teste o suficiente para o risco da mudanca.

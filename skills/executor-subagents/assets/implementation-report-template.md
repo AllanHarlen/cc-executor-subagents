@@ -14,6 +14,8 @@
 | Tipo de trabalho | BUG \| REFACTOR \| FEATURE_SLICE \| TEST_FIX \| UI_FRONTEND \| IMAGE_ASSET \| DOCS \| REVIEW |
 | Risco | LOW \| MEDIUM \| HIGH |
 | Modo de execucao | DIRETO \| 1-AGENTE \| MULTI-AGENTE |
+| Plano pre-definido | Sim \| Nao |
+| Baseline do plano | `{artefatos_dir}/initial-plan-baseline.md` \| N/A |
 
 ---
 
@@ -53,6 +55,21 @@ _N/A se nenhum contrato de interface foi criado ou necessario._
 ## 6. Arquivos alterados
 
 - `<path>` — <descricao curta da mudanca>
+
+---
+
+## 6.1 Review de plano pre-definido
+
+_Preencha somente quando a execucao partiu de um plano pre-definido. Caso contrario, use `N/A`._
+
+| Campo | Valor |
+|---|---|
+| Review obrigatorio | Sim \| Nao |
+| Agente/modelo | Codex gpt-5.5-codex high \| fallback interno por quota \| N/A |
+| Arquivo do parecer | `{artefatos_dir}/plan-vs-output-review.md` \| N/A |
+| Decisao | ALINHADO \| ALINHADO COM DESVIOS ACEITOS \| DESALINHADO \| N/A |
+| Desvios encontrados | Nenhum \| <lista curta> |
+| Acao aplicada apos review | Nenhuma \| <ajuste feito> \| <pendencia registrada> |
 
 ---
 

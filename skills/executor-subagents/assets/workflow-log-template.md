@@ -9,6 +9,8 @@
 | Fim | <YYYY-MM-DD HH:MM UTC ou EM ANDAMENTO> |
 | Status final | CONCLUIDO \| BLOQUEADO \| CANCELADO \| EM ANDAMENTO |
 | Modo | DIRETO \| 1-AGENTE \| MULTI-AGENTE \| GOAL-AUTONOMO |
+| Plano pre-definido | Sim \| Nao |
+| Baseline do plano | `{artefatos_dir}/initial-plan-baseline.md` \| N/A |
 
 ---
 
@@ -17,15 +19,16 @@
 | Fase | Nome | Status | Inicio | Fim | Artefatos gerados | Falhas |
 |---|---|---|---|---|---|---|
 | 0 | Preflight | OK \| AVISO \| FALHA | | | preflight.json | <falha ou N/A> |
-| 1 | Triagem | OK \| PULADO | | | execution-brief.md | N/A |
-| 2 | Mapa de execucao | OK \| PULADO | | | plan.md | N/A |
+| 1 | Triagem | OK \| PULADO | | | initial-plan-baseline.md (se houver plano) | N/A |
+| 2 | Mapa de execucao | OK \| PULADO | | | execution-brief.md | N/A |
 | 3 | Decisao de execucao | OK | | | - | N/A |
 | 4 | Delegacao paralela | OK \| PULADO | | | - | <falha ou N/A> |
 | 5 | Integracao | OK \| PULADO | | | - | <falha ou N/A> |
 | 6 | Verificacao | OK \| FALHOU \| PULADO | | | - | <falha ou N/A> |
+| 6.5 | Review plano vs entrega | OK \| FALHOU \| BLOQUEADO \| N/A | | | {artefatos_dir}/plan-vs-output-review.md | <falha ou N/A> |
 | 7 | Fechamento interno | OK | | | - | N/A |
 | 8 | Monitoramento | ATIVO \| CONCLUIDO \| N/A | | | {artefatos_dir}/monitoring.md | <falha ou N/A> |
-| 9 | Relatorio final | OK | | | {artefatos_dir}/workflow-log.md, {artefatos_dir}/subagents-context.md, {artefatos_dir}/implementation-report.md | N/A |
+| 9 | Relatorio final | OK | | | {artefatos_dir}/workflow-log.md, {artefatos_dir}/subagents-context.md, {artefatos_dir}/implementation-report.md, plan-vs-output-review.md (se houver plano) | N/A |
 
 ---
 

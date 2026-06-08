@@ -1,5 +1,5 @@
 {
-  "version": "2",
+  "version": "3",
   "demanda": "",
   "fase_atual": 0,
   "timestamp": "",
@@ -7,6 +7,14 @@
   "agy_disponivel": true,
   "tipo_trabalho": "",
   "risco": "LOW",
+  "plano_predefinido": false,
+  "plano_predefinido_fonte": "",
+  "baseline_plano_path": "",
+  "review_plano_vs_entrega": {
+    "obrigatorio": false,
+    "status": "N/A",
+    "path": ""
+  },
   "slices": [],
   "waves": [],
   "interface_contract": false,

@@ -26,7 +26,7 @@ node skills/executor-subagents/scripts/preflight.mjs
 | `agy --help` com flags essenciais | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
 | bridge do AGY com flags atuais | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
 
-Falha de Codex bloqueia apenas para tasks que nao sejam puramente front-end. Se a demanda for `UI_FRONTEND` ou `IMAGE_ASSET`, falha de Codex nao cancela — prossiga sem ele. Para qualquer outra natureza de task, falha de Codex cancela com remediacao.
+Falha de Codex bloqueia apenas para tasks que nao sejam puramente front-end, exceto quando houver plano pre-definido. Se a demanda for `UI_FRONTEND` ou `IMAGE_ASSET` sem plano pre-definido, falha de Codex nao cancela — prossiga sem ele. Se houver plano pre-definido, Codex high e necessario para o review read-only plano-vs-entrega; remedeie Codex ou registre aceite explicito do usuario para seguir sem esse review. Para qualquer outra natureza de task, falha de Codex cancela com remediacao.
 
 Falha somente de AGY deve pausar o fluxo e pedir decisao do usuario: remediar, continuar so com Codex, ou cancelar.
 
@@ -119,4 +119,4 @@ npx ctx7 setup --claude
 
 ## Politica
 
-Nao faca fallback silencioso se Codex falhar em tasks que nao sejam front-end puro. Para tasks `UI_FRONTEND` ou `IMAGE_ASSET`, falha de Codex e ignorada silenciosamente (registre no checkpoint como `codex_excluido: true`). Para AGY, exponha a falha, mostre a remediacao e peca uma decisao explicita antes de seguir so com Codex.
+Nao faca fallback silencioso se Codex falhar em tasks que nao sejam front-end puro. Para tasks `UI_FRONTEND` ou `IMAGE_ASSET` sem plano pre-definido, falha de Codex e ignorada silenciosamente (registre no checkpoint como `codex_excluido: true`). Se houver plano pre-definido, Codex high deve ficar disponivel para a Fase 6.5 ou a ausencia dele precisa ser aceita explicitamente pelo usuario. Para AGY, exponha a falha, mostre a remediacao e peca uma decisao explicita antes de seguir so com Codex.
