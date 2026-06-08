@@ -1,10 +1,10 @@
 # Contrato de Interface
 
-Em tasks full-stack onde um agente produz dados/API e outro os consome, o risco de divergencia de contrato e real. O executor cria `.executor/interface-contract.md` **antes de delegar** nesse caso. Todos os agentes recebem o contrato no prompt e nao podem alterar os campos acordados unilateralmente.
+Em tasks full-stack onde um agente produz dados/API e outro os consome, o risco de divergencia de contrato e real. O executor cria `{artefatos_dir}/interface-contract.md` **antes de delegar** nesse caso. Todos os agentes recebem o contrato no prompt e nao podem alterar os campos acordados unilateralmente.
 
 ## Quando criar o contrato (obrigatorio)
 
-Crie `.executor/interface-contract.md` quando **todas** as condicoes abaixo forem verdadeiras:
+Crie `{artefatos_dir}/interface-contract.md` quando **todas** as condicoes abaixo forem verdadeiras:
 
 - dois ou mais agentes participam da wave;
 - ao menos um deles produz dados (endpoint, payload, tipo) que outro consome;

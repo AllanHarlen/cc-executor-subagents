@@ -69,7 +69,15 @@ Depois encerre.
    - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
    - backend/testes/review: Codex.
 
-8. Se usar 2+ agentes, determine `artefatos_dir` (`.executor/demanda-passada-nN/artefatos` onde N = numero de subpastas existentes + 1), salve no checkpoint, e crie todos os artefatos dentro de `artefatos_dir`. Mantenha `{artefatos_dir}/monitoring.md` como fonte viva de eventos (Fase 8): status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase. **Nunca crie artefatos .md na raiz do projeto.**
+8. Se usar 2+ agentes, determine `artefatos_dir` (`.executor/demanda-passada-nN/artefatos` onde N = numero de subpastas existentes + 1), salve no checkpoint, e crie todos os artefatos dentro de `artefatos_dir`. Artefatos obrigatorios desta fase:
+
+   ```text
+   {artefatos_dir}/execution-brief.md     (plano de slices/waves — use assets/plan-template.md)
+   {artefatos_dir}/interface-contract.md  (somente para full-stack com shape de API novo — use references/contracts.md)
+   {artefatos_dir}/monitoring.md          (fonte viva de eventos — use assets/monitoring-template.md)
+   ```
+
+   Mantenha `{artefatos_dir}/monitoring.md` atualizado durante as Fases 4-8: status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase. **Nunca crie artefatos .md na raiz do projeto.**
 
 9. Delegue em paralelo por ownership, nao por dupla fixa.
 

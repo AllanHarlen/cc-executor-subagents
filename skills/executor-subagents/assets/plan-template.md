@@ -24,7 +24,7 @@ LOW | MEDIUM | HIGH
 
 ## Contrato de interface
 - Necessario: sim | nao
-- Arquivo: `.executor/interface-contract.md` (se necessario)
+- Arquivo: `{artefatos_dir}/interface-contract.md` (se necessario)
 
 ## Riscos e rollback
 - Risco:
