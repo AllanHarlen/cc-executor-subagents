@@ -1,65 +1,69 @@
 # cc-executor-subagents
 
-Plugin de Claude Code para resolucoes rapidas com subagentes. Ele adiciona a skill **`executor-subagents`** e o comando **`/executor`**.
+Claude Code plugin for rapid execution with subagents. It adds the skill **`executor-subagents`** and the command **`/executor`**.
 
-O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor pratico multiagente**:
+📖 **[Documentação em Português](./README.pt-BR.md)** | **Portuguese Documentation**
 
-- sem OpenSpec obrigatorio;
-- sem contratos longos por padrao;
-- sem duplas fixas back-end/front-end;
-- com slices independentes por ownership;
-- com suporte a plano pre-definido, preservando baseline e comparando entrega final com Codex high;
-- com Codex como executor principal de backend, testes e review;
-- com Antigravity (AGY) obrigatorio para front-end/UI, imagem e contexto largo;
-- com verificacao e reporte enxutos.
+## Overview
 
-## Quando usar
+Focus has shifted from "architectural orchestrator with OpenSpec" to **practical multi-agent executor**:
 
-Use `/executor` para:
+- no mandatory OpenSpec;
+- no long-form contracts by default;
+- no fixed back-end/front-end pairs;
+- independent slices by ownership;
+- support for pre-defined plans, preserving baseline and comparing final delivery with Codex high;
+- Codex as main executor for backend, tests, and review;
+- Antigravity (AGY) mandatory for front-end/UI, images, and wide context;
+- lean verification and reporting.
 
-- corrigir bugs;
-- refatorar uma area localizada;
-- reparar testes;
-- implementar ou ajustar front-end/UI;
-- gerar mockups, banners, logos ou outros assets visuais;
-- implementar uma feature slice pequena;
-- ajustar endpoints/servicos/telas com escopo curto;
-- investigar causa raiz enquanto outro agente prepara patch;
-- rodar review rapido de risco.
+## When to Use
 
-Nao use para edicoes triviais de 1-2 linhas. Nesses casos, Claude direto e mais rapido. Para mudancas arquiteturais grandes, especificacao formal ou rollout complexo, use outro fluxo mais pesado.
+Use `/executor` for:
 
-## Como funciona
+- fixing bugs;
+- refactoring a localized area;
+- repairing tests;
+- implementing or adjusting front-end/UI;
+- generating mockups, banners, logos, or other visual assets;
+- implementing a small feature slice;
+- adjusting endpoints/services/screens with narrow scope;
+- investigating root cause while another agent prepares a patch;
+- running a quick risk review.
 
-Fluxo resumido:
+Do not use for trivial 1–2 line edits. In those cases, Claude directly is faster. For large architectural changes, formal specification, or complex rollout, use another heavier workflow.
 
-1. preflight leve;
-2. triagem rapida da demanda;
-3. decisao entre execucao direta, 1 agente ou varios agentes;
-4. roteamento por tipo de trabalho;
-5. split por ownership de arquivos/modulos;
-6. agentes independentes em paralelo;
-7. integracao pelo executor principal;
-8. verificacoes proporcionais ao risco;
-9. review Codex high plano-vs-entrega quando houver plano pre-definido;
-10. resumo final.
+## How It Works
 
-Roteamento padrao:
+Simplified flow:
 
-- front-end/UI: AGY em modo agentic;
-- varios entregaveis AGY independentes (relatorios, componentes): AGY com `--parallel` (fan-out nativo de subagentes Gemini; `--subagent-model` opcional para subagentes mais baratos);
-- imagem/asset explicito: AGY com `--generate-imagem`;
-- analise cross-file: AGY com `--read-only`;
-- backend, testes e review: Codex.
+1. light preflight;
+2. quick demand triage;
+3. decision between direct execution, 1 agent, or multiple agents;
+4. routing by work type;
+5. split by file/module ownership;
+6. independent agents in parallel;
+7. integration by main executor;
+8. checks proportional to risk;
+9. Codex high plan-vs-delivery review when a pre-defined plan exists;
+10. final summary.
 
-O paralelismo pode acontecer em duas camadas: waves na camada do Claude Code (slices de domínios diferentes, ex.: AGY + Codex) ou fan-out nativo dentro de um único agente AGY (`--parallel`) quando todos os entregáveis sao de domínio AGY.
+Default routing:
 
-Artefatos opcionais ficam em `.executor/{slug-da-demanda}/artefatos/`:
+- front-end/UI: AGY in agentic mode;
+- multiple independent AGY deliverables (reports, components): AGY with `--parallel` (native fan-out of Gemini subagents; `--subagent-model` optional for cheaper subagents);
+- explicit image/asset: AGY with `--generate-imagem`;
+- cross-file analysis: AGY with `--read-only`;
+- backend, tests, and review: Codex.
+
+Parallelism can happen at two layers: waves at the Claude Code layer (slices from different domains, e.g., AGY + Codex) or native fan-out within a single AGY agent (`--parallel`).
+
+Optional artifacts live in `.executor/{demand-slug}/artifacts/`:
 
 ```text
 .executor/
-`-- desenvolva-pagina-clientes/
-    `-- artefatos/
+`-- develop-clients-page/
+    `-- artifacts/
         |-- execution-brief.md
         |-- initial-plan-baseline.md
         |-- plan-vs-output-review.md
@@ -69,45 +73,45 @@ Artefatos opcionais ficam em `.executor/{slug-da-demanda}/artefatos/`:
         `-- implementation-report.md
 ```
 
-Eles so sao criados quando ajudam, normalmente em execucoes com 2+ agentes, risco medio/alto ou quando a demanda vem com plano pre-definido.
+They are only created when they help, typically in executions with 2+ agents, medium/high risk, or when the demand comes with a pre-defined plan.
 
-Quando o usuario passa um plano pronto (por texto, arquivo, checkpoint ou "siga este plano"), o executor preserva esse conteudo em `initial-plan-baseline.md`, executa sobre ele e, antes de fechar, usa Codex high em modo read-only para gerar `plan-vs-output-review.md`, comparando o definido inicialmente com o que foi gerado.
+When the user passes a ready-made plan (by text, file, checkpoint, or "follow this plan"), the executor preserves that content in `initial-plan-baseline.md`, executes against it, and before closing, reviews and compares the final delivery against the original plan in `plan-vs-output-review.md`.
 
-## Pre-requisitos
+## Prerequisites
 
-Obrigatorios:
+Mandatory:
 
-| Item | Verificar |
+| Item | Check |
 |---|---|
 | Node.js | `node --version` |
 | Codex CLI | `codex --version` |
 | Antigravity CLI (`agy`) | `agy --version` |
-| plugin `openai-codex` | instalado no Claude Code |
-| plugin `cc-antigravity-plugin` `>= 3.6.0` | instalado no Claude Code |
-| permissao `Bash(node:*)` | `.claude/settings.json` |
+| `openai-codex` plugin | installed in Claude Code |
+| `cc-antigravity-plugin` `>= 3.6.0` plugin | installed in Claude Code |
+| `Bash(node:*)` permission | `.claude/settings.json` |
 
-Opcionais:
+Optional:
 
-| Item | Uso |
+| Item | Use |
 |---|---|
-| Context7 MCP | docs atuais de libs/frameworks/APIs |
-| `/goal` hooks | autonomia entre turnos |
+| Context7 MCP | current docs for libs/frameworks/APIs |
+| `/goal` hooks | autonomy between turns |
 
-Instalar Codex:
+Install Codex:
 
 ```bash
 npm install -g @openai/codex
 codex login
 ```
 
-Instalar plugin Codex no Claude Code:
+Install Codex plugin in Claude Code:
 
 ```text
 /plugin marketplace add openai/codex-plugin-cc
 /plugin install codex@openai-codex
 ```
 
-Permissao minima no projeto alvo:
+Minimum permission in target project:
 
 ```json
 {
@@ -119,7 +123,7 @@ Permissao minima no projeto alvo:
 }
 ```
 
-Instalar Antigravity (AGY):
+Install Antigravity (AGY):
 
 ```bash
 curl -fsSL https://antigravity.google/cli/install.sh | bash
@@ -131,7 +135,7 @@ Windows:
 irm https://antigravity.google/cli/install.ps1 | iex
 ```
 
-Autenticacao: abra `agy` interativamente e faca login.
+Authentication: open `agy` interactively and log in.
 
 ```text
 /plugin marketplace add AllanHarlen/cc-antigravity-plugin
@@ -139,19 +143,19 @@ Autenticacao: abra `agy` interativamente e faca login.
 /reload-plugins
 ```
 
-O preflight tambem valida:
+Preflight also validates:
 
-- `agy --help` com `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout` e `--prompt-interactive`;
-- o bridge do `cc-antigravity-plugin` com `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--timeout`, `--continue`, `--conversation` e `--print-command`.
+- `agy --help` with `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, and `--prompt-interactive`;
+- the bridge of `cc-antigravity-plugin` with `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--timeout`, `--continue`, `--conversation`, and `--print-command`.
 
-Se Codex falhar no preflight, o `/executor` cancela para backend/testes/review. Para UI ou asset puro sem plano pre-definido, pode seguir sem Codex. Se houver plano pre-definido, Codex high volta a ser necessario para o review read-only plano-vs-entrega. Se somente AGY falhar, o executor mostra a remediacao e pede decisao: corrigir AGY, continuar so com Codex, deixar o executor assumir UI diretamente, ou cancelar.
+If Codex fails preflight, `/executor` cancels for backend/tests/review. For UI or pure asset without a pre-defined plan, it can proceed without Codex. If a pre-defined plan exists, Codex high comes back for the review phase.
 
-## Instalacao
+## Installation
 
 Local:
 
 ```text
-/plugin marketplace add "C:\Users\allan\Desktop\Projetos Pessoais\cc-executor-subagents"
+/plugin marketplace add "C:\Users\allan\Desktop\Personal Projects\cc-executor-subagents"
 /plugin install cc-executor-subagents@cc-executor-subagents
 ```
 
@@ -162,57 +166,57 @@ GitHub:
 /plugin install cc-executor-subagents@cc-executor-subagents
 ```
 
-Validar:
+Validate:
 
 ```text
 /executor preflight
 ```
 
-## Uso
+## Usage
 
 ```text
-/executor corrija o bug que quebra o login quando o usuario nao tem avatar
+/executor fix the bug that breaks login when user has no avatar
 ```
 
 ```text
-/executor refatore o service de pagamentos para remover duplicacao e ajuste os testes quebrados
+/executor refactor the payment service to remove duplication and fix broken tests
 ```
 
 ```text
-/executor deixe a tela de onboarding responsiva e corrija os estados de loading/empty/error
+/executor make the onboarding screen responsive and fix loading/empty/error states
 ```
 
 ```text
-/executor crie um mockup de hero e salve o asset em assets/onboarding usando AGY --generate-imagem
+/executor create a hero mockup and save the asset to assets/onboarding using AGY --generate-imagem
 ```
 
 ```text
-/executor analise o impacto de refatorar o modulo auth antes de mexer no backend
+/executor analyze the impact of refactoring the auth module before touching the backend
 ```
 
 ```text
-/executor siga o plano em .executor/minha-demanda/artefatos/initial-plan-baseline.md e implemente; ao final compare plano vs entrega com Codex high
+/executor follow the plan in .executor/my-demand/artifacts/initial-plan-baseline.md and implement; at the end compare plan vs delivery with Codex high
 ```
 
-## Como o executor decide
+## How the Executor Decides
 
-Casos comuns:
+Common cases:
 
-- bug ou patch backend localizado: Codex
-- testes quebrados e glue code: Codex
-- review de risco: Codex high
-- plano pre-definido: executar sobre o baseline + Codex high read-only em `plan-vs-output-review.md`
-- front-end/UI do dia a dia: AGY `gemini-3.5-flash-medium`
-- front-end/UI complexa: AGY `gemini-3.1-pro-high`
-- analise de arquitetura ou impacto: AGY `--read-only`
-- asset visual explicito: AGY `--generate-imagem`
+- localized backend bug or patch: Codex
+- broken tests and glue code: Codex
+- risk review: Codex high
+- pre-defined plan: execute against baseline + Codex high read-only in `plan-vs-output-review.md`
+- daily front-end/UI: AGY `gemini-3.5-flash-medium`
+- complex front-end/UI: AGY `gemini-3.1-pro-high`
+- architecture analysis or impact: AGY `--read-only`
+- explicit visual asset: AGY `--generate-imagem`
 
-## Modo autonomo
+## Autonomous Mode
 
-Para deixar o Claude continuar entre turnos:
+To let Claude continue between turns:
 
 ```text
-/goal Execute a skill cc-executor-subagents:executor-subagents para: <demanda>. Condicao de conclusao: preflight OK; escopo rapido definido; agentes independentes lancados ou decisao documentada de execucao direta; patches integrados; testes/verificacoes executados ou impedimento registrado; resumo final com arquivos alterados, riscos e proximos passos publicado na conversa; ou pare apos 12 turnos preservando o estado.
+/goal Execute the cc-executor-subagents:executor-subagents skill for: <demand>. Conclusion condition: preflight OK; quick scope defined; independent agents launched or decision documented [...]
 ```
 
 ## Layout
@@ -246,14 +250,14 @@ cc-executor-subagents/
             `-- subagents-context-template.md
 ```
 
-## Principios
+## Principles
 
-- **Resolver antes de ritualizar.** Planejamento curto, execucao real.
-- **Ownership claro.** Cada agente sabe o que pode e o que nao pode editar.
-- **Paralelismo seletivo.** Use varios agentes quando houver fatias independentes.
-- **Executor integra.** Pequenos ajustes de glue podem ser feitos diretamente.
-- **Plano pronto vira baseline.** Se ja existe plano, o executor trabalha sobre ele e revisa a entrega final contra esse baseline.
-- **Front-end com AGY.** UI e assets visuais seguem pelo `cc-antigravity-plugin`.
-- **Fallback explicito.** Falha de AGY nao vira fallback silencioso; o executor pede decisao ao usuario.
-- **Verificacao proporcional.** Teste o suficiente para o risco da mudanca.
-- **Sem OpenSpec.** Este plugin nao depende de OpenSpec.
+- **Solve before ritualizing.** Short planning, real execution.
+- **Clear ownership.** Each agent knows what it can and cannot edit.
+- **Selective parallelism.** Use multiple agents when there are independent slices.
+- **Executor integrates.** Small glue adjustments can be done directly.
+- **Ready plan becomes baseline.** If a plan already exists, the executor works on it and reviews the final delivery against that baseline.
+- **Front-end with AGY.** UI and visual assets go through `cc-antigravity-plugin`.
+- **Explicit fallback.** AGY failure is not a silent fallback; the executor asks the user for a decision.
+- **Proportional verification.** Test enough for the risk of the change.
+- **No OpenSpec.** This plugin does not depend on OpenSpec.
