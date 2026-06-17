@@ -41,7 +41,16 @@ Sob `/goal`, nao devolva controle so porque uma etapa acabou. Continue ate haver
 
 **Verificar checkpoint antes de tudo:**
 
-Se `.executor/checkpoint.json` existir, leia-o. Se `status` for `RUNNING` e `fase_atual >= 1`, pergunte ao usuario se quer retomar da fase `fase_atual` ou reiniciar do zero. Em caso de retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint. Em caso de reinicio, apague o checkpoint e siga normalmente (um novo `artefatos_dir` sera calculado).
+Se `.executor/checkpoint.json` existir, leia-o. Avalie o campo `status` da execucao atual:
+
+- `status: RUNNING` e `fase_atual >= 1`: pergunte ao usuario se quer **retomar** da fase `fase_atual` ou **iniciar nova execucao**. Em retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint. Em nova execucao, arquive a execucao atual em `historico` com `status: ABANDONED` e `timestamp_fim` preenchido, limpe os campos da execucao corrente e siga normalmente.
+- `status: DONE`, `FAILED` ou `CANCELLED`: arquive automaticamente em `historico` (sem perguntar) e inicie nova execucao. O `artefatos_dir` anterior permanece intacto em disco.
+
+Se o checkpoint nao existir, crie-o com `historico: []` e `execucao_atual: ""`.
+
+Ao arquivar uma execucao em `historico`, registre: `demanda`, `demanda_slug`, `artefatos_dir`, `tipo_trabalho`, `risco`, `status` (DONE | FAILED | CANCELLED | ABANDONED), `fase_final` (valor de `fase_atual` no momento do arquivamento), `timestamp_inicio`, `timestamp_fim` (timestamp atual se ainda vazio), `agentes_count` (comprimento de `agentes[]`), `fallbacks_acionados` e `plano_predefinido`.
+
+Mantenha `execucao_atual` sempre apontando para o `artefatos_dir` da execucao em andamento. Atualize-o logo apos calcular o novo `artefatos_dir` na Fase 0.
 
 Execute:
 
@@ -67,7 +76,7 @@ Se a demanda tiver plano pre-definido, Codex high e necessario para o review pla
 
 Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
 
-Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp`.
+Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp_inicio`.
 
 **Determinar `artefatos_dir` (obrigatorio antes da Fase 2):**
 
@@ -124,7 +133,7 @@ Todos os agentes afetados recebem o contrato no prompt e ficam proibidos de alte
 
 Nao crie o contrato se a task for puramente visual, teste-only, docs-only, ou consumir API ja existente sem mudar shape.
 
-**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `slices`, `waves`, `tipo_trabalho`, `risco`, `interface_contract`, `artefatos_dir`, `plano_predefinido`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega`.
+**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `demanda_slug`, `slices`, `waves`, `tipo_trabalho`, `risco`, `interface_contract`, `artefatos_dir`, `execucao_atual` (igual a `artefatos_dir`), `plano_predefinido`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega`.
 
 Nao crie artefatos formais se a demanda couber em execucao direta ou em um unico agente, exceto quando houver plano pre-definido. Nesse caso, crie pelo menos `{artefatos_dir}/initial-plan-baseline.md` e, no fim, `{artefatos_dir}/plan-vs-output-review.md`.
 
@@ -340,7 +349,7 @@ Use os templates de `assets/` como base. Regras:
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
 
-**Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9` e `status: "DONE"`. Se `plano_predefinido: true`, confirme tambem `review_plano_vs_entrega.status: REVIEWED` ou registre o bloqueio. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` sem criar o arquivo se ele nao existia, exceto quando houver plano pre-definido.
+**Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9`, `status: "DONE"` e `timestamp_fim` com o timestamp atual. Se `plano_predefinido: true`, confirme tambem `review_plano_vs_entrega.status: REVIEWED` ou registre o bloqueio. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` e `timestamp_fim` sem criar o arquivo se ele nao existia, exceto quando houver plano pre-definido.
 
 **Secao 14 - Instrucoes de negocio** (parte opcional do `implementation-report.md`):
 
