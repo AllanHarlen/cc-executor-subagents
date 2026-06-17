@@ -160,4 +160,4 @@ O fechamento deve ser curto:
 
 ## Retomada
 
-Se a sessao parar, leia `.executor/checkpoint.json` para recuperar `artefatos_dir`, depois use `{artefatos_dir}/subagents-context.md` como fonte de verdade e `{artefatos_dir}/workflow-log.md` como auditoria. O contexto deve conter agentes lancados, status, arquivos tocados, pendencias e recomendacao de proxima acao.
+Se a sessao parar, leia `.executor/checkpoint.json`. O campo `execucao_atual` aponta para o `artefatos_dir` da execucao ativa; use-o para localizar `{artefatos_dir}/subagents-context.md` (fonte de verdade) e `{artefatos_dir}/workflow-log.md` (auditoria). O campo `historico` lista todas as execucoes anteriores com `demanda_slug`, `artefatos_dir`, `status` e timestamps para referencia rapida — cada entrada aponta para a pasta de artefatos correspondente caso seja necessario inspecionar uma execucao passada.
