@@ -107,6 +107,8 @@ Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte u
 
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
+**Modo conjunto (Orchestrador → Executor):** antes de tratar a demanda como avulsa, procure `.orchestration/<slug>/handoff.json` (`stage: orchestrador`). Se existir, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem `handoff.json`, leia `.orchestration/<slug>/implementation-report.md` + `tasks-classification.md` + `waves.md` + `contracts/`. Detalhes em `references/handoff-contract.md` (secao 7).
+
 ### Fase 2 - Mapa de execucao curto
 
 Crie um plano mental ou, se a tarefa passar de 2 agentes ou houver plano pre-definido, um arquivo leve:
@@ -398,6 +400,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/subagent-prompts.md` | sempre antes de delegar |
 | `references/parallelization.md` | dividir slices independentes |
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
+| `references/handoff-contract.md` | modo conjunto: ingerir o handoff do Orchestrador/Pensador e emitir o proprio |
 | `references/preflight-check.md` | entender/remediar preflight |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |

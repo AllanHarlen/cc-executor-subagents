@@ -53,7 +53,7 @@ Depois encerre.
 
    Se a tool de Skill recusar por `disable-model-invocation: true`, leia `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/SKILL.md` e siga diretamente.
 
-5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade.
+5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. **Modo conjunto:** procure tambem `.orchestration/<slug>/handoff.json` (entrega do Orchestrador); se existir, adote-o como plano pre-definido baseline para corrigir/ajustar a entrega e siga `upstream` ate o Pensador para rastreabilidade. Ver `skills/executor-subagents/references/handoff-contract.md`.
 
 6. Decida:
 
