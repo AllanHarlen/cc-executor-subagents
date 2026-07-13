@@ -98,6 +98,13 @@ Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte u
 
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
+**Ingestao de handoff upstream (Orchestrador/Pensador):** aplique `references/handoff-contract.md` no papel de consumidor. Antes de montar o baseline, procure os artefatos dos estagios anteriores:
+
+1. Procure `.orchestration/<slug>/handoff.json`. Se a demanda citar um slug/pasta especifico, use-o; senao, liste os `slug` disponiveis e confirme via `AskUserQuestion` quando houver mais de um.
+2. Sem `handoff.json` no orchestrador: faca fallback para `.orchestration/<slug>/implementation-report.md` + `tasks-classification.md` + `waves.md` + `contracts/`.
+3. Siga o campo `upstream` ate `.pensador/<slug>-vN/handoff.json` e use o `prd`/`communication-contract` do Pensador como fonte de verdade do review plano-vs-entrega.
+4. Consolide essas fontes em `{artefatos_dir}/initial-plan-baseline.md` e registre os caminhos em `plano_predefinido_fonte` no checkpoint. `handoffVersion != 1`: avise o usuario e degrade para descoberta por convencao.
+
 ### Fase 2 - Mapa de execucao curto
 
 Crie um plano mental ou, se a tarefa passar de 2 agentes ou houver plano pre-definido, um arquivo leve:
@@ -328,6 +335,7 @@ Para toda execucao que usar 2+ agentes, tiver risco MEDIUM/HIGH, tiver plano pre
 {artefatos_dir}/workflow-log.md
 {artefatos_dir}/subagents-context.md
 {artefatos_dir}/implementation-report.md
+{artefatos_dir}/handoff.json
 ```
 
 Use os templates de `assets/` como base. Regras:
@@ -336,6 +344,7 @@ Use os templates de `assets/` como base. Regras:
 - **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
 - **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
 - Se houver plano pre-definido, os tres entregaveis devem referenciar `{artefatos_dir}/initial-plan-baseline.md` e `{artefatos_dir}/plan-vs-output-review.md`.
+- Grave `{artefatos_dir}/handoff.json` (`HANDOFF_VERSION = 1`, veja `references/handoff-contract.md`) com `stage: "executor"`, `upstream` apontando para `.orchestration/<slug>/handoff.json` (quando houve ingestao upstream), `artifacts[]` com os roles do executor (`initial-plan-baseline`, `execution-brief`, `plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots`) e `status` final. Como o executor e o ultimo estagio da cadeia, `nextStage` pode ser `null`.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
@@ -384,6 +393,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 
 | Arquivo | Quando ler |
 |---|---|
+| `references/handoff-contract.md` | ingerir artefatos do Orchestrador/Pensador e gravar `handoff.json` |
 | `references/workflow.md` | detalhes do fluxo rapido |
 | `references/agent-stack.md` | escolher Codex/Antigravity/effort |
 | `references/subagent-prompts.md` | sempre antes de delegar |
