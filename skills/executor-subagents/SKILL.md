@@ -41,7 +41,16 @@ Sob `/goal`, nao devolva controle so porque uma etapa acabou. Continue ate haver
 
 **Verificar checkpoint antes de tudo:**
 
-Se `.executor/checkpoint.json` existir, leia-o. Se `status` for `RUNNING` e `fase_atual >= 1`, pergunte ao usuario se quer retomar da fase `fase_atual` ou reiniciar do zero. Em caso de retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint. Em caso de reinicio, apague o checkpoint e siga normalmente (um novo `artefatos_dir` sera calculado).
+Se `.executor/checkpoint.json` existir, leia-o. Avalie o campo `status` da execucao atual:
+
+- `status: RUNNING` e `fase_atual >= 1`: pergunte ao usuario se quer **retomar** da fase `fase_atual` ou **iniciar nova execucao**. Em retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint. Em nova execucao, arquive a execucao atual em `historico` com `status: ABANDONED` e `timestamp_fim` preenchido, limpe os campos da execucao corrente e siga normalmente.
+- `status: DONE`, `FAILED` ou `CANCELLED`: arquive automaticamente em `historico` (sem perguntar) e inicie nova execucao. O `artefatos_dir` anterior permanece intacto em disco.
+
+Se o checkpoint nao existir, crie-o com `historico: []` e `execucao_atual: ""`.
+
+Ao arquivar uma execucao em `historico`, registre: `demanda`, `demanda_slug`, `artefatos_dir`, `tipo_trabalho`, `risco`, `status` (DONE | FAILED | CANCELLED | ABANDONED), `fase_final` (valor de `fase_atual` no momento do arquivamento), `timestamp_inicio`, `timestamp_fim` (timestamp atual se ainda vazio), `agentes_count` (comprimento de `agentes[]`), `fallbacks_acionados` e `plano_predefinido`.
+
+Mantenha `execucao_atual` sempre apontando para o `artefatos_dir` da execucao em andamento. Atualize-o logo apos calcular o novo `artefatos_dir` na Fase 0.
 
 Execute:
 
@@ -67,7 +76,7 @@ Se a demanda tiver plano pre-definido, Codex high e necessario para o review pla
 
 Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
 
-Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp`.
+Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp_inicio`.
 
 **Determinar `artefatos_dir` (obrigatorio antes da Fase 2):**
 
@@ -98,12 +107,7 @@ Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte u
 
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
-**Ingestao de handoff upstream (Orchestrador/Pensador):** aplique `references/handoff-contract.md` no papel de consumidor. Antes de montar o baseline, procure os artefatos dos estagios anteriores:
-
-1. Procure `.orchestration/<slug>/handoff.json`. Se a demanda citar um slug/pasta especifico, use-o; senao, liste os `slug` disponiveis e confirme via `AskUserQuestion` quando houver mais de um.
-2. Sem `handoff.json` no orchestrador: faca fallback para `.orchestration/<slug>/implementation-report.md` + `tasks-classification.md` + `waves.md` + `contracts/`.
-3. Siga o campo `upstream` ate `.pensador/<slug>-vN/handoff.json` e use o `prd`/`communication-contract` do Pensador como fonte de verdade do review plano-vs-entrega.
-4. Consolide essas fontes em `{artefatos_dir}/initial-plan-baseline.md` e registre os caminhos em `plano_predefinido_fonte` no checkpoint. `handoffVersion != 1`: avise o usuario e degrade para descoberta por convencao.
+**Modo conjunto (Orchestrador → Executor):** antes de tratar a demanda como avulsa, procure `.orchestration/<slug>/handoff.json` (`stage: orchestrador`). Se existir, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem `handoff.json`, leia `.orchestration/<slug>/implementation-report.md` + `tasks-classification.md` + `waves.md` + `contracts/`. Detalhes em `references/handoff-contract.md` (secao 7).
 
 ### Fase 2 - Mapa de execucao curto
 
@@ -131,7 +135,7 @@ Todos os agentes afetados recebem o contrato no prompt e ficam proibidos de alte
 
 Nao crie o contrato se a task for puramente visual, teste-only, docs-only, ou consumir API ja existente sem mudar shape.
 
-**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `slices`, `waves`, `tipo_trabalho`, `risco`, `interface_contract`, `artefatos_dir`, `plano_predefinido`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega`.
+**Checkpoint apos Fase 2:** atualize `.executor/checkpoint.json` com `fase_atual: 2`, `demanda_slug`, `slices`, `waves`, `tipo_trabalho`, `risco`, `interface_contract`, `artefatos_dir`, `execucao_atual` (igual a `artefatos_dir`), `plano_predefinido`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega`.
 
 Nao crie artefatos formais se a demanda couber em execucao direta ou em um unico agente, exceto quando houver plano pre-definido. Nesse caso, crie pelo menos `{artefatos_dir}/initial-plan-baseline.md` e, no fim, `{artefatos_dir}/plan-vs-output-review.md`.
 
@@ -349,7 +353,7 @@ Use os templates de `assets/` como base. Regras:
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
 
-**Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9` e `status: "DONE"`. Se `plano_predefinido: true`, confirme tambem `review_plano_vs_entrega.status: REVIEWED` ou registre o bloqueio. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` sem criar o arquivo se ele nao existia, exceto quando houver plano pre-definido.
+**Checkpoint no encerramento:** ao concluir a Fase 9 com sucesso, atualize `.executor/checkpoint.json` com `fase_atual: 9`, `status: "DONE"` e `timestamp_fim` com o timestamp atual. Se `plano_predefinido: true`, confirme tambem `review_plano_vs_entrega.status: REVIEWED` ou registre o bloqueio. Em execucoes simples (direto ou 1 agente), apenas marque `status: "DONE"` e `timestamp_fim` sem criar o arquivo se ele nao existia, exceto quando houver plano pre-definido.
 
 **Secao 14 - Instrucoes de negocio** (parte opcional do `implementation-report.md`):
 
@@ -399,6 +403,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/subagent-prompts.md` | sempre antes de delegar |
 | `references/parallelization.md` | dividir slices independentes |
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
+| `references/handoff-contract.md` | modo conjunto: ingerir o handoff do Orchestrador/Pensador e emitir o proprio |
 | `references/preflight-check.md` | entender/remediar preflight |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |

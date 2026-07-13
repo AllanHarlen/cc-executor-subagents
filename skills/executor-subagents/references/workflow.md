@@ -33,6 +33,8 @@ Use pesquisa local (`rg`, `rg --files`, leitura de arquivos) antes de perguntar.
 
 Se houver plano pre-definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md`, registre `plano_predefinido: true` no checkpoint e trate esse baseline como fonte de verdade para slices, criterios de aceite e verificacao final.
 
+**Modo conjunto (Orchestrador → Executor):** procure `.orchestration/<slug>/handoff.json` antes de tratar a demanda como avulsa. Se existir, o executor entra no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador: adote o handoff como plano pre-definido baseline, siga `upstream` ate o Pensador para rastreabilidade (`prd`/`api-contract`/`design-system-files`) e mantenha obrigatorio o review Codex high plano-vs-entrega. Ver `references/handoff-contract.md` (secao 7).
+
 ## Fase 2 - Plano curto
 
 Para tarefas com 2+ agentes ou com plano pre-definido, crie `{artefatos_dir}/execution-brief.md` usando `assets/plan-template.md`.
@@ -150,6 +152,8 @@ Em tarefas com varios agentes, crie:
 
 Em tarefas com plano pre-definido, crie tambem `{artefatos_dir}/plan-vs-output-review.md` e referencie `{artefatos_dir}/initial-plan-baseline.md` nos tres relatorios finais.
 
+**Modo conjunto:** quando a execucao veio de `.orchestration/<slug>/handoff.json`, grave tambem `{artefatos_dir}/handoff.json` (`stage: executor`, `upstream` apontando o handoff do Orchestrador) conforme `references/handoff-contract.md`, com os roles do estagio Executor (`plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots` quando houver). E o estagio terminal: `nextStage` pode ser `null`.
+
 O fechamento deve ser curto:
 
 - resultado;
@@ -160,4 +164,4 @@ O fechamento deve ser curto:
 
 ## Retomada
 
-Se a sessao parar, leia `.executor/checkpoint.json` para recuperar `artefatos_dir`, depois use `{artefatos_dir}/subagents-context.md` como fonte de verdade e `{artefatos_dir}/workflow-log.md` como auditoria. O contexto deve conter agentes lancados, status, arquivos tocados, pendencias e recomendacao de proxima acao.
+Se a sessao parar, leia `.executor/checkpoint.json`. O campo `execucao_atual` aponta para o `artefatos_dir` da execucao ativa; use-o para localizar `{artefatos_dir}/subagents-context.md` (fonte de verdade) e `{artefatos_dir}/workflow-log.md` (auditoria). O campo `historico` lista todas as execucoes anteriores com `demanda_slug`, `artefatos_dir`, `status` e timestamps para referencia rapida — cada entrada aponta para a pasta de artefatos correspondente caso seja necessario inspecionar uma execucao passada.
