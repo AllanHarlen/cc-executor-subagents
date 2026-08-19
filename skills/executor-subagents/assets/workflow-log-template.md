@@ -58,7 +58,7 @@ _N/A se nenhuma falha ocorreu._
 | # | Fase | Decisao | Motivo | Impacto |
 |---|---|---|---|---|
 | 1 | 3 | Execucao direta (sem agentes) | Mudanca de 1 arquivo, baixo risco | Nenhum agente lancado |
-| 2 | 4 | Front-end roteado para AGY | AGY 3.6.0+ validado no preflight | Fluxo UI seguiu com antigravity-agent |
+| 2 | 4 | Front-end roteado para AGY | AGY 3.6.0+ validado no preflight | Fluxo UI seguiu com antigravity-coder |
 
 _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 
@@ -81,4 +81,9 @@ _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 | Agente B (<modelo>) | N/A | N/A | N/A | N/A |
 | **TOTAL** | **<n>** | **<n>** | **<n>** | **<n>** |
 
-_Use N/A para agentes que nao reportaram tokens. O orquestrador calcula o total consolidado._
+Regras de fechamento:
+- Dado nao reportado e `N/A` e nunca `0`.
+- Agente/componente que nao executou nesta execucao fica `N/A` na linha inteira.
+- Com `--parallel`, o total do AGY ja e o agregado da sessao (subagentes nativos incluidos) — nao some o fan-out por fora dele.
+- Rodada de review repetida por `REPROVADO`/`DESALINHADO` soma na mesma linha do agente, com a contagem de rodadas indicada (ex.: "Codex review high (2 rodadas)").
+- Esta tabela e a de `{artefatos_dir}/subagents-context.md` precisam fechar no mesmo total.

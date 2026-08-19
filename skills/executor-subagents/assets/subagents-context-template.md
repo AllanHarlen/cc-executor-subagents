@@ -93,6 +93,8 @@ _Preencha somente quando a execucao partiu de um plano pre-definido._
 | Agente B (<modelo>) | N/A | N/A | N/A | N/A |
 | **TOTAL** | **<n>** | **<n>** | **<n>** | **<n>** |
 
+Dado nao reportado e `N/A`, nunca `0`. Agente que nao executou fica `N/A` na linha inteira. Com `--parallel`, o total do AGY ja e o agregado da sessao — nao some o fan-out por fora. Rodada de review repetida soma na mesma linha, com a contagem de rodadas indicada. Esta tabela e a de `{artefatos_dir}/workflow-log.md` precisam fechar no mesmo total.
+
 ---
 
 ## Contexto para retomada

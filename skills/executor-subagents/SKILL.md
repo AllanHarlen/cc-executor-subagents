@@ -52,29 +52,27 @@ Ao arquivar uma execucao em `historico`, registre: `demanda`, `demanda_slug`, `a
 
 Mantenha `execucao_atual` sempre apontando para o `artefatos_dir` da execucao em andamento. Atualize-o logo apos calcular o novo `artefatos_dir` na Fase 0.
 
-Execute:
+**0.1 - Preflight:**
 
 ```bash
 node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
 ```
 
-O preflight valida apenas o que e necessario para execucao rapida:
+O `status`/`failed` do preflight sao decididos pelo Required_CLI_Set da **Project_Config** (`.orchestrator/project-config.md` — mesmo arquivo do `cc-orchestrador-subagents`, ver `references/project-config.md`), nao por uma lista fixa de `codex`+`agy`. O relatorio traz o bloco `projectConfig` (os quatro papeis efetivos, `path`, `updatedAt`, `requiredCliSet`, `source: "file" | "default"`) e `warnings` para reprovado opcional/MCP ausente — `failed` so contem reprovado obrigatorio segundo o Required_CLI_Set vigente.
 
-| Item | Obrigatorio | Uso |
-|---|---:|---|
-| `codex` CLI | Sim | agentes Codex para backend, testes, review e recuperacao |
-| `agy` CLI | Sim | agentes AGY para front-end, imagem e contexto largo |
-| plugin `openai-codex` | Sim | subagente `codex:codex-rescue` |
-| plugin `cc-antigravity-plugin` `>= 3.6.0` | Sim | subagente `cc-antigravity-plugin:antigravity-agent` (inclui `--parallel` e `--subagent-model` para fan-out nativo) |
-| permissao Bash do Codex companion | Sim | evita bloqueio de aprovacao em background |
-| `/goal` hooks | Opcional | autonomia entre turnos |
-| Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
+**0.2 - Resolucao da Project_Config:**
 
-Se Codex falhar, verifique o tipo da demanda antes de cancelar: faca uma pre-triagem rapida (leia o enunciado da tarefa) para checar se e puramente `UI_FRONTEND` ou `IMAGE_ASSET` e se ha plano pre-definido. Se for front-end puro sem plano pre-definido, prossiga sem Codex e registre `codex_excluido: true` no checkpoint — Codex nao e necessario para implementacao de tasks puramente front-end. Se houver plano pre-definido, Codex continua necessario para o review read-only da Fase 6.5. Se nao for front-end puro, cancele com a remediacao do JSON.
+- `source: "file"` -> a configuracao existe e e valida; carregue-a e **nao repita as quatro perguntas**.
+- `source: "default"` com arquivo ausente -> apresente as quatro perguntas de `AskUserQuestion` (`backendExecutor`, `frontendExecutor`, `frontendReviewer`, `backendReviewer`), com a descricao de papel e a CLI exigida por opcao de `references/project-config.md`; grave com `scripts/project-config.mjs write` (papel sem resposta entra em `default-aplicado`) e rode o preflight de novo.
+- `checks.config["project-config"].ok: false` -> o arquivo existe e e invalido; pare com o erro do parser e a remediacao de corrigir ou remover `.orchestrator/project-config.md`, sem sobrescreve-lo.
 
-Se a demanda tiver plano pre-definido, Codex high e necessario para o review plano-vs-entrega, mesmo quando a implementacao for puramente front-end/UI ou imagem. Se Codex falhar nesse caso, mostre a remediacao e pergunte se o usuario quer corrigir Codex, continuar assumindo o risco sem esse review comparativo, ou cancelar.
+Para uma tarefa trivial de 1-2 minutos sem CLI externa nenhuma envolvida (glue pequeno, doc), pule a Fase 0.2 e siga com o default — as quatro perguntas so valem a pena quando a tarefa de fato vai delegar a um subagente externo.
 
-Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
+**0.3 - Instalacao assistida (Dependency_Installer):**
+
+Com a Project_Config resolvida, monte a lista de dependencias ausentes (Context7 e CBM opcionais, cada CLI do Required_CLI_Set reprovada e o plugin do Claude Code que a conecta) usando `scripts/lib/dependency-plan.mjs`. Siga o protocolo completo em `references/project-config.md`: uma pergunta `AskUserQuestion` por dependencia, execucao so apos `instalar`, registro limitado a `name`/`decision`/`command`/`exitCode`/`durationMs`, e a oferta de trocar o papel afetado para `claude-code` quando o usuario recusa uma CLI obrigatoria. Ao final, rode o preflight uma vez mais.
+
+Verifique tambem o tipo da demanda antes de insistir numa CLI: faca uma pre-triagem rapida (leia o enunciado da tarefa) para checar se e puramente `UI_FRONTEND` ou `IMAGE_ASSET` e se ha plano pre-definido. Se for front-end puro sem plano pre-definido, a fatia nao precisa de `backendExecutor`/`backendReviewer` — prossiga sem essa CLI e registre `codex_excluido: true` no checkpoint quando o papel configurado for `codex`. Se houver plano pre-definido, o `backendReviewer` configurado continua necessario para o review read-only da Fase 6.5.
 
 Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp_inicio`.
 
@@ -107,7 +105,7 @@ Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte u
 
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
-**Modo conjunto (Orchestrador → Executor):** antes de tratar a demanda como avulsa, procure `.orchestration/<slug>/handoff.json` (`stage: orchestrador`). Se existir, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem `handoff.json`, leia `.orchestration/<slug>/implementation-report.md` + `tasks-classification.md` + `waves.md` + `contracts/`. Detalhes em `references/handoff-contract.md` (secao 7).
+**Modo conjunto (Orchestrador → Executor):** antes de tratar a demanda como avulsa, procure `.orchestration/<slug>/report/handoff.json` (`stage: orchestrador`, layout 2, runs a partir do Orchestrador 4.1.0); se ausente, tente `.orchestration/<slug>/handoff.json` (layout 1, runs anteriores). Se existir em qualquer um dos dois caminhos, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff que de fato respondeu, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem manifesto em nenhum dos dois caminhos, leia `.orchestration/<slug>/report/implementation-report.md` + `plan/tasks-classification.md` + `plan/waves.md` + `contracts/`, com fallback para os mesmos nomes na raiz (`implementation-report.md`, `tasks-classification.md`, `waves.md`) quando o layout 2 nao existir. Detalhes em `references/handoff-contract.md` (secao 7).
 
 ### Fase 2 - Mapa de execucao curto
 
@@ -176,10 +174,10 @@ Cada prompt deve incluir:
 
 Roteamento padrao:
 
-- front-end/UI: `cc-antigravity-plugin:antigravity-agent` em modo agentic;
-- varios entregaveis AGY independentes sem Codex: `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo de subagentes Gemini; opcional `--subagent-model` para subagentes mais baratos);
-- imagem/asset explicito: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
-- analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
+- front-end/UI: `cc-antigravity-plugin:antigravity-coder` em modo agentic;
+- varios entregaveis AGY independentes sem Codex: `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo de subagentes Gemini; opcional `--subagent-model` para subagentes mais baratos);
+- imagem/asset explicito: `cc-antigravity-plugin:antigravity-coder --generate-imagem`;
+- analise pura: `cc-antigravity-plugin:antigravity-agent --read-only` (somente leitura — nunca usar para implementar);
 - backend/testes/review: Codex.
 
 **Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-imagem`.
@@ -193,7 +191,11 @@ Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar li
 Quando agentes retornarem:
 
 1. Leia os resumos e os arquivos alterados.
-2. Verifique se houve toque fora do ownership.
+2. Verifique se houve toque fora do ownership. Com 3+ agentes ou ownership complexo, mecanize em vez de conferir no olho:
+   ```bash
+   node "${CLAUDE_SKILL_DIR}/scripts/validate-task-scope.mjs" --root . --allowed "<padroes/do/slice/**>"
+   ```
+   `outOfScope` fora de `[]` e achado — trate como toque fora do ownership (item 3 abaixo). Para risco `MEDIUM`/`HIGH`, rode tambem `node "${CLAUDE_SKILL_DIR}/scripts/inspect-diff.mjs" --root .` e leve qualquer `riskCounts` (migration, lockfile, auth/tenancy, possivel segredo, TODO novo, artefato de debug) para a Fase 6/6.5.
 3. Resolva conflitos pequenos diretamente quando for seguro.
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
 5. Atualize `{artefatos_dir}/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
@@ -211,6 +213,8 @@ Execute verificacoes proporcionais ao risco:
 - `HIGH`: suite relevante, review Codex high e plano de rollback.
 
 Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario deve rodar depois.
+
+**Verificacao em navegador real, quando a fatia toca front-end que chama back-end em origem separada.** `build`/`tsc`/`curl` nao detectam CORS ausente, resolucao de tenant/host feita a partir do browser, mismatch de casing no corpo da resposta, nem "200 mas a UI ficou silenciosamente quebrada" — sao cegos a essa classe de defeito de integracao por construcao. Antes de reportar a fatia como concluida, dirija **o fluxo alterado** (nao a app inteira) num navegador real e confirme: console/network sem erro de CORS, o dado retornado bate com o que a UI mostra, e o efeito final da acao de fato aconteceu. Sem ferramenta de navegador disponivel, registre a limitacao explicitamente e reporte a fatia como `PARTIAL` — nunca como verificada.
 
 ### Fase 6.5 - Review plano vs entrega
 
@@ -348,7 +352,7 @@ Use os templates de `assets/` como base. Regras:
 - **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
 - **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
 - Se houver plano pre-definido, os tres entregaveis devem referenciar `{artefatos_dir}/initial-plan-baseline.md` e `{artefatos_dir}/plan-vs-output-review.md`.
-- Grave `{artefatos_dir}/handoff.json` (`HANDOFF_VERSION = 1`, veja `references/handoff-contract.md`) com `stage: "executor"`, `upstream` apontando para `.orchestration/<slug>/handoff.json` (quando houve ingestao upstream), `artifacts[]` com os roles do executor (`initial-plan-baseline`, `execution-brief`, `plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots`) e `status` final. Como o executor e o ultimo estagio da cadeia, `nextStage` pode ser `null`.
+- Grave `{artefatos_dir}/handoff.json` (`HANDOFF_VERSION = 1`, veja `references/handoff-contract.md`) com `stage: "executor"`, `upstream` apontando para o caminho do handoff do Orchestrador que de fato respondeu na ingestao (`.orchestration/<slug>/report/handoff.json` ou, em fallback, `.orchestration/<slug>/handoff.json`), `artifacts[]` com os roles do executor (`initial-plan-baseline`, `execution-brief`, `plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots`) e `status` final. Como o executor e o ultimo estagio da cadeia, `nextStage` pode ser `null`.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
@@ -385,6 +389,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Para front-end/UI puro (`UI_FRONTEND`, `IMAGE_ASSET`): Codex nao participa do fluxo — nem como agente, nem como fallback. Aplique somente a escada AGY (pro-high → flash-medium → executor direto). Nunca lance Codex para estas tasks.
 - Excecao: se `plano_predefinido: true`, Codex high participa apenas como review read-only na Fase 6.5 para comparar o plano inicial com a entrega gerada; ele nao implementa nem faz fallback de UI/asset.
 - Para imagem/asset: sem AGY nao ha fallback automatico; registre como `BLOCKED` e pergunte ao usuario.
+- **Nunca delegue implementacao (UI, imagem/asset, fan-out) para `cc-antigravity-plugin:antigravity-agent`.** Esse subagente e somente leitura (analise, planejamento, review); quem escreve arquivo e `cc-antigravity-plugin:antigravity-coder`. Delegar escrita ao agente de leitura falha silenciosamente ou produz uma "implementacao" que nunca tocou o disco.
 
 ## Comunicacao
 
@@ -405,9 +410,14 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
 | `references/handoff-contract.md` | modo conjunto: ingerir o handoff do Orchestrador/Pensador e emitir o proprio |
 | `references/preflight-check.md` | entender/remediar preflight |
+| `references/project-config.md` | Fase 0.2/0.3: as quatro perguntas da Project_Config e o protocolo do Dependency_Installer |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
 | `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |
 | `assets/subagents-context-template.md` | gerar `{artefatos_dir}/subagents-context.md` (Fase 9) |
 | `assets/implementation-report-template.md` | gerar `{artefatos_dir}/implementation-report.md` (Fase 9) |
-| `scripts/preflight.mjs` | validar ambiente minimo |
+| `scripts/preflight.mjs` | validar ambiente minimo, com Required_CLI_Set derivado da Project_Config |
+| `scripts/project-config.mjs` | Fase 0.2: `show`/`write`/`validate`/`required-clis` da Project_Config |
+| `scripts/lib/dependency-plan.mjs` | Fase 0.3: catalogo de dependencias ausentes do Dependency_Installer |
+| `scripts/validate-task-scope.mjs` | Fase 5: mecanizar a verificacao de arquivos alterados fora do ownership |
+| `scripts/inspect-diff.mjs` | Fase 5/6: sinalizar migration, lockfile, auth/tenancy, possivel segredo, TODO novo ou artefato de debug no diff |

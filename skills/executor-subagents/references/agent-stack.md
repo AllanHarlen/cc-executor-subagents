@@ -1,5 +1,7 @@
 # Stack de Agentes
 
+> **A stack e configuravel, nao fixa.** As tabelas abaixo descrevem o comportamento sob os defaults da Project_Config (`backendExecutor: codex`, `frontendExecutor: agy`, `backendReviewer: codex`, `frontendReviewer: agy`). Quem de fato implementa/revisa cada tipo de trabalho vem de `.orchestrator/project-config.md` — o mesmo arquivo do `cc-orchestrador-subagents` — resolvido na Fase 0.2 e derivado por `scripts/lib/project-config.mjs`; ver `references/project-config.md`. Quando um papel e `claude-code`, o Executor (voce mesmo) assume a task diretamente, sem CLI externa nem fallback ladder.
+
 ## Papeis
 
 | Papel | Modelo | Subagent type | Quando usar |
@@ -7,10 +9,12 @@
 | Executor principal | Claude | voce mesmo | triagem, split, integracao, verificacao, glue pequeno e alinhamento com o usuario |
 | Executor geral | Codex gpt-5.4 medium | `codex:codex-rescue` | backend, testes, refactor localizado, bugfix, integracao tecnica |
 | Review critico | Codex gpt-5.5 high | `codex:codex-rescue` | risco alto, auth, dados, concorrencia, review final |
-| UI/front-end | AGY gemini-3.5-flash-medium | `cc-antigravity-plugin:antigravity-agent` | tarefas front-end do dia a dia, componentes, layouts, estados e polish visual |
-| UI/front-end complexa | AGY gemini-3.1-pro-high | `cc-antigravity-plugin:antigravity-agent` | redesign mais complexo, fluxos visuais grandes, UX com mais ambiguidade |
+| UI/front-end | AGY gemini-3.5-flash-medium | `cc-antigravity-plugin:antigravity-coder` | tarefas front-end do dia a dia, componentes, layouts, estados e polish visual |
+| UI/front-end complexa | AGY gemini-3.1-pro-high | `cc-antigravity-plugin:antigravity-coder` | redesign mais complexo, fluxos visuais grandes, UX com mais ambiguidade |
 | Analise cross-file | AGY read-only | `cc-antigravity-plugin:antigravity-agent` | arquitetura, impacto de refactor, orientacao de codebase |
-| Imagem/asset | AGY nano-banana | `cc-antigravity-plugin:antigravity-agent` | mockups, assets, ilustracoes e pedidos explicitos de imagem |
+| Imagem/asset | AGY nano-banana | `cc-antigravity-plugin:antigravity-coder` | mockups, assets, ilustracoes e pedidos explicitos de imagem |
+
+`cc-antigravity-plugin:antigravity-coder` e o unico subagente AGY com permissao de escrita (cria, edita, move e formata arquivos via o bridge nativo) — usar para qualquer implementacao front-end/imagem. `cc-antigravity-plugin:antigravity-agent` e **somente leitura** (analise, planejamento, review); jamais delegar implementacao a ele.
 
 Codex e obrigatorio para tasks de backend, testes e review. Para tasks puramente front-end (`UI_FRONTEND`, `IMAGE_ASSET`), somente AGY e necessario — Codex nao participa dessas tasks. AGY 3.6.0+ e obrigatorio para front-end, imagem, contexto largo e fan-out nativo de subagentes Gemini (`--parallel`).
 
@@ -120,6 +124,14 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 - use Context7 se estiver disponivel no preflight;
 - instrua os agentes a consultar docs atuais;
 - se nao estiver disponivel, registre que seguiram pelos padroes locais.
+
+**Ordem obrigatoria, sem atalho:** resolver o identificador da biblioteca (nome livre -> identificador do Context7) **antes** de pedir a documentacao, mesmo quando o identificador "ja e conhecido" de uma consulta anterior na mesma execucao — nome de pacote e identificador do servidor nao sao a mesma coisa, e pedir documentacao de um identificador inventado devolve conteudo errado ou vazio. Quando a task fixa versao (`package.json`, `*.csproj`, lockfile), passe a versao na consulta: documentacao de major diferente e a causa mais comum de API inexistente em codigo gerado.
+
+**Fora de tudo:** chave de API do Context7 nunca entra em prompt de subagente, artefato (`{artefatos_dir}/`) ou checkpoint. Cite apenas nome do servidor e comando de setup.
+
+## Codebase Memory (opcional)
+
+Quando `codebase-memory-mcp` estiver disponivel (indicado pelo `codebase-memory-mcp` no PATH ou por `.mcp.json` conhecido — nao ha check dedicado no preflight leve do executor, mas o servidor pode ja estar registrado na sessao do Claude Code), use-o na Fase 1 (triagem) para localizar owner e raio de impacto de forma mais barata do que `Grep`/`Glob` isolados: `search_graph` para achar o simbolo citado na demanda, `trace_path` para quem chama/e chamado. Resultado de grafo e pista, nao prova — confirme por leitura do arquivo antes de fixar ownership ou afirmar que algo nao existe. Sem o servidor, siga com `Read`/`Glob`/`Grep` normalmente; a triagem de 2 minutos ja cobre esse caminho.
 
 ## Escolha rapida
 

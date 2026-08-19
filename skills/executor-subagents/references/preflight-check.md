@@ -21,10 +21,11 @@ node skills/executor-subagents/scripts/preflight.mjs
 | `codex` CLI | executa agentes de backend, testes e review |
 | `agy` CLI | executa agentes de front-end, imagem e analise em contexto largo |
 | plugin `openai-codex` | expoe `codex:codex-rescue` |
-| plugin `cc-antigravity-plugin` `>= 3.6.0` | expoe `cc-antigravity-plugin:antigravity-agent` e o bridge com flags atuais (incluindo `--parallel` e `--subagent-model`) |
+| plugin `cc-antigravity-plugin` `>= 3.6.0` | expoe `cc-antigravity-plugin:antigravity-coder` (implementacao, escrita), `cc-antigravity-plugin:antigravity-agent` (analise/review, somente leitura) e o bridge com flags atuais (incluindo `--parallel` e `--subagent-model`) |
 | permissao Bash para Codex companion | evita aprovacoes no meio de agentes em background |
 | `agy --help` com flags essenciais | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
 | bridge do AGY com flags atuais | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
+| `agents/antigravity-coder.md` e `agents/antigravity-agent.md` presentes | confirma que o plugin instalado expoe os dois subagentes distintos — implementacao (escrita) e analise/review (somente leitura) |
 
 Falha de Codex bloqueia apenas para tasks que nao sejam puramente front-end, exceto quando houver plano pre-definido. Se a demanda for `UI_FRONTEND` ou `IMAGE_ASSET` sem plano pre-definido, falha de Codex nao cancela — prossiga sem ele. Se houver plano pre-definido, Codex high e necessario para o review read-only plano-vs-entrega; remedeie Codex ou registre aceite explicito do usuario para seguir sem esse review. Para qualquer outra natureza de task, falha de Codex cancela com remediacao.
 

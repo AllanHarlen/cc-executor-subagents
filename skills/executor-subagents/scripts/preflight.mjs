@@ -2,14 +2,16 @@
 /**
  * Preflight check for cc-executor-subagents.
  *
- * Required:
- * - codex CLI
- * - agy CLI
- * - openai-codex Claude Code plugin
- * - cc-antigravity-plugin >= 3.6.0
- * - Bash permission for the Codex companion
+ * The Required_CLI_Set is derived from the Project_Config (`.orchestrator/project-config.md`,
+ * shared with cc-orchestrador-subagents — same file, same four roles) instead of being
+ * a fixed codex+agy pair: `cli.codex`/`plugins.openai-codex`/capabilities tied to Codex
+ * are required iff some role uses `codex`; the AGY equivalents iff some role uses `agy`.
+ * With all four roles set to `claude-code`, no external CLI is required at all.
  *
- * Optional:
+ * Always required regardless of Project_Config:
+ * - `config.project-config` (must be absent-or-valid, never invalid-and-ignored)
+ *
+ * Always optional:
  * - /goal hook compatibility
  * - Context7 MCP
  */
@@ -17,11 +19,21 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+
+import {
+  DEFAULT_PROJECT_CONFIG,
+  ProjectConfigError,
+  PROJECT_CONFIG_RELATIVE_PATH,
+  ROLES,
+  deriveRequiredCliSet,
+  readProjectConfig,
+} from "./lib/project-config.mjs";
 
 const HOME = homedir();
 const PLUGINS_CACHE = join(HOME, ".claude", "plugins", "cache");
-const PROJECT_CLAUDE_DIR = join(process.cwd(), ".claude");
+const PROJECT_ROOT = resolve(process.cwd());
+const PROJECT_CLAUDE_DIR = join(PROJECT_ROOT, ".claude");
 const MIN_ANTIGRAVITY_PLUGIN_VERSION = "3.6.0";
 const REQUIRED_AGY_FLAGS = [
   "--print",
@@ -129,6 +141,22 @@ function checkAntigravityBridge() {
       version: plugin.version,
       minVersion: MIN_ANTIGRAVITY_PLUGIN_VERSION,
       error: `cc-antigravity-plugin ${plugin.version} is below required ${MIN_ANTIGRAVITY_PLUGIN_VERSION}`,
+    };
+  }
+
+  // antigravity-coder is the only write-capable AGY subagent (implementation);
+  // antigravity-agent is read-only (analysis/review). Both files must exist so
+  // the split routing in agent-stack.md/subagent-prompts.md actually resolves.
+  const requiredAgents = ["agents/antigravity-coder.md", "agents/antigravity-agent.md"];
+  const missingAgents = requiredAgents.filter(
+    (file) => !existsSync(join(plugin.versionPath, file)),
+  );
+  if (missingAgents.length > 0) {
+    return {
+      ok: false,
+      version: plugin.version,
+      missingAgents,
+      error: `cc-antigravity-plugin is missing required agent definitions: ${missingAgents.join(", ")}`,
     };
   }
 
@@ -314,43 +342,226 @@ function checkContext7Mcp() {
   };
 }
 
+function checkCodebaseMemoryMcp() {
+  const evidence = [];
+
+  if (checkCli("codebase-memory-mcp").ok) {
+    evidence.push({ type: "cli", path: "codebase-memory-mcp (PATH)" });
+  }
+
+  const skillCandidates = [
+    join(HOME, ".claude", "skills", "codebase-memory", "SKILL.md"),
+    join(HOME, ".claude", "skills", "codebase-memory-mcp", "SKILL.md"),
+  ];
+  for (const file of skillCandidates) {
+    if (existsSync(file)) evidence.push({ type: "skill", path: file });
+  }
+
+  const configCandidates = [
+    join(process.cwd(), ".mcp.json"),
+    join(HOME, ".claude.json"),
+    join(HOME, ".claude", "mcp.json"),
+    join(HOME, ".config", "claude", "mcp.json"),
+  ];
+  for (const file of configCandidates) {
+    if (!existsSync(file)) continue;
+    try {
+      const contents = readFileSync(file, "utf8");
+      if (/codebase-memory-mcp/i.test(contents)) {
+        evidence.push({ type: "mcp-config", path: file });
+      }
+    } catch (err) {
+      evidence.push({
+        type: "mcp-config-unreadable",
+        path: file,
+        error: err.message?.split(/\r?\n/)[0] ?? "cannot read file",
+      });
+    }
+  }
+
+  if (evidence.some((item) => item.type !== "mcp-config-unreadable")) {
+    return { ok: true, optional: true, evidence };
+  }
+
+  return {
+    ok: false,
+    optional: true,
+    error: "codebase-memory-mcp not detected in known locations.",
+    install: ["see references/project-config.md / Dependency_Installer"],
+  };
+}
+
+/**
+ * Resolves the Project_Config of the target project before any other check —
+ * it decides which CLIs (and their plugins/capabilities) are required. Same
+ * three outcomes as the orchestrator's preflight (they share this module and
+ * the same `.orchestrator/project-config.md` file):
+ *
+ *  - File present and valid: roles come from the file, `source: "file"`.
+ *  - File absent: roles come from the default stack, `source: "default"`.
+ *  - File present and invalid: the parser error becomes a failing required
+ *    check (`checks.config.project-config`), and the Required_CLI_Set falls
+ *    back to the default only so the report stays complete. The file is
+ *    never rewritten by reading it.
+ */
+function resolveProjectConfigState(projectRoot) {
+  try {
+    const resolved = readProjectConfig(projectRoot);
+    const requiredCliSet = deriveRequiredCliSet(resolved.config);
+    const roles = {};
+    for (const role of ROLES) roles[role] = resolved.config[role];
+
+    return {
+      requiredCliSet,
+      block: {
+        source: resolved.source,
+        path: PROJECT_CONFIG_RELATIVE_PATH,
+        updatedAt: resolved.config.updatedAt ?? null,
+        roles,
+        requiredCliSet: [...requiredCliSet.clis],
+      },
+      check: {
+        ok: true,
+        required: true,
+        exists: resolved.exists,
+        source: resolved.source,
+        path: PROJECT_CONFIG_RELATIVE_PATH,
+      },
+    };
+  } catch (error) {
+    if (!(error instanceof ProjectConfigError)) throw error;
+    // Fallback keeps the report complete; status is already "failed" so no
+    // workflow decision is made from these default roles.
+    const requiredCliSet = deriveRequiredCliSet(DEFAULT_PROJECT_CONFIG);
+    const path = error.details?.path ?? PROJECT_CONFIG_RELATIVE_PATH;
+
+    return {
+      requiredCliSet,
+      block: {
+        source: "default",
+        path: PROJECT_CONFIG_RELATIVE_PATH,
+        updatedAt: null,
+        roles: { ...DEFAULT_PROJECT_CONFIG },
+        requiredCliSet: [...requiredCliSet.clis],
+      },
+      check: {
+        ok: false,
+        required: true,
+        exists: true,
+        source: "invalid",
+        path,
+        code: error.code,
+        error: error.message,
+        field: error.details?.field ?? null,
+        received: error.details?.received ?? null,
+        accepted: error.details?.accepted ?? null,
+        expected: "um Project_Config_File valido ou nenhum arquivo",
+      },
+    };
+  }
+}
+
+// The Project_Config is resolved before any other check: it decides which
+// CLIs/plugins/capabilities are required.
+const projectConfigState = resolveProjectConfigState(PROJECT_ROOT);
+const requiredCliSet = projectConfigState.requiredCliSet;
+
 const checks = {
-  required: {
-    cli: {
-      codex: checkCli("codex"),
-      agy: checkCli("agy"),
-    },
-    plugins: {
-      "openai-codex": checkPlugin("openai-codex", "codex"),
-      "cc-antigravity-plugin": checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin"),
-    },
-    permissions: {
-      "codex-companion-bash": checkCodexCompanionBashPermission(),
-    },
-    capabilities: {
-      "agy-help": checkAgyHelp(),
-      "cc-antigravity-bridge": checkAntigravityBridge(),
-    },
+  config: {
+    "project-config": projectConfigState.check,
+  },
+  cli: {
+    codex: checkCli("codex"),
+    agy: checkCli("agy"),
+  },
+  plugins: {
+    "openai-codex": checkPlugin("openai-codex", "codex"),
+    "cc-antigravity-plugin": checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin"),
+  },
+  permissions: {
+    "codex-companion-bash": checkCodexCompanionBashPermission(),
+  },
+  capabilities: {
+    "agy-help": checkAgyHelp(),
+    "cc-antigravity-bridge": checkAntigravityBridge(),
   },
   optional: {
     permissions: {
       "goal-hooks-enabled": checkGoalHookSettings(),
     },
     mcp: {
+      "codebase-memory": checkCodebaseMemoryMcp(),
       context7: checkContext7Mcp(),
     },
   },
 };
 
+/**
+ * Requiredness per check. `config.project-config` is always required.
+ * `cli.codex`/`plugins.openai-codex`/`permissions.codex-companion-bash` are
+ * required iff some Project_Config role uses `codex`; the AGY equivalents
+ * (`cli.agy`/`plugins.cc-antigravity-plugin`/`capabilities.*`) iff some role
+ * uses `agy`. With all four roles `claude-code`, none of these are required.
+ */
+const REQUIRED_BY_CHECK = {
+  config: { "project-config": true },
+  cli: { codex: requiredCliSet.codex, agy: requiredCliSet.agy },
+  plugins: {
+    "openai-codex": requiredCliSet.codex,
+    "cc-antigravity-plugin": requiredCliSet.agy,
+  },
+  permissions: { "codex-companion-bash": requiredCliSet.codex },
+  capabilities: {
+    "agy-help": requiredCliSet.agy,
+    "cc-antigravity-bridge": requiredCliSet.agy,
+  },
+};
+
+const CATEGORY_LABEL = {
+  config: "config",
+  cli: "cli",
+  plugins: "plugin",
+  permissions: "permission",
+  capabilities: "capability",
+};
+
+const NOT_REQUIRED_BY_PROJECT_CONFIG = "NOT_REQUIRED_BY_PROJECT_CONFIG";
+
 const failed = [];
 const warnings = [];
 
-collectFailures(checks.required, failed);
-collectFailures(checks.optional, warnings);
+// MCP and the /goal hook are always optional, never block the run.
+for (const [name, result] of Object.entries(checks.optional.mcp)) {
+  if (result.ok) continue;
+  warnings.push({ category: "mcp", name, required: false, reason: result.error ?? "NOT_DETECTED" });
+}
+for (const [name, result] of Object.entries(checks.optional.permissions)) {
+  if (result.ok) continue;
+  warnings.push({ category: "permission", name, required: false, reason: result.error ?? "NOT_ENABLED" });
+}
+
+for (const [group, results] of Object.entries(REQUIRED_BY_CHECK)) {
+  for (const [name, required] of Object.entries(results)) {
+    const result = checks[group][name];
+    result.required = required;
+    if (result.ok) continue;
+    if (required) {
+      failed.push({ category: CATEGORY_LABEL[group], name, ...result });
+      continue;
+    }
+    warnings.push({
+      category: CATEGORY_LABEL[group],
+      name,
+      required: false,
+      reason: NOT_REQUIRED_BY_PROJECT_CONFIG,
+    });
+  }
+}
 
 const report = {
   status: failed.length === 0 ? "ok" : "failed",
   generatedAt: new Date().toISOString(),
+  projectConfig: projectConfigState.block,
   checks,
   failed,
   warnings,
@@ -359,14 +570,6 @@ const report = {
 
 console.log(JSON.stringify(report, null, 2));
 process.exit(report.status === "ok" ? 0 : 1);
-
-function collectFailures(group, target) {
-  for (const [category, values] of Object.entries(group)) {
-    for (const [name, result] of Object.entries(values)) {
-      if (!result.ok) target.push({ category, name, ...result });
-    }
-  }
-}
 
 function remediationFor(f) {
   const key = `${f.category}:${f.name}`;
@@ -394,6 +597,16 @@ function remediationFor(f) {
           "  agy",
         ],
         docs: "https://antigravity.google/docs/cli-using",
+      };
+    case "config:project-config":
+      return {
+        target: "Project_Config_File: .orchestrator/project-config.md",
+        steps: [
+          "The file exists but is invalid (unparseable, missing field, or value outside codex|agy|claude-code).",
+          "Fix the field the error message points to, or delete the file to fall back to the default stack.",
+          "Never overwrite it automatically — the run must not guess a configuration the user did not confirm.",
+        ],
+        docs: null,
       };
     case "plugins:openai-codex":
       return {

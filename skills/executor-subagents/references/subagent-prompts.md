@@ -2,6 +2,8 @@
 
 Leia este arquivo antes de delegar. Copie o prompt mais proximo e preencha os placeholders.
 
+> **Escrita vs leitura no Antigravity/AGY.** `cc-antigravity-plugin:antigravity-coder` e o unico subagente AGY com permissao de escrita (cria, edita, move e formata arquivos via o bridge nativo) — use-o para qualquer implementacao (UI, imagem/asset, fan-out paralelo). `cc-antigravity-plugin:antigravity-agent` e **somente leitura** (analise, planejamento, review); jamais delegue implementacao a ele.
+
 ## Protocolo comum
 
 Inclua em todos os prompts:
@@ -92,7 +94,8 @@ Verifique:
 - testes faltantes;
 - arquivos fora de escopo;
 - inconsistencias entre modulos;
-- comandos de verificacao que ainda faltam.
+- comandos de verificacao que ainda faltam;
+- `// TODO`, `NotImplementedException`, placeholder ou stub no caminho do que foi pedido — trate como achado BLOQUEANTE, nunca como "lacuna conhecida".
 
 Retorne:
 1. Decisao: APROVADO | APROVADO COM RISCOS | REPROVADO
@@ -132,6 +135,10 @@ Compare:
 - desvios de escopo, omissoes, alteracoes de contrato e suposicoes novas;
 - testes/verificacoes planejados versus executados.
 
+Regras de achado bloqueante:
+- `// TODO`, `NotImplementedException`, placeholder ou stub no caminho de um requisito do plano e achado BLOQUEANTE, nunca "lacuna conhecida" — mesmo que o restante do requisito pareca completo.
+- Em fatia de UI/front-end: elemento interativo (botao, link, campo) sem `:hover`/`:focus` reais via CSS e achado bloqueante quando o plano/design system exigir esses estados — `style={{}}` inline nao expressa pseudo-classe nem `@keyframes`; so uma regra CSS externa cumpre o requisito.
+
 Retorne:
 1. Decisao: ALINHADO | ALINHADO COM DESVIOS ACEITOS | DESALINHADO
 2. Matriz plano vs entrega: item do plano, evidencia gerada, status
@@ -144,7 +151,7 @@ Retorne:
 
 ## 3. AGY front-end/UI
 
-**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+**Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
 Use `--model gemini-3.5-flash-medium` para UI do dia a dia e `--model gemini-3.1-pro-high` para UI complexa.
 
@@ -171,6 +178,7 @@ Estados obrigatorios:
 - error:
 - empty:
 - success:
+- hover/focus: use regras CSS reais (`:hover`, `:focus`, `@keyframes`) para elementos interativos — `style={{}}` inline nao expressa pseudo-classe.
 
 Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
@@ -297,7 +305,7 @@ Retorne:
 
 ## 8. AGY fan-out paralelo
 
-**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+**Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
 Use quando todos os entregaveis sao de dominio AGY, sao independentes entre si e nao envolvem Codex. O AGY decompoe e executa com subagentes Gemini nativos.
 
@@ -344,7 +352,7 @@ Retorne:
 
 ## 7. AGY imagem/asset
 
-**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+**Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
 Use quando o usuario pedir explicitamente asset, mockup, ilustracao, banner, logo ou imagem.
 

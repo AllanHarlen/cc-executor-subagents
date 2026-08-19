@@ -53,7 +53,7 @@ Depois encerre.
 
    Se a tool de Skill recusar por `disable-model-invocation: true`, leia `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/SKILL.md` e siga diretamente.
 
-5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/handoff.json`, siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
+5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/report/handoff.json` (com fallback para `.orchestration/<slug>/handoff.json`, layout antigo), siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
 
 6. Decida:
 
@@ -63,10 +63,10 @@ Depois encerre.
 
 7. Roteie por padrao:
 
-   - front-end/UI: `cc-antigravity-plugin:antigravity-agent`;
-   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex): `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo); adicione `--subagent-model gemini-3.5-flash-medium` para subagentes mais baratos;
-   - imagem explicita: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
-   - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
+   - front-end/UI: `cc-antigravity-plugin:antigravity-coder`;
+   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex): `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo); adicione `--subagent-model gemini-3.5-flash-medium` para subagentes mais baratos;
+   - imagem explicita: `cc-antigravity-plugin:antigravity-coder --generate-imagem`;
+   - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only` (somente leitura);
    - backend/testes/review: Codex.
 
 8. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:

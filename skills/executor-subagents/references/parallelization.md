@@ -8,7 +8,7 @@ O executor opera em duas camadas distintas. Escolha a certa para cada situacao.
 
 ### Camada Claude — waves
 
-Lanca varios subagentes `antigravity-agent` e/ou `codex:codex-rescue` em paralelo no mesmo bloco de ferramentas.
+Lanca varios subagentes `antigravity-coder` (implementacao) e/ou `codex:codex-rescue` em paralelo no mesmo bloco de ferramentas — use `antigravity-agent` (somente leitura) apenas para fatias de analise/investigacao, nunca para as que escrevem codigo.
 
 Use quando:
 
@@ -18,7 +18,7 @@ Use quando:
 
 ### Fan-out nativo do AGY (`--parallel`)
 
-Um unico `antigravity-agent` com `--parallel`. O AGY decompoe a tarefa em subtarefas Gemini nativas (`DefineSubagent`/`invoke_subagent`/`ManageSubagents`), executa em paralelo, agrega os resultados e reporta os Conversation IDs de cada subagente.
+Um unico `antigravity-coder` com `--parallel`. O AGY decompoe a tarefa em subtarefas Gemini nativas (`DefineSubagent`/`invoke_subagent`/`ManageSubagents`), executa em paralelo, agrega os resultados e reporta os Conversation IDs de cada subagente.
 
 Use quando:
 

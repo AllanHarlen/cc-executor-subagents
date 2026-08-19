@@ -33,7 +33,7 @@ Use pesquisa local (`rg`, `rg --files`, leitura de arquivos) antes de perguntar.
 
 Se houver plano pre-definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md`, registre `plano_predefinido: true` no checkpoint e trate esse baseline como fonte de verdade para slices, criterios de aceite e verificacao final.
 
-**Modo conjunto (Orchestrador → Executor):** procure `.orchestration/<slug>/handoff.json` antes de tratar a demanda como avulsa. Se existir, o executor entra no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador: adote o handoff como plano pre-definido baseline, siga `upstream` ate o Pensador para rastreabilidade (`prd`/`api-contract`/`design-system-files`) e mantenha obrigatorio o review Codex high plano-vs-entrega. Ver `references/handoff-contract.md` (secao 7).
+**Modo conjunto (Orchestrador → Executor):** procure `.orchestration/<slug>/report/handoff.json` (layout 2, Orchestrador >= 4.1.0) antes de tratar a demanda como avulsa; se ausente, tente `.orchestration/<slug>/handoff.json` (layout 1). Se existir em qualquer um dos dois, o executor entra no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador: adote o handoff como plano pre-definido baseline, registre qual caminho respondeu, siga `upstream` ate o Pensador para rastreabilidade (`prd`/`api-contract`/`design-system-files`) e mantenha obrigatorio o review Codex high plano-vs-entrega. Ver `references/handoff-contract.md` (secao 7).
 
 ## Fase 2 - Plano curto
 
@@ -118,8 +118,8 @@ Normalize `QUOTA_EXAUSTED` do bridge para `QUOTA_EXHAUSTED` no contexto do execu
 
 Ao receber retornos:
 
-1. Compare arquivos alterados com ownership.
-2. Leia diffs de areas compartilhadas.
+1. Compare arquivos alterados com ownership — com 3+ agentes ou ownership complexo, use `node "${CLAUDE_SKILL_DIR}/scripts/validate-task-scope.mjs" --root . --allowed "<padroes>"` em vez de conferir no olho.
+2. Leia diffs de areas compartilhadas; `node "${CLAUDE_SKILL_DIR}/scripts/inspect-diff.mjs" --root .` sinaliza migration, lockfile, auth/tenancy, possivel segredo, TODO novo e artefato de debug.
 3. Rode verificacoes incrementais.
 4. Corrija glue pequeno diretamente se for seguro.
 5. Redelegue correcoes grandes ou arriscadas.
@@ -152,7 +152,7 @@ Em tarefas com varios agentes, crie:
 
 Em tarefas com plano pre-definido, crie tambem `{artefatos_dir}/plan-vs-output-review.md` e referencie `{artefatos_dir}/initial-plan-baseline.md` nos tres relatorios finais.
 
-**Modo conjunto:** quando a execucao veio de `.orchestration/<slug>/handoff.json`, grave tambem `{artefatos_dir}/handoff.json` (`stage: executor`, `upstream` apontando o handoff do Orchestrador) conforme `references/handoff-contract.md`, com os roles do estagio Executor (`plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots` quando houver). E o estagio terminal: `nextStage` pode ser `null`.
+**Modo conjunto:** quando a execucao veio de `.orchestration/<slug>/report/handoff.json` ou `.orchestration/<slug>/handoff.json`, grave tambem `{artefatos_dir}/handoff.json` (`stage: executor`, `upstream` apontando o caminho do handoff do Orchestrador que de fato respondeu) conforme `references/handoff-contract.md`, com os roles do estagio Executor (`plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots` quando houver). E o estagio terminal: `nextStage` pode ser `null`.
 
 O fechamento deve ser curto:
 
