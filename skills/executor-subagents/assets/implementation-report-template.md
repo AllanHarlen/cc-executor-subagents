@@ -127,7 +127,7 @@ _N/A se nenhum fallback foi necessario. Inclui fallback de review interno por QU
 | Agente B (<modelo>) | N/A | N/A | N/A | N/A |
 | **TOTAL** | **<n>** | **<n>** | **<n>** | **<n>** |
 
-_Use N/A para agentes que nao reportaram tokens. O orquestrador calcula o total consolidado._
+Dado nao reportado e `N/A`, nunca `0`. Agente que nao executou fica `N/A` na linha inteira. Com `--parallel`, o total do AGY ja e o agregado da sessao — nao some o fan-out por fora. Rodada de review repetida soma na mesma linha, com a contagem de rodadas indicada. Esta tabela e a de `{artefatos_dir}/subagents-context.md`/`{artefatos_dir}/workflow-log.md` precisam fechar no mesmo total.
 
 ---
 
