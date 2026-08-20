@@ -397,7 +397,6 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 
 | Arquivo | Quando ler |
 |---|---|
-| `references/handoff-contract.md` | ingerir artefatos do Orchestrador/Pensador e gravar `handoff.json` |
 | `references/workflow.md` | detalhes do fluxo rapido |
 | `references/agent-stack.md` | escolher Codex/Antigravity/effort |
 | `references/subagent-prompts.md` | sempre antes de delegar |
