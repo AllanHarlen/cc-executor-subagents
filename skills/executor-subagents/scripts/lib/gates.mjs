@@ -16,6 +16,15 @@
 
 export const RISK_LEVELS = Object.freeze(["LOW", "MEDIUM", "HIGH"]);
 
+export class GatePlanError extends Error {
+  constructor(code, message, details = {}) {
+    super(message);
+    this.name = "GatePlanError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
 const SCRIPT = (name) => `\${CLAUDE_SKILL_DIR}/scripts/${name}`;
 
 function scriptGate(id, phase, name, args, reason) {
@@ -47,7 +56,18 @@ function actionGate(id, phase, reason) {
  * @returns {{ gates: Array<object>, skipped: Array<{ id: string, reason: string }> }}
  */
 export function planGates(context = {}) {
-  const risk = RISK_LEVELS.includes(context.risk) ? context.risk : "LOW";
+  // Risco invalido NAO cai para LOW: LOW e a resposta mais permissiva
+  // (zero gates), entao adivinhar aqui faria um `--risk` com typo desligar
+  // silenciosamente toda a verificacao. Um planejador de gates precisa falhar
+  // fechado — quem chama corrige a entrada.
+  const risk = String(context.risk ?? "").toUpperCase();
+  if (!RISK_LEVELS.includes(risk)) {
+    throw new GatePlanError(
+      "INVALID_RISK_LEVEL",
+      `Invalid risk level ${JSON.stringify(String(context.risk ?? ""))}; accepted: ${RISK_LEVELS.join(", ")}`,
+      { received: context.risk ?? null, accepted: [...RISK_LEVELS] },
+    );
+  }
   const agentCount = Number.isFinite(context.agentCount) ? context.agentCount : 1;
   const predefinedPlan = context.predefinedPlan === true;
   const jointMode = context.jointMode === true;

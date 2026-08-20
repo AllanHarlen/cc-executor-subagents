@@ -89,6 +89,7 @@ function main(argv) {
   let ownPatterns = ownFlags;
   let overlappingTasks = [];
   let taskNotRegistered = false;
+  let taskCommitBefore = null;
 
   if (artifactDir && taskId) {
     const state = loadRun(artifactDir, { verifyReplay: boolArg(args["verify-replay"], false) }).state;
@@ -103,6 +104,7 @@ function main(argv) {
       ownPatterns = declared ?? [];
       taskNotRegistered = ownPatterns.length === 0;
     }
+    taskCommitBefore = task.commitBefore ?? null;
     overlappingTasks = Object.values(state.tasks)
       .filter((candidate) => candidate.id !== taskId && !["DONE", "CANCELLED"].includes(candidate.status))
       .map((candidate) => ({
@@ -114,7 +116,13 @@ function main(argv) {
   }
 
   const git = inspectGit(root);
-  const sinceCommit = args.since && args.since !== true ? String(args.since) : null;
+  // Sem `--since`, cai para o `commitBefore` da task. Isso NAO e opcional: um
+  // agente que **commita** o proprio trabalho deixa a working tree limpa, e
+  // olhar so para `git.changedFiles` faria o gate reportar `valid: true` com
+  // zero arquivos justamente quando ele deveria acusar escrita fora do
+  // ownership. Sem task (modo stateless) nao ha baseline, entao so a working
+  // tree e considerada.
+  const sinceCommit = args.since && args.since !== true ? String(args.since) : taskCommitBefore;
   const changedFiles = [...new Set([
     ...(git.changedFiles ?? []),
     ...(sinceCommit ? committedFiles(root, sinceCommit, git.head) : []),
@@ -135,6 +143,9 @@ function main(argv) {
     deniedHits: deniedFiles.length,
     overlappingActiveTasks: overlappingTasks.length,
     taskOwnershipNotRegistered: taskNotRegistered,
+    // Baseline de commits considerado, para o leitor saber se o gate olhou
+    // apenas a working tree (null) ou tambem o historico desde este commit.
+    sinceCommit,
     valid: outOfScope.length === 0 && overlappingTasks.length === 0,
   };
   const result = intelligenceResult("validate-scope", summary, {

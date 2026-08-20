@@ -245,6 +245,30 @@ test("run cannot be DONE while a task remains non-terminal", () => {
   assert.equal(done.state.status, "DONE");
 });
 
+// Regressao: `initRun` defaultava a raiz do projeto para `process.cwd()`,
+// enquanto `resolveProjectRoot` (usado por updateTaskStatus/evidencia)
+// adivinhava `join(artifactDir, "..", "..", "..")`. Com um artifactDir fora da
+// convencao de 3 niveis os dois discordavam, e um arquivo existente era
+// reportado como ausente — rejeitando uma task legitimamente pronta.
+test("project root is recovered from state.artifactRoot for a non-conventional artifactDir", () => {
+  const { root } = fixture();
+  const artifactDir = join(root, "odd", "artefatos"); // 2 niveis, nao 3
+  writeFileSync(join(root, "real-file.txt"), "x\n", "utf8");
+
+  const previousCwd = process.cwd();
+  process.chdir(root);
+  try {
+    initRun({ slug: "odd", artifactDir });
+    registerTask(artifactDir, "t1", { expectedFiles: ["real-file.txt"] });
+    updateTaskStatus(artifactDir, "t1", "RUNNING", { executor: "codex" });
+    // O arquivo existe na raiz real; DONE deve ser aceito.
+    const done = updateTaskStatus(artifactDir, "t1", "DONE", {});
+    assert.equal(done.task.status, "DONE");
+  } finally {
+    process.chdir(previousCwd);
+  }
+});
+
 test("findRunDirectory prefers an explicit artifactDir over the checkpoint index", () => {
   const { artifactDir } = fixture();
   assert.equal(findRunDirectory({ artifactDir }), artifactDir);

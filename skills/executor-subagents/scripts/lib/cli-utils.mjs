@@ -26,8 +26,13 @@ export function parseArgs(argv) {
 
 export function required(args, key, fallback = undefined) {
   const value = args[key] ?? fallback;
-  if (value === undefined || value === "") {
-    const error = new Error(`Missing required argument --${key}`);
+  // `true` e o que `parseArgs` produz para uma flag sem valor (`--payload`).
+  // Para um argumento que exige valor, isso e ausencia: sem este caso o `true`
+  // vaza para o corpo do script e vira um erro cru do Node
+  // (`ERR_INVALID_ARG_TYPE`, "Cannot read properties of undefined") em vez do
+  // `MISSING_ARGUMENT` com exit 2 que o contrato da CLI promete.
+  if (value === undefined || value === "" || value === true) {
+    const error = new Error(`Missing value for required argument --${key}`);
     error.code = "MISSING_ARGUMENT";
     throw error;
   }
@@ -36,6 +41,13 @@ export function required(args, key, fallback = undefined) {
 
 export function numberArg(value, fallback = undefined) {
   if (value === undefined) return fallback;
+  // `Number(true)` e 1, entao uma flag numerica sem valor (`--limit`) viraria
+  // silenciosamente o numero 1. Trate como entrada invalida, nao como 1.
+  if (value === true) {
+    const error = new Error("Expected a number, received a flag with no value");
+    error.code = "INVALID_NUMBER";
+    throw error;
+  }
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     const error = new Error(`Expected a number, received ${value}`);

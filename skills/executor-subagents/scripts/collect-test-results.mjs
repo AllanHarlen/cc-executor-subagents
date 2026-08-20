@@ -100,8 +100,13 @@ function parseResult(file) {
 function main(argv) {
   const args = parseArgs(argv);
   const root = resolve(args.root ?? process.cwd());
-  const inputs = args.input ?? args._;
-  if (!inputs || inputs.length === 0) required(args, "input");
+  // `--input` sem valor vira `true` no parser; sem normalizar, o `true`
+  // chegaria em `collectInputFiles` e estouraria um ERR_INVALID_ARG_TYPE cru
+  // em vez do MISSING_ARGUMENT do contrato da CLI.
+  const declared = args.input === true ? undefined : args.input;
+  const positional = args._.length > 0 ? args._ : undefined;
+  const inputs = declared ?? positional;
+  if (inputs === undefined) required(args, "input");
   const files = collectInputFiles(root, inputs);
   const results = files.map(parseResult);
   const parsed = results.filter((result) => result.parsed);

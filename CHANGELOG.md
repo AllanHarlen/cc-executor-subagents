@@ -2,6 +2,17 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.0.1] - Correcoes de review
+
+Quatro defeitos encontrados em review do proprio port, todos com teste de regressao. Nenhum estava coberto pela suite anterior — os testes exercitavam o caminho feliz de cada script, e o caso dos gates chegava a cristalizar o comportamento errado.
+
+### Corrigido
+
+- **`validate-scope.mjs` dava falso negativo quando o agente commitava o trabalho** (o mais grave: e o gate que existe para pegar escrita fora do ownership). Um agente que commita deixa a working tree limpa, e o gate olhava so `git.changedFiles` — reportava `valid: true` com zero arquivos exatamente no caso que deveria acusar. Agora o baseline cai para o `commitBefore` da task quando `--since` nao e passado; o `commitBefore` ja e capturado sozinho no `task --status RUNNING`, entao nao ha flag nova a lembrar. O `summary.sinceCommit` passa a reportar qual baseline foi usado.
+- **`initRun` e `resolveProjectRoot` discordavam sobre a raiz do projeto**: o primeiro usava `process.cwd()`, o segundo adivinhava `join(artifactDir, "..", "..", "..")`. Com um `artifactDir` fora da convencao de 3 niveis, um arquivo existente era reportado como ausente e uma task legitimamente pronta era rejeitada com `TASK_EXPECTED_FILES_MISSING`. A raiz agora e recuperada do `state.artifactRoot` gravado no `init`, com `process.cwd()` como ultimo recurso — sem adivinhacao por profundidade.
+- **`executor-gates.mjs plan` falhava aberto**: `--risk` com typo ou sem valor caia para `LOW`, que e a resposta mais permissiva (zero gates), desligando silenciosamente toda a verificacao. Agora rejeita (`INVALID_RISK_LEVEL`), e `--risk` ausente vira `MISSING_ARGUMENT`.
+- **Flag sem valor vazava erro cru do Node em vez do contrato JSON da CLI**: `parseArgs` transforma `--payload` em `true`, e `required()` so rejeitava `undefined`/`""`. Afetava `check-agy-prompt --file`, `validate-wire-format --payload` e `collect-test-results --input`, que devolviam `ERR_INVALID_ARG_TYPE`/`Cannot read properties of undefined` com exit 1 em vez de `MISSING_ARGUMENT` com exit 2. Corrigido na raiz (`required()` e `numberArg()` de `lib/cli-utils.mjs`, mais a copia em `scripts/executor-state.mjs`), o que cobre a classe inteira.
+
 ## [2.0.0] - Layout por estagio, gates de conclusao e documentacao
 
 Fase 2.0 (final) do port Tier 1/Tier 2 de capacidades do `cc-orchestrador-subagents`. Fecha o ciclo: os artefatos passam a viver agrupados por estagio, e uma run so pode fechar `DONE` com os gates de conclusao fechados — nao so com as tasks terminais.

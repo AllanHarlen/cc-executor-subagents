@@ -1193,9 +1193,31 @@ function assertTaskDoneEvidence(task, projectRoot, git) {
   }
 }
 
-function resolveProjectRoot(artifactDir, options) {
-  // {artefatos_dir} = .executor/<slug>/artefatos -> volta 3 niveis ate a raiz do projeto.
-  return resolve(options.projectRoot ?? join(resolve(artifactDir), "..", "..", ".."));
+/**
+ * Raiz do projeto de uma run, em ordem de precedencia:
+ *
+ * 1. `options.projectRoot` explicito — o que a CLI sempre passa.
+ * 2. `state.artifactRoot`: o caminho relativo que `initRun` gravou no
+ *    snapshot. Subir esses segmentos a partir de `artifactDir` recupera
+ *    exatamente a raiz que o `init` usou, seja qual for a convencao de
+ *    diretorio.
+ * 3. `process.cwd()` — o mesmo default de `initRun`.
+ *
+ * Nao ha mais adivinhacao por profundidade fixa: assumir
+ * `.executor/<slug>/artefatos` (3 niveis) discordava do default de `initRun`
+ * e fazia `assertTaskDoneEvidence` procurar arquivo na raiz errada sempre que
+ * o `artifactDir` fugia dessa convencao — um arquivo existente era reportado
+ * como ausente e uma task legitimamente pronta era rejeitada.
+ */
+function resolveProjectRoot(artifactDir, options = {}, state = null) {
+  if (options.projectRoot) return resolve(options.projectRoot);
+  const artifactRoot = typeof state?.artifactRoot === "string" ? state.artifactRoot.trim() : "";
+  if (artifactRoot) {
+    const segments = artifactRoot.split("/").filter((segment) => segment !== "" && segment !== ".");
+    // Caminho com `..` nao tem inverso confiavel; cai para o default comum.
+    if (!segments.includes("..")) return resolve(artifactDir, ...segments.map(() => ".."));
+  }
+  return resolve(process.cwd());
 }
 
 export function updateTaskStatus(artifactDir, taskId, status, options = {}) {
@@ -1209,7 +1231,7 @@ export function updateTaskStatus(artifactDir, taskId, status, options = {}) {
     assertRunMutable(state, "update a task");
     const normalizedTaskId = ensureTask(state, taskId);
     const now = iso(options.now);
-    const projectRoot = resolveProjectRoot(artifactDir, options);
+    const projectRoot = resolveProjectRoot(artifactDir, options, state);
     const git = inspectGit(projectRoot);
     const task = mergeTaskFields(state.tasks[normalizedTaskId], normalizedStatus, options, now, git);
     if (normalizedStatus === "DONE") assertTaskDoneEvidence(task, projectRoot, git);
@@ -1607,7 +1629,7 @@ function reconcileTask(task, probe, projectRoot, git, now) {
 }
 
 function reconcileLocked(artifactDir, state, options = {}) {
-  const projectRoot = resolveProjectRoot(artifactDir, options);
+  const projectRoot = resolveProjectRoot(artifactDir, options, state);
   const probeSet = readProbeFile(options.probeFile);
   const now = iso(options.now);
   const git = inspectGit(projectRoot);
@@ -1729,7 +1751,7 @@ export function resumeRunAtDirectory(artifactDir, options = {}) {
       { tasks: reconciled.tasks, runStatus: reconciled.runStatus, repository: reconciled.repository, resume: reconciled.resume },
       options,
     );
-    const projectConfigDrift = computeProjectConfigDrift(committed.state, resolveProjectRoot(artifactDir, options));
+    const projectConfigDrift = computeProjectConfigDrift(committed.state, resolveProjectRoot(artifactDir, options, committed.state));
     return {
       state: committed.state,
       events: [resumed.event, committed.event],

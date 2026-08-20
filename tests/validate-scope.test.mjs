@@ -143,6 +143,52 @@ test("state-backed mode: reads allowedPaths from a registered task in state.json
   assert.equal(json.result.summary.taskOwnershipNotRegistered, false);
 });
 
+// Regressao: um agente que COMMITA o proprio trabalho deixa a working tree
+// limpa. Olhando so para `git.changedFiles`, o gate reportava `valid: true`
+// com zero arquivos justamente no caso que ele existe para pegar. O baseline
+// (`task.commitBefore`) ja estava no state.json e simplesmente nao era lido.
+test("state-backed mode: catches out-of-ownership work that the agent COMMITTED", () => {
+  const root = fixture();
+  initGitRepo(root);
+  const artifactDir = join(root, ".executor", "demo", "artefatos");
+
+  runNode(EXECUTOR_STATE_SCRIPT, ["init", "--slug", "demo", "--dir", artifactDir, "--root", root], root);
+  runNode(
+    EXECUTOR_STATE_SCRIPT,
+    ["task", "register", "--dir", artifactDir, "--task", "codex-1", "--allowed-path", "src/pages/**", "--root", root],
+    root,
+  );
+  const before = git(root, "rev-parse", "HEAD");
+  runNode(
+    EXECUTOR_STATE_SCRIPT,
+    [
+      "task", "--dir", artifactDir, "--task", "codex-1", "--status", "RUNNING",
+      "--executor", "codex", "--commit-before", before, "--root", root,
+    ],
+    root,
+  );
+
+  // O agente escreve fora do ownership E commita: working tree fica limpa.
+  mkdirSync(join(root, "src", "api"), { recursive: true });
+  writeFileSync(join(root, "src", "api", "client.ts"), "// out of ownership\n", "utf8");
+  git(root, "add", "-A");
+  git(root, "commit", "-m", "agent committed out-of-scope work");
+
+  const { json } = runNode(SCRIPT, ["--root", root, "--dir", artifactDir, "--task", "codex-1"], root);
+  assert.equal(json.ok, true);
+  assert.equal(json.result.summary.valid, false, "committed out-of-ownership work must not pass the gate");
+  assert.ok(json.result.details.outOfScope.includes("src/api/client.ts"));
+  assert.equal(json.result.summary.sinceCommit, before, "baseline must default to task.commitBefore");
+});
+
+test("stateless mode reports sinceCommit null: only the working tree was considered", () => {
+  const root = fixture();
+  initGitRepo(root);
+  writeFileSync(join(root, "loose.ts"), "// x\n", "utf8");
+  const { json } = runNode(SCRIPT, ["--root", root, "--own", "src/**"], root);
+  assert.equal(json.result.summary.sinceCommit, null);
+});
+
 test("state-backed mode: unknown task id fails with TASK_NOT_FOUND", () => {
   const root = fixture();
   initGitRepo(root);

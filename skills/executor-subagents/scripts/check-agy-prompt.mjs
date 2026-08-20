@@ -43,14 +43,10 @@ function main(argv) {
   const args = parseArgs(argv);
   const limit = numberArg(args.limit, AGY_PROMPT_CHAR_LIMIT);
 
-  let text;
-  if (args.file && args.file !== true) {
-    text = readFileSync(resolve(String(args.file)), "utf8");
-  } else if (args.stdin) {
-    text = readStdin();
-  } else {
-    required(args, "file");
-  }
+  // `required` rejeita tanto `--file` ausente quanto `--file` sem valor, e o
+  // resultado e sempre atribuido: nao ha caminho em que `text` fique
+  // `undefined` e estoure um TypeError cru mais abaixo.
+  const text = args.stdin ? readStdin() : readFileSync(resolve(String(required(args, "file"))), "utf8");
 
   const chars = text.length;
   const ok = chars <= limit;

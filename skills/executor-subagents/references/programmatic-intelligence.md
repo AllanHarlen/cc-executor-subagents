@@ -19,6 +19,15 @@ Scripts disponiveis:
 | `check-agy-prompt.mjs` | tamanho do prompt AGY contra o limite de 28.000 chars antes de delegar |
 | `executor-gates.mjs plan` | lista exata de gates a rodar nas Fases 6/6.5/6.6, dado risco/plano-predefinido/modo-conjunto |
 
+## Baseline de `validate-scope.mjs`
+
+O que conta como "arquivo alterado" depende do modo:
+
+- **Com `--dir` e `--task`** (execucao ativa): working tree **mais** tudo commitado desde o `commitBefore` da task. O `commitBefore` e capturado sozinho no `task --status RUNNING` (nao precisa passar `--commit-before`). Isso e o que faz o gate pegar um agente que **commita** o proprio trabalho — sem esse baseline a working tree fica limpa e o gate reportaria `valid: true` com zero arquivos justamente no caso que ele existe para pegar.
+- **Sem `--dir`** (modo stateless, so `--own`/`--deny`): apenas a working tree, a menos que voce passe `--since <sha>` explicitamente.
+
+O `summary.sinceCommit` do resultado diz qual baseline foi usado (`null` = so working tree), entao da para auditar depois se o gate olhou o suficiente.
+
 Todos os scripts de intelligence (nao `executor-gates.mjs`, que so planeja):
 
 - recebem caminhos explicitos e recusam traversal fora do projeto (`PATH_OUTSIDE_PROJECT`);

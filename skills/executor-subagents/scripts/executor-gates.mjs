@@ -9,7 +9,7 @@
  * plano pre-definido e modo conjunto entao...".
  */
 
-import { boolArg, executeJsonCli, numberArg, parseArgs } from "./lib/cli-utils.mjs";
+import { boolArg, executeJsonCli, numberArg, parseArgs, required } from "./lib/cli-utils.mjs";
 import { planGates } from "./lib/gates.mjs";
 
 function help() {
@@ -25,7 +25,10 @@ function help() {
 
 function plan(args) {
   return planGates({
-    risk: String(args.risk ?? "LOW").toUpperCase(),
+    // `required` rejeita `--risk` ausente ou vazio; `planGates` rejeita valor
+    // fora de LOW/MEDIUM/HIGH. Nenhum dos dois cai para um default
+    // permissivo.
+    risk: String(required(args, "risk")).toUpperCase(),
     agentCount: numberArg(args["agent-count"], 1),
     predefinedPlan: boolArg(args["predefined-plan"], false),
     jointMode: boolArg(args["joint-mode"], false),

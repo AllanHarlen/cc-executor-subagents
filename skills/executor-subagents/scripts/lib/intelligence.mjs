@@ -189,7 +189,9 @@ export function persistIntelligenceEvidence(result, options = {}) {
   }
   return {
     path,
-    relativePath: toPosixPath(relative(resolve(options.projectRoot ?? join(artifactDir, "..", "..", "..")), path)),
+    // Mesmo default de `initRun`/`resolveProjectRoot`: sem `projectRoot`
+    // explicito, `cwd`. Nao adivinhe a raiz pela profundidade do artifactDir.
+    relativePath: toPosixPath(relative(resolve(options.projectRoot ?? process.cwd()), path)),
     taskId: task?.id ?? null,
   };
 }

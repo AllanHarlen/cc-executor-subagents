@@ -1,6 +1,6 @@
 {
   "name": "cc-executor-subagents",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, supports pre-defined plan execution with Codex high plan-vs-output review, routes backend/front-end work through a per-project Project_Config (Codex/AGY/Claude Code, configurable), persists run state crash-safely with /executor resume, gates verification and completion proportionally to risk with deterministic validators, and reports without OpenSpec ceremony.",
   "author": {
     "name": "allanharlen"

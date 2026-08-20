@@ -85,7 +85,21 @@ test("every script gate's command starts with node and references ${CLAUDE_SKILL
   }
 });
 
-test("unknown risk value falls back to LOW (no gates) rather than throwing", () => {
-  const { gates } = planGates({ risk: "NONSENSE" });
-  assert.deepEqual(gates, []);
+// Este teste antes afirmava o oposto ("cai para LOW em vez de lancar"), o que
+// cristalizava um fail-open: LOW e a resposta mais permissiva (zero gates),
+// entao um `--risk` com typo desligava silenciosamente toda a verificacao. Um
+// planejador de gates precisa falhar fechado.
+test("an unknown or missing risk value is rejected, never silently treated as LOW", () => {
+  for (const risk of ["NONSENSE", "", undefined, null, true, 3]) {
+    assert.throws(
+      () => planGates({ risk }),
+      (error) => error.code === "INVALID_RISK_LEVEL",
+      `risk=${JSON.stringify(risk)} should be rejected`,
+    );
+  }
+});
+
+test("risk level is accepted case-insensitively", () => {
+  assert.deepEqual(planGates({ risk: "low" }).gates, []);
+  assert.ok(planGates({ risk: "medium" }).gates.some((gate) => gate.id === "inspect-diff"));
 });

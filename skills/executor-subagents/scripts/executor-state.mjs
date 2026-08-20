@@ -54,8 +54,10 @@ function parseArgs(argv) {
 
 function required(args, key, fallback = undefined) {
   const value = args[key] ?? fallback;
-  if (value === undefined || value === "") {
-    throw new ExecutorStateError("MISSING_ARGUMENT", `Missing required argument --${key}`);
+  // `true` = flag sem valor (`--dir`), que para um argumento com valor e
+  // ausencia. Mesma regra do `required` de `lib/cli-utils.mjs`.
+  if (value === undefined || value === "" || value === true) {
+    throw new ExecutorStateError("MISSING_ARGUMENT", `Missing value for required argument --${key}`);
   }
   return value;
 }
