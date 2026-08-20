@@ -134,3 +134,105 @@ test("checkpoint template does not declare a retired identifier as a field", () 
     assert.ok(!content.includes(identifier), `checkpoint-template.json still declares "${identifier}"`);
   }
 });
+
+// `preflight.mjs` is a runnable CLI script (unconditional top-level
+// `console.log`/`process.exit`), not a pure module - it cannot be imported
+// here without executing a real preflight. Its `MIN_ANTIGRAVITY_PLUGIN_VERSION`
+// is instead read as text, the same pattern the rest of this suite uses to
+// keep prose in lockstep with code.
+const PREFLIGHT_SOURCE = readFileSync(
+  FILES.find((f) => rel(f) === "skills/executor-subagents/scripts/preflight.mjs"),
+  "utf8",
+);
+const MIN_ANTIGRAVITY_PLUGIN_VERSION = PREFLIGHT_SOURCE.match(
+  /const MIN_ANTIGRAVITY_PLUGIN_VERSION = "([^"]+)"/,
+)?.[1];
+
+test("preflight.mjs declares MIN_ANTIGRAVITY_PLUGIN_VERSION (otherwise the version guard below is vacuous)", () => {
+  assert.ok(MIN_ANTIGRAVITY_PLUGIN_VERSION, "could not find MIN_ANTIGRAVITY_PLUGIN_VERSION in preflight.mjs");
+});
+
+// The bug that motivated this guard: preflight.mjs required cc-antigravity-plugin
+// >= 4.0.0 while SKILL.md/README*.md still advertised 3.6.0. Nothing failed
+// loudly - the prose was just wrong. This test fails the moment the two
+// diverge again, in either direction.
+const VERSION_SYNCED_DOCS = [
+  "skills/executor-subagents/SKILL.md",
+  "skills/executor-subagents/references/preflight-check.md",
+  "skills/executor-subagents/assets/implementation-report-template.md",
+  "README.md",
+  "README.pt-BR.md",
+];
+
+test("MIN_ANTIGRAVITY_PLUGIN_VERSION from preflight.mjs appears in every doc that advertises the requirement", () => {
+  for (const path of VERSION_SYNCED_DOCS) {
+    const file = FILES.find((f) => rel(f) === path);
+    assert.ok(file, `expected ${path} to be part of the scanned file set`);
+    const content = readFileSync(file, "utf8");
+    assert.ok(
+      content.includes(MIN_ANTIGRAVITY_PLUGIN_VERSION),
+      `${path} does not mention cc-antigravity-plugin ${MIN_ANTIGRAVITY_PLUGIN_VERSION}`,
+    );
+  }
+});
+
+// Routing guard: implementation (front-end/UI, parallel fan-out, image/asset)
+// must delegate to `antigravity-coder` (the agent with bridge write access);
+// `antigravity-agent` is read-only in the cc-antigravity-plugin 4.0 contract
+// and routing implementation to it silently writes nothing. This is exactly
+// the critical bug this release fixes - the guard exists so it cannot regress.
+const SUBAGENT_PROMPTS = readFileSync(
+  FILES.find((f) => rel(f) === "skills/executor-subagents/references/subagent-prompts.md"),
+  "utf8",
+);
+
+// Split into top-level `## N. <title>` sections (the file's own structure).
+function splitSections(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const sections = [];
+  let current = null;
+  for (const line of lines) {
+    const heading = line.match(/^## (.+)$/);
+    if (heading) {
+      current = { title: heading[1], body: [] };
+      sections.push(current);
+    } else if (current) {
+      current.body.push(line);
+    }
+  }
+  return sections.map((s) => ({ title: s.title, text: s.body.join("\n") }));
+}
+
+const AGY_IMPLEMENTATION_SECTIONS = ["AGY front-end/UI", "AGY fan-out paralelo", "AGY imagem/asset"];
+const AGY_READONLY_SECTIONS = ["AGY analise cross-file"];
+
+test("AGY implementation sections in subagent-prompts.md route to antigravity-coder, never antigravity-agent", () => {
+  const sections = splitSections(SUBAGENT_PROMPTS);
+  for (const label of AGY_IMPLEMENTATION_SECTIONS) {
+    const section = sections.find((s) => s.title.includes(label));
+    assert.ok(section, `expected a "## N. ${label}" section in subagent-prompts.md`);
+    assert.match(
+      section.text,
+      /\*\*Subagent type:\*\* `cc-antigravity-plugin:antigravity-coder`/,
+      `"${label}" must declare antigravity-coder as its Subagent type`,
+    );
+    assert.doesNotMatch(
+      section.text,
+      /\*\*Subagent type:\*\* `cc-antigravity-plugin:antigravity-agent`/,
+      `"${label}" is implementation work and must not route to the read-only antigravity-agent`,
+    );
+  }
+});
+
+test("AGY analysis sections in subagent-prompts.md stay on the read-only antigravity-agent", () => {
+  const sections = splitSections(SUBAGENT_PROMPTS);
+  for (const label of AGY_READONLY_SECTIONS) {
+    const section = sections.find((s) => s.title.includes(label));
+    assert.ok(section, `expected a "## N. ${label}" section in subagent-prompts.md`);
+    assert.match(
+      section.text,
+      /\*\*Subagent type:\*\* `cc-antigravity-plugin:antigravity-agent`/,
+      `"${label}" must declare antigravity-agent as its Subagent type`,
+    );
+  }
+});

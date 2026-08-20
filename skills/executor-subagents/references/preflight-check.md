@@ -33,9 +33,10 @@ Ver `references/project-config.md` para o catalogo completo de perguntas e o pro
 |---|---|---|
 | Project_Config valida | sempre, se o arquivo existir | arquivo invalido bloqueia sem nunca ser sobrescrito automaticamente |
 | `codex` CLI + plugin `openai-codex` | `backendExecutor` ou `backendReviewer` = `codex` | executa agentes de backend, testes e review |
-| `agy` CLI + plugin `cc-antigravity-plugin` `>= 3.6.0` | `frontendExecutor` ou `frontendReviewer` = `agy` | executa agentes de front-end, imagem e analise em contexto largo |
-| `agy --help` com flags essenciais | igual ao `agy` CLI | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
-| bridge do AGY com flags atuais | igual ao `agy` CLI | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
+| `agy` CLI (`>= 1.1.8`, `1.1.16` recomendado) + plugin `cc-antigravity-plugin` `>= 4.0.0` | `frontendExecutor` ou `frontendReviewer` = `agy` | executa agentes de front-end, imagem e analise em contexto largo |
+| `agy --help` com flags essenciais | igual ao `agy` CLI | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive`, `--output-format`, `--mode`, `--model`, `--effort` |
+| bridge do AGY com flags atuais | igual ao `agy` CLI | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command`, `--format`, `--effort`, `--mode`, `--json-schema`, `--allow-slash-commands`, `--interactive`, `--agent` |
+| arquivos do plugin `cc-antigravity-plugin` instalado | igual ao `agy` CLI | `agents/antigravity-coder.md` (implementacao), `agents/antigravity-agent.md` (review read-only), `commands/antigravity.md`, `scripts/antigravity-bridge.js` |
 | permissao Bash para Codex companion | sempre | evita aprovacoes no meio de agentes em background — **auto-remediado** quando possivel |
 
 Quando os quatro papeis apontam para `claude-code`, nenhuma CLI externa e exigida e o preflight passa mesmo sem `codex`/`agy` no PATH.

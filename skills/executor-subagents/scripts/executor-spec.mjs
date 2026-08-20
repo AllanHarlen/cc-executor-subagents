@@ -63,8 +63,20 @@ export const RISK_LEVELS = Object.freeze(["LOW", "MEDIUM", "HIGH"]);
  * obrigatoriedade de CLI passou a vir inteira da Project_Config
  * (`backendExecutor`/`frontendExecutor` = `claude-code`), entao a excecao
  * ad-hoc de "front-end puro pode seguir sem Codex" deixou de existir.
+ *
+ * `nano-banana`, `gemini-3.5-flash-medium` e `gemini-3.1-pro-high` foram
+ * retirados no alinhamento com o `cc-antigravity-plugin` 4.0: o modelo de
+ * imagem sintetico deixou de existir (a tool nativa `generate_imagem` faz o
+ * trabalho sem trocar de modelo) e os slugs pinados de Gemini foram
+ * substituidos por aliases de familia (`--model flash`/`--model pro`) que o
+ * bridge resolve contra o catalogo dinamico de `agy models`.
  */
-export const RETIRED_IDENTIFIERS = Object.freeze(["codex_excluido"]);
+export const RETIRED_IDENTIFIERS = Object.freeze([
+  "codex_excluido",
+  "nano-banana",
+  "gemini-3.5-flash-medium",
+  "gemini-3.1-pro-high",
+]);
 
 /** Avanca para a proxima fase na ordem canonica; sem efeito no final da lista. */
 export function nextPhase(phase) {

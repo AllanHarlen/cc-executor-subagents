@@ -114,10 +114,10 @@ Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhas
 
 6. Roteie pelo papel efetivo na Project_Config (`frontendExecutor`/`backendExecutor`, default `agy`/`codex`), nao por uma regra fixa:
 
-   - front-end/UI: `frontendExecutor` (default `cc-antigravity-plugin:antigravity-agent`; `claude-code` delega a um subagente Task do proprio Claude);
-   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex), quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo); adicione `--subagent-model gemini-3.5-flash-medium` para subagentes mais baratos;
-   - imagem explicita, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
-   - analise pura, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --read-only`;
+   - front-end/UI: `frontendExecutor` (default `cc-antigravity-plugin:antigravity-coder`; `claude-code` delega a um subagente Task do proprio Claude);
+   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex), quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo); adicione `--subagent-model flash` para subagentes mais baratos;
+   - imagem explicita, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-coder --generate-image`;
+   - analise pura, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --read-only` (somente leitura, nunca implementa);
    - backend/testes/review: `backendExecutor`/`backendReviewer` (default Codex; `claude-code` delega a um subagente Task do proprio Claude).
 
 7. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
@@ -165,7 +165,7 @@ Se a demanda for uma edicao trivial que voce consegue fazer em menos tempo do qu
 
 Use updates curtos:
 
-- "preflight OK; AGY 3.6.0+ validado para front-end, fan-out nativo e analise";
+- "preflight OK; cc-antigravity-plugin 4.0.0+ e AGY 1.1.8+ validados para front-end, fan-out nativo e analise";
 - "vou dividir em 3 slices independentes";
 - "lancei 3 agentes em paralelo; ownership: testes, service, front-end";
 - "verificacao passou/falhou; estou integrando o ajuste final".

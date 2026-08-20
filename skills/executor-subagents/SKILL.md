@@ -20,7 +20,7 @@ Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce
 - **Paralelismo pragmastico.** Rode em paralelo apenas tarefas independentes; serialize arquivos centrais compartilhados.
 - **Plano pre-definido vira baseline.** Quando o usuario trouxer um plano pronto, trabalhe sobre ele, preserve-o como fonte de verdade e revise a entrega contra esse baseline.
 - **Executor pode integrar.** O executor principal pode fazer pequenos ajustes de integracao, documentacao e glue code quando for mais rapido e seguro do que redelegar.
-- **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 3.6.0+. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
+- **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 4.0.0+ via `antigravity-coder` (implementacao). `antigravity-agent` e somente leitura e nunca implementa. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
 - **Context7 quando houver docs de libs.** Se a task envolver biblioteca, framework, SDK, API, CLI ou cloud service, use Context7 quando disponivel.
 - **Sem OpenSpec.** Nao crie `openspec/`, nao chame `/openspec-*`, nao bloqueie por ausencia de OpenSpec.
 - **Sem teatralidade.** Updates curtos, decisao rapida, evidencia final.
@@ -69,7 +69,7 @@ O preflight deriva quais itens sao obrigatorios da **Project_Config** (`.executo
 | Item | Obrigatorio quando | Uso |
 |---|---|---|
 | `codex` CLI + plugin `openai-codex` | `backendExecutor` ou `backendReviewer` = `codex` | subagente `codex:codex-rescue` para backend, testes, review e recuperacao |
-| `agy` CLI + plugin `cc-antigravity-plugin` `>= 3.6.0` | `frontendExecutor` ou `frontendReviewer` = `agy` | subagente `cc-antigravity-plugin:antigravity-agent` (inclui `--parallel` e `--subagent-model` para fan-out nativo) |
+| `agy` CLI (`>= 1.1.8`, `1.1.16` recomendado) + plugin `cc-antigravity-plugin` `>= 4.0.0` | `frontendExecutor` ou `frontendReviewer` = `agy` | subagente `cc-antigravity-plugin:antigravity-coder` para implementacao (inclui `--parallel` e `--subagent-model` para fan-out nativo); `antigravity-agent` para analise/review read-only |
 | permissao Bash do Codex companion | sempre | evita bloqueio de aprovacao em background — auto-remediado quando possivel |
 | `/goal` hooks | opcional | autonomia entre turnos |
 | Context7 MCP | opcional | docs atuais para libs/frameworks/APIs |
@@ -164,10 +164,10 @@ Use esta regra:
 |---|---|
 | 1 arquivo, mudanca obvia, baixo risco | Execute direto |
 | 1 area backend clara, patch medio | 1 agente Codex |
-| UI/front-end isolado | 1 agente AGY agentic — Codex nao participa |
-| UI/front-end complexa | 1 agente AGY com `--model gemini-3.1-pro-high` — Codex nao participa |
-| Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY com `--parallel`; adicione `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
-| Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` — Codex nao participa |
+| UI/front-end isolado | 1 agente AGY (`antigravity-coder`) agentic — Codex nao participa |
+| UI/front-end complexa | 1 agente AGY (`antigravity-coder`) com `--model pro --effort high` — Codex nao participa |
+| Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY (`antigravity-coder`) com `--parallel`; adicione `--subagent-model flash` para subagentes baratos |
+| Imagem ou asset explicito | 1 agente AGY (`antigravity-coder`) com `--generate-image` — Codex nao participa |
 | Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
 | N areas independentes de dominios diferentes (AGY + Codex) | N agentes em paralelo (waves na camada Claude); sem limite fixo — o criterio e ownership disjunto |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
@@ -193,13 +193,15 @@ Cada prompt deve incluir:
 
 Roteamento padrao:
 
-- front-end/UI: `cc-antigravity-plugin:antigravity-agent` em modo agentic;
-- varios entregaveis AGY independentes sem Codex: `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo de subagentes Gemini; opcional `--subagent-model` para subagentes mais baratos);
-- imagem/asset explicito: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
+- front-end/UI: `cc-antigravity-plugin:antigravity-coder --mode accept-edits`;
+- varios entregaveis AGY independentes sem Codex: `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo de subagentes Gemini; opcional `--subagent-model` para subagentes mais baratos);
+- imagem/asset explicito: `cc-antigravity-plugin:antigravity-coder --generate-image`;
 - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
 - backend/testes/review: Codex.
 
-**Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-imagem`.
+`antigravity-agent` e somente leitura — nunca roteie implementacao para ele; a task nao escreveria nada.
+
+**Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-image`.
 
 **Limite de prompt AGY.** Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>` (ou `--stdin`). Acima de 28.000 caracteres o bridge pode falhar com `ENAMETOOLONG` no Windows — divida a task em subtasks por entregaveis independentes antes de delegar, nunca envie o prompt acima do limite.
 
@@ -216,6 +218,7 @@ Quando agentes retornarem:
 3. Resolva conflitos pequenos diretamente quando for seguro.
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
 5. Atualize `{artefatos_dir}/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
+6. Se um agente front-end devolveu `IMAGE_SUGGESTIONS` preenchido (nao `N/A`), trate antes de fechar a fase: apresente as opcoes ao usuario via `AskUserQuestion` (`multiSelect: true`) e delegue cada aprovacao de volta ao `antigravity-coder` com `--generate-image` (uma chamada por imagem). Ver `references/subagent-prompts.md` secao 3a.
 
 Se um agente falhar por cota, auth, timeout ou ausencia do AGY, normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`, registre a evidencia e aplique o fallback gradual (ver "Politica de falhas" abaixo) antes de pausar para o usuario.
 
@@ -304,9 +307,9 @@ Antes de pausar para o usuario, aplique automaticamente a escada de fallback aba
 **Escada AGY:**
 
 ```
-AGY gemini-3.1-pro-high
-  → AGY gemini-3.5-flash-medium  (retry automatico, sem perguntar)
-  → Executor (Claude) direto     (se flash-medium tambem falhar)
+AGY --model pro --effort high
+  → AGY --model flash --effort medium  (retry automatico, sem perguntar)
+  → Executor (Claude) direto           (se flash tambem falhar)
 ```
 
 **Escada Codex:**
@@ -331,8 +334,9 @@ O executor (Claude) assume a task diretamente quando todos os degraus acima falh
 
 1. Normalize para `QUOTA_EXHAUSTED` no contexto do executor.
 2. Registre a evidencia no `{artefatos_dir}/monitoring.md`.
-3. Aplique a escada AGY: tente `flash-medium`; se falhar, executor direto.
-4. Se a task for de imagem/asset e o executor nao puder substituir, pergunte ao usuario se quer remediar, pular o asset, ou cancelar.
+3. Prefira retomar com `--conversation <id>` quando o envelope de erro trouxer um `conversation_id` exato; use `--continue` somente quando nao houver ID disponivel.
+4. Aplique a escada AGY: tente `--model flash --effort medium`; se falhar, executor direto.
+5. Se a task for de imagem/asset e o executor nao puder substituir, pergunte ao usuario se quer remediar, pular o asset, ou cancelar.
 
 **AGY emite `AUTH_REQUIRED`, `TIMEOUT` ou `AGY_MISSING`:**
 
@@ -418,7 +422,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Nao instale dependencias novas sem justificativa e autorizacao quando houver impacto de lockfile.
 - Nao altere auth/autorizacao/segredos sem review dedicado.
 - Nao ignore erro de build/teste; se aceitar uma falha, registre como pendencia.
-- Para front-end/UI puro (`UI_FRONTEND`, `IMAGE_ASSET`): Codex nao participa do fluxo — nem como agente, nem como fallback. Aplique somente a escada AGY (pro-high → flash-medium → executor direto). Nunca lance Codex para estas tasks.
+- Para front-end/UI puro (`UI_FRONTEND`, `IMAGE_ASSET`): Codex nao participa do fluxo — nem como agente, nem como fallback. Aplique somente a escada AGY (`pro`/high → `flash`/medium → executor direto). Nunca lance Codex para estas tasks.
 - Excecao: se `plano_predefinido: true`, Codex high participa apenas como review read-only na Fase 6.5 para comparar o plano inicial com a entrega gerada; ele nao implementa nem faz fallback de UI/asset.
 - Para imagem/asset: sem AGY nao ha fallback automatico; registre como `BLOCKED` e pergunte ao usuario.
 

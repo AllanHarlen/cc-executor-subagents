@@ -43,6 +43,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write \
 
 Preflight (`/executor preflight`) derives which CLIs/plugins are required from this configuration — with all four roles set to `claude-code`, no external CLI is required at all. See `skills/executor-subagents/references/project-config.md`.
 
+When a role is `agy`, implementation always routes to `cc-antigravity-plugin:antigravity-coder` (the agent with write access via the bridge); `cc-antigravity-plugin:antigravity-agent` is read-only and is only used for architecture analysis or review — it never implements. A front-end task can return an `IMAGE_SUGGESTIONS` block with proposed imagery (hero, banners, empty-state illustrations); the executor presents those options to the user via `AskUserQuestion` before generating any image.
+
 ## Persistent state and resume
 
 Each run gets its own crash-safe `{artefatos_dir}/state.json` + `events.jsonl` (event fsynced before the snapshot swaps atomically — a crash mid-write is repaired by replay, not lost). `.executor/checkpoint.json` is a lightweight index (`execucao_atual`, `historico[]`) pointing at the active run. Resume with:
@@ -98,7 +100,7 @@ Default routing:
 
 - front-end/UI: AGY in agentic mode;
 - multiple independent AGY deliverables (reports, components): AGY with `--parallel` (native fan-out of Gemini subagents; `--subagent-model` optional for cheaper subagents);
-- explicit image/asset: AGY with `--generate-imagem`;
+- explicit image/asset: AGY with `--generate-image`;
 - cross-file analysis: AGY with `--read-only`;
 - backend, tests, and review: Codex.
 
@@ -131,9 +133,9 @@ Mandatory:
 |---|---|
 | Node.js | `node --version` |
 | Codex CLI | `codex --version` |
-| Antigravity CLI (`agy`) | `agy --version` |
+| Antigravity CLI (`agy`) `>= 1.1.8` (`1.1.16` recommended) | `agy --version` |
 | `openai-codex` plugin | installed in Claude Code |
-| `cc-antigravity-plugin` `>= 3.6.0` plugin | installed in Claude Code |
+| `cc-antigravity-plugin` `>= 4.0.0` plugin | installed in Claude Code |
 | `Bash(node:*)` permission | `.claude/settings.json` |
 
 Optional:
@@ -233,7 +235,7 @@ Validate:
 ```
 
 ```text
-/executor create a hero mockup and save the asset to assets/onboarding using AGY --generate-imagem
+/executor create a hero mockup and save the asset to assets/onboarding using AGY --generate-image
 ```
 
 ```text
@@ -252,10 +254,10 @@ Common cases:
 - broken tests and glue code: Codex
 - risk review: Codex high
 - pre-defined plan: execute against baseline + Codex high read-only in `plan-vs-output-review.md`
-- daily front-end/UI: AGY `gemini-3.5-flash-medium`
-- complex front-end/UI: AGY `gemini-3.1-pro-high`
-- architecture analysis or impact: AGY `--read-only`
-- explicit visual asset: AGY `--generate-imagem`
+- daily front-end/UI: AGY `--model flash --effort medium` (`antigravity-coder`)
+- complex front-end/UI: AGY `--model pro --effort high` (`antigravity-coder`)
+- architecture analysis or impact: AGY `--read-only` (`antigravity-agent`, read-only)
+- explicit visual asset: AGY `--generate-image` (`antigravity-coder`)
 
 ## Autonomous Mode
 

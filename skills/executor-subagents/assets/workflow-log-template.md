@@ -37,7 +37,7 @@
 | Onda | ID | Tipo/Modelo | Slice/Ownership | Status | Tokens (in/out/cache/total) | Arquivos alterados |
 |---|---|---|---|---|---|---|
 | 1 | A | codex gpt-5.4 medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED | N/A | <arquivos> |
-| 1 | B | agy gemini-3.5-flash-medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING | N/A | <arquivos> |
+| 1 | B | agy --model flash --effort medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING | N/A | <arquivos> |
 
 _Adicione linhas conforme as ondas e agentes reais da execucao._
 
@@ -58,7 +58,7 @@ _N/A se nenhuma falha ocorreu._
 | # | Fase | Decisao | Motivo | Impacto |
 |---|---|---|---|---|
 | 1 | 3 | Execucao direta (sem agentes) | Mudanca de 1 arquivo, baixo risco | Nenhum agente lancado |
-| 2 | 4 | Front-end roteado para AGY | AGY 3.6.0+ validado no preflight | Fluxo UI seguiu com antigravity-agent |
+| 2 | 4 | Front-end roteado para AGY | cc-antigravity-plugin 4.0.0+ validado no preflight | Fluxo UI seguiu com antigravity-coder |
 
 _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 

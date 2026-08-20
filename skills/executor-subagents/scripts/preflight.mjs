@@ -57,7 +57,9 @@ const PROJECT_ROOT = process.cwd();
 const PLUGINS_CACHE = join(HOME, ".claude", "plugins", "cache");
 const PROJECT_CLAUDE_DIR = join(PROJECT_ROOT, ".claude");
 const PROJECT_SETTINGS_FILE = join(PROJECT_CLAUDE_DIR, "settings.json");
-const MIN_ANTIGRAVITY_PLUGIN_VERSION = "3.6.0";
+const MIN_ANTIGRAVITY_PLUGIN_VERSION = "4.0.0";
+const MIN_AGY_VERSION = "1.1.8";
+const RECOMMENDED_AGY_VERSION = "1.1.16";
 const PREFLIGHT_SCHEMA_VERSION = 2;
 
 const REQUIRED_AGY_FLAGS = [
@@ -66,6 +68,10 @@ const REQUIRED_AGY_FLAGS = [
   "--dangerously-skip-permissions",
   "--print-timeout",
   "--prompt-interactive",
+  "--output-format",
+  "--mode",
+  "--model",
+  "--effort",
 ];
 const REQUIRED_BRIDGE_FLAGS = [
   "--read-only",
@@ -78,15 +84,69 @@ const REQUIRED_BRIDGE_FLAGS = [
   "--continue",
   "--conversation",
   "--print-command",
+  "--format",
+  "--effort",
+  "--mode",
+  "--json-schema",
+  "--allow-slash-commands",
+  "--interactive",
+  "--agent",
+];
+const REQUIRED_ANTIGRAVITY_PLUGIN_FILES = [
+  "agents/antigravity-coder.md",
+  "agents/antigravity-agent.md",
+  "commands/antigravity.md",
+  "scripts/antigravity-bridge.js",
 ];
 
-function checkCli(cli) {
+// Parses a strict `major.minor.patch` (with optional prerelease) version string.
+function parseSemver(version) {
+  const match = String(version ?? "").match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
+  if (!match) return null;
+  return {
+    core: match.slice(1, 4).map((part) => Number(part)),
+    prerelease: match[4]?.split(".") ?? [],
+  };
+}
+
+function compareSemver(left, right) {
+  const a = parseSemver(left);
+  const b = parseSemver(right);
+  if (!a || !b) return null;
+  for (let index = 0; index < 3; index += 1) {
+    const delta = a.core[index] - b.core[index];
+    if (delta !== 0) return delta;
+  }
+  if (a.prerelease.length === 0 && b.prerelease.length > 0) return 1;
+  if (a.prerelease.length > 0 && b.prerelease.length === 0) return -1;
+  return a.prerelease.join(".").localeCompare(b.prerelease.join("."));
+}
+
+function checkCli(cli, options = {}) {
   try {
     const out = execSync(`${cli} --version`, {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 10_000,
     }).toString().trim();
-    return { ok: true, version: out.split(/\r?\n/)[0] };
+    const versionLine = out.split(/\r?\n/)[0];
+    const version = versionLine.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/)?.[0] ?? null;
+    if (options.minVersion && (!version || compareSemver(version, options.minVersion) < 0)) {
+      return {
+        ok: false,
+        version: version ?? versionLine,
+        minVersion: options.minVersion,
+        error: `${cli} ${options.minVersion}+ is required (found ${version ?? versionLine})`,
+      };
+    }
+    return {
+      ok: true,
+      version: version ?? versionLine,
+      minVersion: options.minVersion ?? null,
+      recommendedVersion: options.recommendedVersion ?? null,
+      recommended: options.recommendedVersion && version
+        ? compareSemver(version, options.recommendedVersion) >= 0
+        : null,
+    };
   } catch (err) {
     return { ok: false, error: err.message?.split(/\r?\n/)[0] ?? "not found" };
   }
@@ -179,6 +239,21 @@ function checkAntigravityBridge() {
     };
   }
 
+  const missingFiles = REQUIRED_ANTIGRAVITY_PLUGIN_FILES.filter(
+    (relativePath) => !existsSync(join(plugin.versionPath, relativePath)),
+  );
+  if (missingFiles.length > 0) {
+    return {
+      ok: false,
+      version: plugin.version,
+      minVersion: MIN_ANTIGRAVITY_PLUGIN_VERSION,
+      bridgePath,
+      requiredFiles: REQUIRED_ANTIGRAVITY_PLUGIN_FILES,
+      missingFiles,
+      error: `cc-antigravity-plugin is missing required files: ${missingFiles.join(", ")}`,
+    };
+  }
+
   try {
     const out = execSync(`node "${bridgePath}" --help`, {
       stdio: ["ignore", "pipe", "pipe"],
@@ -192,6 +267,8 @@ function checkAntigravityBridge() {
       bridgePath,
       flags: REQUIRED_BRIDGE_FLAGS,
       missingFlags,
+      requiredFiles: REQUIRED_ANTIGRAVITY_PLUGIN_FILES,
+      missingFiles: [],
       error:
         missingFlags.length > 0
           ? `bridge help is missing required flags: ${missingFlags.join(", ")}`
@@ -555,7 +632,10 @@ const checks = {
   },
   cli: {
     codex: checkCli("codex"),
-    agy: checkCli("agy"),
+    agy: checkCli("agy", {
+      minVersion: MIN_AGY_VERSION,
+      recommendedVersion: RECOMMENDED_AGY_VERSION,
+    }),
   },
   plugins: {
     "openai-codex": checkPlugin("openai-codex", "codex"),
@@ -700,9 +780,10 @@ function remediationFor(f) {
       return {
         target: "agy-cli",
         steps: [
-          "Install Antigravity CLI:",
+          `Install or update Antigravity CLI to at least ${MIN_AGY_VERSION} (${RECOMMENDED_AGY_VERSION} recommended):`,
           "  macOS/Linux: curl -fsSL https://antigravity.google/cli/install.sh | bash",
           "  Windows: irm https://antigravity.google/cli/install.ps1 | iex",
+          "  Or update in place: agy update",
           "Authenticate once in an interactive terminal:",
           "  agy",
           "Or set frontendExecutor/frontendReviewer to claude-code in .executor/project-config.md " +
@@ -755,7 +836,7 @@ function remediationFor(f) {
       return {
         target: "agy CLI capability set",
         steps: [
-          "Update Antigravity CLI to a current version:",
+          `Update Antigravity CLI to at least ${MIN_AGY_VERSION} (${RECOMMENDED_AGY_VERSION} recommended):`,
           "  agy update",
           "Confirm the required flags are available in `agy --help`.",
         ],
@@ -769,7 +850,9 @@ function remediationFor(f) {
           "  /plugin marketplace add AllanHarlen/cc-antigravity-plugin",
           "  /plugin install cc-antigravity-plugin@cc-antigravity-plugin",
           "  /reload-plugins",
-          "Confirm the bridge help exposes the required flags.",
+          "Confirm the bridge help exposes the required flags and the plugin ships " +
+            "agents/antigravity-coder.md, agents/antigravity-agent.md, commands/antigravity.md " +
+            "and scripts/antigravity-bridge.js.",
         ],
         docs: "https://github.com/AllanHarlen/cc-antigravity-plugin",
       };

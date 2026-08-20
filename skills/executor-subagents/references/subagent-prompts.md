@@ -144,12 +144,12 @@ Retorne:
 
 ## 3. AGY front-end/UI
 
-**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+**Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
-Use `--model gemini-3.5-flash-medium` para UI do dia a dia e `--model gemini-3.1-pro-high` para UI complexa.
+Use `--model flash --effort medium` para UI do dia a dia e `--model pro --effort high` para UI complexa. O bridge resolve o alias de familia contra o catalogo dinamico de `agy models`.
 
 ```text
---model gemini-3.5-flash-medium --dirs <DIRS>
+--mode accept-edits --format stream-json --model flash --effort medium --dirs <DIRS>
 
 Voce e um agente AGY responsavel por implementar front-end/UI em uma execucao rapida multiagente.
 
@@ -182,6 +182,7 @@ Regras:
 - Preserve design system existente.
 - Mantenha responsividade e acessibilidade.
 - Nao altere payload/API sem avisar.
+- Se identificar oportunidades de imagery (hero, banner, ilustracao de empty/error state, icone), NAO gere sem aprovacao: liste as sugestoes no item IMAGE_SUGGESTIONS do retorno. O executor principal (nunca voce) apresenta as opcoes ao usuario antes de qualquer geracao.
 - Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
 
 Retorne:
@@ -194,7 +195,21 @@ Retorne:
 6. Pendencias
 7. Riscos
 8. Skills utilizadas
+9. IMAGE_SUGGESTIONS: <bloco de sugestoes de imagem | "N/A (nenhuma oportunidade de imagery identificada)">
 ```
+
+### 3a. Tratamento de `IMAGE_SUGGESTIONS` (pos-retorno da task front-end)
+
+Se o item 9 do retorno da Secao 3 vier preenchido (nao `N/A`), o executor principal segue este fluxo **antes de considerar a task concluida**:
+
+1. Apresente cada entrada do bloco ao usuario via `AskUserQuestion` (`multiSelect: true`), um `option` por imagem sugerida (label = nome curto, description = prompt resumido).
+2. Para cada opcao aprovada, delegue de volta ao `cc-antigravity-plugin:antigravity-coder` (uma chamada por imagem — o bridge nao mistura `--generate-image` com `--parallel`):
+   ```text
+   --generate-image --output-dir <DIR DO ENTREGAVEL> -- "<prompt da sugestao>"
+   ```
+3. Apos gerar, confirme que o arquivo foi referenciado em algum componente (import/`src`/`background-image`) — imagem gerada e nao referenciada e uma pendencia, nao uma entrega.
+4. Registre em `{artefatos_dir}/subagents-context.md`: quais imagens foram sugeridas, quais o usuario aprovou, e o caminho final de cada arquivo gerado.
+5. Se o usuario nao aprovar nenhuma, registre a recusa e siga sem bloquear a task — imagery e um enriquecimento, nao um requisito obrigatorio, exceto quando a demanda explicitamente exigir imagem de produto/servico.
 
 ## 4. Investigacao read-only
 
@@ -239,10 +254,10 @@ Nao implemente trabalho novo nesta resposta.
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-agent`
 
-Use `--read-only` sempre. Use `--model gemini-3.5-flash-medium` para analise geral e `--model gemini-3.1-pro-high` quando o raciocinio precisar ser mais profundo.
+Use `--read-only` sempre. Use `--model flash` para analise geral e `--model pro --effort high` quando o raciocinio precisar ser mais profundo.
 
 ```text
---read-only --model gemini-3.5-flash-medium --dirs <DIRS>
+--read-only --format json --model flash --dirs <DIRS>
 
 Voce e um agente de analise em uma execucao rapida multiagente.
 
@@ -299,12 +314,12 @@ Retorne:
 
 ## 8. AGY fan-out paralelo
 
-**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+**Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
 Use quando todos os entregaveis sao de dominio AGY, sao independentes entre si e nao envolvem Codex. O AGY decompoe e executa com subagentes Gemini nativos.
 
 ```text
---parallel --subagent-model gemini-3.5-flash-medium --dirs <DIRS>
+--parallel --subagent-model flash --format stream-json --dirs <DIRS>
 
 Voce e um agente AGY em modo fan-out paralelo numa execucao rapida multiagente.
 
@@ -346,12 +361,12 @@ Retorne:
 
 ## 7. AGY imagem/asset
 
-**Subagent type:** `cc-antigravity-plugin:antigravity-agent`
+**Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
-Use quando o usuario pedir explicitamente asset, mockup, ilustracao, banner, logo ou imagem.
+Use quando o usuario pedir explicitamente asset, mockup, ilustracao, banner, logo ou imagem, ou quando uma sugestao de `IMAGE_SUGGESTIONS` (secao 3a) for aprovada.
 
 ```text
---generate-imagem --files <ARQUIVOS_DE_REFERENCIA> --output-dir <DESTINO>
+--generate-image --files <ARQUIVOS_DE_REFERENCIA> --output-dir <DESTINO>
 
 Voce e um agente AGY responsavel por gerar um asset visual em uma execucao rapida multiagente.
 
@@ -368,7 +383,7 @@ Destino:
 <PASTA OU ARQUIVO ESPERADO>
 
 Regras:
-- Use `--generate-imagem` como flag canonica.
+- Use `--generate-image` como flag canonica (`--generate-imagem` e aceito como alias pelo bridge).
 - Use `--files` quando houver guias de estilo, paleta, texto ou referencias locais.
 - Nao edite codigo da aplicacao, exceto se o prompt disser para conectar o asset gerado.
 - Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.

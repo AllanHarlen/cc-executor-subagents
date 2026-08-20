@@ -96,9 +96,9 @@ Cada agente precisa receber:
 
 Roteamento padrao (o Executor deriva o agente do papel efetivo na Project_Config, nao de uma regra fixa por tipo de trabalho):
 
-- front-end/UI: `frontendExecutor` (default AGY agentic);
-- imagem/asset explicito: `frontendExecutor` com `--generate-imagem` quando for AGY;
-- analise pura: AGY `--read-only` quando `frontendExecutor` for AGY;
+- front-end/UI: `frontendExecutor` (default AGY agentic via `antigravity-coder`);
+- imagem/asset explicito: `frontendExecutor` com `--generate-image` quando for AGY (`antigravity-coder`);
+- analise pura: AGY `--read-only` via `antigravity-agent` (somente leitura) quando `frontendExecutor` for AGY;
 - backend, testes, integracao e review: `backendExecutor`/`backendReviewer` (default Codex).
 
 Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>`. Acima de 28.000 caracteres, divida a task em subtasks por entregaveis independentes antes de delegar.
@@ -112,6 +112,7 @@ Ao receber retornos:
 3. Rode verificacoes incrementais.
 4. Corrija glue pequeno diretamente se for seguro.
 5. Redelegue correcoes grandes ou arriscadas.
+6. Se um agente front-end devolveu `IMAGE_SUGGESTIONS` preenchido, apresente as opcoes ao usuario via `AskUserQuestion` antes de gerar qualquer imagem (ver `references/subagent-prompts.md` secao 3a).
 
 Se houver falha de AGY em task obrigatoria, pause para alinhamento com o usuario antes de fallback para Codex.
 

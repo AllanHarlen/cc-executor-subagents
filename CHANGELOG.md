@@ -2,6 +2,61 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.1.0] - Alinhamento com o cc-antigravity-plugin 4.0
+
+Atualiza o Executor para o contrato do `cc-antigravity-plugin` 4.0.0 (AGY 1.1.8+, `1.1.16`
+recomendado). O `cc-orchestrador-subagents` ja tinha passado por essa migracao — incluindo um hotfix
+critico de roteamento — e este release porta o mesmo conserto para o Executor.
+
+**Requisito de ambiente novo (efeito de breaking na pratica):** o preflight agora exige
+`cc-antigravity-plugin >= 4.0.0`. Instalacoes com uma versao anterior do plugin (por exemplo `3.8.0`)
+passam a reprovar o preflight ate rodar `/plugin install cc-antigravity-plugin@cc-antigravity-plugin`
+— a remediacao sai impressa no proprio relatorio.
+
+### Corrigido
+
+- **CRITICO — todo o roteamento de implementacao front-end/imagem/fan-out apontava para
+  `cc-antigravity-plugin:antigravity-agent`**, que no plugin 4.0 e **somente leitura**
+  (`tools: Bash(node *antigravity-bridge.js* --read-only*)`). A task de UI, imagem ou fan-out AGY nao
+  escrevia arquivo nenhum. Corrigido em `agent-stack.md`, `subagent-prompts.md`, `parallelization.md`,
+  `SKILL.md`, `commands/executor.md` e `workflow.md`: implementacao vai para `antigravity-coder`;
+  `antigravity-agent` fica reservado para analise/review read-only.
+
+### Alterado
+
+- Flags AGY atualizadas para a superficie 4.0: `--mode accept-edits`/`--mode plan`, `--format
+  json|stream-json`, `--effort low|medium|high`, `--json-schema`. `--agent <nome>` agora exige valor
+  e seleciona um agente customizado do AGY; sessao humana usa `--interactive` (o Executor, sendo
+  headless, nunca usa essa flag).
+- Modelos AGY passam a ser referenciados por alias de familia (`--model flash`, `--model pro`) em vez
+  de slugs pinados (`gemini-3.5-flash-medium`, `gemini-3.1-pro-high`) — o bridge resolve o alias
+  contra o catalogo dinamico de `agy models`, entao a prosa nao envelhece a cada release do AGY.
+- Escada de fallback AGY: `--model pro --effort high` → `--model flash --effort medium` →
+  Executor (Claude) direto.
+- Retomada apos `QUOTA_EXHAUSTED`: preferir `--conversation <id>` quando o envelope de erro trouxer
+  um `conversation_id` exato; usar `--continue` somente quando nao houver ID disponivel.
+- `preflight.mjs`: `MIN_ANTIGRAVITY_PLUGIN_VERSION` `3.6.0` → `4.0.0`; novos `MIN_AGY_VERSION`
+  (`1.1.8`) e `RECOMMENDED_AGY_VERSION` (`1.1.16`) checados via `agy --version`; `checkCli` ganhou
+  suporte a `minVersion`/`recommendedVersion`; `REQUIRED_AGY_FLAGS`/`REQUIRED_BRIDGE_FLAGS` ampliados
+  para as flags 4.0; `checkAntigravityBridge` passa a exigir tambem os arquivos do plugin instalado
+  (`agents/antigravity-coder.md`, `agents/antigravity-agent.md`, `commands/antigravity.md`,
+  `scripts/antigravity-bridge.js`).
+- Papel Imagem/asset (`agent-stack.md`) passa a usar `antigravity-coder` com a tool nativa
+  `generate_imagem` — o modelo removido `nano-banana` nao existe mais no bridge 4.0.
+
+### Adicionado
+
+- Pipeline `IMAGE_SUGGESTIONS` (`references/subagent-prompts.md` secao 3a, espelhando o
+  `cc-orchestrador-subagents`): quando a task front-end devolve sugestoes de imagem, o Executor
+  apresenta as opcoes ao usuario via `AskUserQuestion` (`multiSelect`) antes de qualquer
+  `--generate-image`. Ganchado na Fase 5 (Integracao) de `SKILL.md` e `references/workflow.md`.
+- Dois guards de doc-sync em `tests/docs-consistency.test.mjs`: um routing guard (secoes de
+  implementacao AGY nunca declaram `antigravity-agent`) e um version guard (`MIN_ANTIGRAVITY_PLUGIN_VERSION`
+  precisa aparecer consistente entre `preflight.mjs` e a prosa) — a divergencia `3.6.0` (prosa) vs
+  `4.0.0` (codigo) que motivou este release nao teria passado despercebida com esses guards.
+- `executor-spec.mjs`: `RETIRED_IDENTIFIERS` ganhou `nano-banana`, `gemini-3.5-flash-medium` e
+  `gemini-3.1-pro-high`.
+
 ## [2.0.1] - Correcoes de review
 
 Quatro defeitos encontrados em review do proprio port, todos com teste de regressao. Nenhum estava coberto pela suite anterior — os testes exercitavam o caminho feliz de cada script, e o caso dos gates chegava a cristalizar o comportamento errado.
