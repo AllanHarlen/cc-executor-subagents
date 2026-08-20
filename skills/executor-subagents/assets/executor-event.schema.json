@@ -21,7 +21,8 @@
         "STALL_SWEEP_COMPLETED",
         "RUN_RESUMED",
         "RUN_RECONCILED",
-        "RUN_STATUS_UPDATED"
+        "RUN_STATUS_UPDATED",
+        "COMPLETION_GATE_UPDATED"
       ]
     },
     "payload": { "type": "object" }

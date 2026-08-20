@@ -1,7 +1,7 @@
 {
     "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
     "name": "cc-executor-subagents",
-    "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, supports pre-defined plan execution with Codex high plan-vs-output review, routes backend/front-end work through a per-project Project_Config (Codex/AGY/Claude Code, configurable), persists run state crash-safely with /executor resume, gates verification proportionally to risk with deterministic validators, and reports without OpenSpec ceremony.",
+    "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, supports pre-defined plan execution with Codex high plan-vs-output review, routes backend/front-end work through a per-project Project_Config (Codex/AGY/Claude Code, configurable), persists run state crash-safely with /executor resume, gates verification and completion proportionally to risk with deterministic validators, and reports without OpenSpec ceremony.",
     "owner": {
         "name": "allanharlen",
         "email": "allanharlen@gmail.com"
@@ -13,8 +13,8 @@
     "plugins": [
         {
             "name": "cc-executor-subagents",
-            "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a light preflight, follows pre-defined plans when provided, routes front-end and image work to AGY, keeps Codex on backend, tests, and review, then integrates and verifies without OpenSpec ceremony.",
-            "version": "1.3.0",
+            "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a Project_Config-aware preflight, follows pre-defined plans when provided, routes work by configurable role (Codex/AGY/Claude Code), persists crash-safe run state with resume, gates completion proportionally to risk, then integrates and verifies without OpenSpec ceremony.",
+            "version": "2.0.0",
             "author": {
                 "name": "allanharlen"
             },

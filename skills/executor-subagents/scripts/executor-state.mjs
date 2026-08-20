@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 
 import {
+  COMPLETION_GATE_DEFINITIONS,
   ExecutorStateError,
   findRunDirectory,
   heartbeatTask,
@@ -12,6 +13,7 @@ import {
   resumeRunAtDirectory,
   statusRun,
   sweepStalledTasks,
+  updateCompletionGate,
   updatePhase,
   updateRunStatus,
   updateTaskStatus,
@@ -126,12 +128,14 @@ function help() {
       heartbeat: "heartbeat --dir <dir> --task <id> [--api-calls N] [--tool-calls N] [--current-tool name]",
       sweep: "sweep --dir <dir> [--stale-idle-seconds 450] [--stale-in-tool-seconds 1200] [--stall-grace-seconds 120]",
       phase: "phase --dir <dir> --phase <n> --status RUNNING|DONE|FAILED|BLOCKED|CANCELLED|UNKNOWN",
+      gate: "gate --dir <dir> --gate verificacao|review|e2e|reports|handoff --status PENDING|DONE|BLOCKED|N/A [--required bool] [--evidence id]... [--reason text]",
       reconcile: "reconcile --dir <dir> [--probe-file <json>]",
       resume: "resume [--dir <dir>] [--root <project>] [--probe-file <json>]",
       run: "run --dir <dir> --status RUNNING|DONE|FAILED|BLOCKED|STALLED|CANCELLED|UNKNOWN",
       status: "status [--dir <dir>] [--root <project>]",
       verify: "verify --dir <dir>",
     },
+    completionGateDefinitions: COMPLETION_GATE_DEFINITIONS,
     probeFileShape: {
       tasks: {
         "codex-1": {
@@ -188,6 +192,13 @@ function execute(argv) {
       return sweepStalledTasks(artifactDir(args), common);
     case "phase":
       return updatePhase(artifactDir(args), required(args, "phase"), required(args, "status"), { ...common, reason: args.reason });
+    case "gate":
+      return updateCompletionGate(artifactDir(args), required(args, "gate"), required(args, "status"), {
+        ...common,
+        required: bool(args.required),
+        evidence: args.evidence,
+        reason: args.reason,
+      });
     case "reconcile":
       return reconcileRunAtDirectory(artifactDir(args), common);
     case "resume": {

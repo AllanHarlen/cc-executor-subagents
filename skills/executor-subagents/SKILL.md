@@ -94,6 +94,18 @@ Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/che
 
 **Regra absoluta:** nenhum artefato `.md` deve ser criado na raiz do projeto ou em qualquer caminho fora de `artefatos_dir`. Qualquer arquivo gerado pelo executor (plano, monitoring, logs, relatorios, contratos) vai exclusivamente dentro de `artefatos_dir`.
 
+**Layout de artefatos.** Desde a Fase 2.0 do port, `artefatos_dir` agrupa por estagio (layout 2 — ver `scripts/lib/artifact-layout.mjs`). Toda mencao a `{artefatos_dir}/<nome>` neste documento resolve para o caminho abaixo; escreva diretamente no subcaminho correto:
+
+| `{artefatos_dir}/<nome>` | Caminho real |
+|---|---|
+| `execution-brief.md`, `interface-contract.md` | `plan/<nome>` |
+| `monitoring.md`, `reconciliation-probe.json` | `run/<nome>` |
+| `plan-vs-output-review.md`, `review-final.md`, `e2e-verification.md` | `review/<nome>` |
+| `implementation-report.md`, `workflow-log.md`, `subagents-context.md` | `report/<nome>` |
+| `handoff.json`, `initial-plan-baseline.md`, `state.json`, `events.jsonl` | raiz de `artefatos_dir` (nunca movem — ver `references/handoff-contract.md`) |
+
+Runs criadas antes da Fase 2.0 (layout 1, tudo na raiz) continuam legiveis e nao sao migradas automaticamente — leitura sempre tenta o layout 2 e cai para a raiz.
+
 ### Fase 1 - Triagem de 2 minutos
 
 Antes de delegar, levante somente o que muda a execucao:
@@ -371,6 +383,8 @@ Use os templates de `assets/` como base. Regras:
 - **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
 - Se houver plano pre-definido, os tres entregaveis devem referenciar `{artefatos_dir}/initial-plan-baseline.md` e `{artefatos_dir}/plan-vs-output-review.md`.
 - Grave `{artefatos_dir}/handoff.json` (`HANDOFF_VERSION = 1`, veja `references/handoff-contract.md`) com `stage: "executor"`, `upstream` apontando para `.orchestration/<slug>/handoff.json` (quando houve ingestao upstream), `artifacts[]` com os roles do executor (`initial-plan-baseline`, `execution-brief`, `plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots`) e `status` final. Como o executor e o ultimo estagio da cadeia, `nextStage` pode ser `null`.
+
+**Gates de conclusao.** Quando a execucao usa `executor-state.mjs` (2+ agentes, plano pre-definido ou sessao longa), feche os gates antes de `run --status DONE`: `node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" gate --dir {artefatos_dir} --gate <verificacao|review|e2e|reports|handoff> --status DONE|N/A`. `verificacao` e `reports` sao sempre obrigatorios; `review`/`e2e`/`handoff` so bloqueiam quando `--required true` foi declarado (plano pre-definido, front-end separado, ou modo conjunto respectivamente) — caso contrario, feche-os como `N/A`. Ver `references/persistent-state.md`.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
@@ -429,6 +443,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/project-config.md` | as 4 perguntas de stack, protocolo do Dependency_Installer, roteamento derivado |
 | `references/persistent-state.md` | entender `state.json`/`events.jsonl`, os 5 invariantes e o protocolo de `/executor resume` |
 | `references/programmatic-intelligence.md` | scripts deterministicos (inspect-diff, validate-wire-format, validate-scope, collect-test-results) |
+| `references/mcp-context.md` | protocolo do Context7 MCP |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
 | `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |

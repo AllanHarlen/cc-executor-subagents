@@ -84,6 +84,23 @@ export const RUN_STATUSES = Object.freeze([
   "UNKNOWN",
 ]);
 
+export const GATE_STATUSES = Object.freeze(["PENDING", "DONE", "BLOCKED", "N/A"]);
+
+/**
+ * Gates de conclusao minimos (Fase 2.0 do port). `waivable: true` significa
+ * que o gate pode fechar como `N/A` quando a condicao que o aciona nao se
+ * aplica a run (ex.: `e2e` sem front-end separado do back). Um gate
+ * `required: true` nao-waivable so fecha `run --status DONE` como `DONE`.
+ */
+export const COMPLETION_GATE_DEFINITIONS = Object.freeze({
+  verificacao: { phase: 6, label: "Verificacao (Fase 6)", waivable: false },
+  review: { phase: 6.5, label: "Review plano vs entrega (Fase 6.5)", waivable: true },
+  e2e: { phase: 6.6, label: "Verificacao E2E no navegador real (Fase 6.6)", waivable: true },
+  reports: { phase: 9, label: "Relatorios finais (Fase 9)", waivable: false },
+  handoff: { phase: 9, label: "handoff.json (modo conjunto, Fase 9)", waivable: true },
+});
+const GATE_STATUS_SET = new Set(GATE_STATUSES);
+
 const TASK_STATUS_SET = new Set(TASK_STATUSES);
 const PHASE_STATUS_SET = new Set(PHASE_STATUSES);
 const RUN_STATUS_SET = new Set(RUN_STATUSES);
@@ -414,6 +431,35 @@ function assertRunTransition(state, nextStatus) {
   }
 }
 
+/**
+ * `completionGates` e opcional: runs criadas antes da Fase 2.0 do port nao
+ * tem o campo e continuam validas (nenhuma migracao de run existente).
+ */
+function validateCompletionGates(gates) {
+  if (gates == null) return;
+  if (typeof gates !== "object" || Array.isArray(gates)) {
+    throw new ExecutorStateError("INVALID_COMPLETION_GATES", "completionGates must be an object");
+  }
+  for (const [gateId, definition] of Object.entries(COMPLETION_GATE_DEFINITIONS)) {
+    const gate = gates[gateId];
+    if (!gate || !GATE_STATUS_SET.has(gate.status)) {
+      throw new ExecutorStateError(
+        "INVALID_COMPLETION_GATE",
+        `Completion gate ${gateId} is missing or has an invalid status`,
+      );
+    }
+    if (typeof gate.required !== "boolean") {
+      throw new ExecutorStateError("INVALID_COMPLETION_GATE", `Completion gate ${gateId} must declare required`);
+    }
+    if (gate.status === "N/A" && !definition.waivable) {
+      throw new ExecutorStateError(
+        "INVALID_COMPLETION_GATE",
+        `Completion gate ${gateId} is not waivable and cannot be N/A`,
+      );
+    }
+  }
+}
+
 export function validateState(state) {
   if (!state || state.schemaVersion !== STATE_SCHEMA_VERSION) {
     throw new ExecutorStateError("UNSUPPORTED_STATE_SCHEMA", `Expected state schema ${STATE_SCHEMA_VERSION}`);
@@ -429,6 +475,7 @@ export function validateState(state) {
   }
   for (const [taskId, task] of Object.entries(state.tasks ?? {})) validateTask(taskId, task);
   validateProjectConfigSnapshot(state.projectConfig);
+  validateCompletionGates(state.completionGates);
   return state;
 }
 
@@ -472,6 +519,9 @@ function reduceEvent(previousState, event) {
     case "RUN_STATUS_UPDATED":
       state.status = payload.runStatus;
       state.statusReason = payload.statusReason ?? null;
+      break;
+    case "COMPLETION_GATE_UPDATED":
+      state.completionGates = { ...(state.completionGates ?? {}), [payload.gateId]: clone(payload.gate) };
       break;
     default:
       throw new ExecutorStateError("UNKNOWN_EVENT_TYPE", `Unknown executor event type: ${event.type}`);
@@ -815,6 +865,22 @@ function computeProjectConfigDrift(state, projectRoot) {
   };
 }
 
+/** Estado inicial dos 5 gates de conclusao: todos `PENDING`, `required` conforme `COMPLETION_GATE_DEFINITIONS`. */
+function initialCompletionGates(now) {
+  const gates = {};
+  for (const [gateId, definition] of Object.entries(COMPLETION_GATE_DEFINITIONS)) {
+    gates[gateId] = {
+      id: gateId,
+      phase: definition.phase,
+      required: !definition.waivable,
+      status: "PENDING",
+      evidence: [],
+      updatedAt: now,
+    };
+  }
+  return gates;
+}
+
 /**
  * Inicializa uma run nova em `artifactDir`, ou devolve a run existente
  * (idempotente) se `state.json`/`events.jsonl` ja existirem. Congela a
@@ -858,6 +924,7 @@ export function initRun(options) {
       phaseStatus: "RUNNING",
       lastSafePhase: Math.max(0, Number(options.lastSafePhase ?? phase - 1)),
       tasks: {},
+      completionGates: initialCompletionGates(now),
       phaseHistory: {
         [String(phase)]: { name: phaseName(phase), status: "RUNNING", startedAt: now, completedAt: null },
       },
@@ -1327,6 +1394,56 @@ export function updatePhase(artifactDir, phase, phaseStatus, options = {}) {
   }, options);
 }
 
+/**
+ * Atualiza um gate de conclusao (`verificacao`, `review`, `e2e`, `reports`,
+ * `handoff`). `status: "N/A"` so e aceito em gate `waivable` (ver
+ * `COMPLETION_GATE_DEFINITIONS`); `--required <bool>` (opcional) declara se
+ * a condicao que aciona um gate condicional (`review`/`e2e`/`handoff`) se
+ * aplica a esta run — sem isso, `run --status DONE` nao bloqueia por ele.
+ */
+export function updateCompletionGate(artifactDir, gateId, status, options = {}) {
+  const definition = COMPLETION_GATE_DEFINITIONS[gateId];
+  if (!definition) {
+    throw new ExecutorStateError(
+      "UNKNOWN_COMPLETION_GATE",
+      `Unknown completion gate: ${gateId}`,
+      { accepted: Object.keys(COMPLETION_GATE_DEFINITIONS) },
+    );
+  }
+  const normalizedStatus = String(status ?? "").toUpperCase() === "N/A" ? "N/A" : String(status ?? "").toUpperCase();
+  if (!GATE_STATUS_SET.has(normalizedStatus)) {
+    throw new ExecutorStateError("INVALID_GATE_STATUS", `Invalid gate status: ${status}`);
+  }
+  if (normalizedStatus === "N/A" && definition.waivable !== true) {
+    throw new ExecutorStateError("GATE_NOT_WAIVABLE", `Completion gate ${gateId} is not waivable and cannot be N/A`);
+  }
+
+  return withLock(artifactDir, () => {
+    const state = loadRun(artifactDir, { repairSnapshot: true }).state;
+    assertRunMutable(state, "update a completion gate");
+    const now = iso(options.now);
+    const previous = state.completionGates?.[gateId] ?? {
+      id: gateId,
+      phase: definition.phase,
+      required: !definition.waivable,
+      status: "PENDING",
+      evidence: [],
+      updatedAt: now,
+    };
+    const gate = {
+      ...previous,
+      status: normalizedStatus,
+      required: options.required === undefined ? previous.required : Boolean(options.required),
+      evidence: options.evidence ? [...new Set([...(previous.evidence ?? []), ...normalizeList(options.evidence)])] : previous.evidence,
+      reason: options.reason ?? previous.reason ?? null,
+      updatedAt: now,
+    };
+
+    const committed = commitEvent(artifactDir, state, "COMPLETION_GATE_UPDATED", { gateId, gate }, options);
+    return { state: committed.state, event: committed.event, gate, summary: runSummary(committed.state) };
+  }, options);
+}
+
 function normalizeExternalStatus(probe) {
   const raw = String(probe?.executorStatus ?? probe?.sessionStatus ?? probe?.conversationStatus ?? probe?.status ?? "").toUpperCase();
   const map = {
@@ -1647,6 +1764,18 @@ export function updateRunStatus(artifactDir, status, options = {}) {
         );
       }
     }
+    if (normalizedStatus === "DONE" && state.completionGates) {
+      const openGates = Object.values(state.completionGates).filter(
+        (gate) => gate.required && gate.status !== "DONE" && gate.status !== "N/A",
+      );
+      if (openGates.length > 0) {
+        throw new ExecutorStateError(
+          "RUN_GATES_NOT_CLOSED",
+          "Run cannot be DONE while a required completion gate is still open",
+          { gates: openGates.map((gate) => ({ id: gate.id, status: gate.status })) },
+        );
+      }
+    }
     const committed = commitEvent(
       artifactDir,
       state,
@@ -1708,6 +1837,7 @@ export function statusRun(artifactDir) {
     summary: runSummary(loaded.state),
     projectConfig: loaded.state.projectConfig ?? null,
     tasks: loaded.state.tasks,
+    completionGates: loaded.state.completionGates ?? null,
     resume: loaded.state.resume,
     integrity: {
       snapshotRecovered: loaded.snapshotRecovered,

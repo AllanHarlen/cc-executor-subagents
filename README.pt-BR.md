@@ -39,6 +39,26 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write \
 
 O preflight (`/executor preflight`) deriva quais CLIs/plugins são obrigatórios dessa configuração — com os quatro papéis em `claude-code`, nenhuma CLI externa é exigida. Ver `skills/executor-subagents/references/project-config.md`.
 
+## Estado persistente e retomada
+
+Cada execução ganha seu próprio `{artefatos_dir}/state.json` + `events.jsonl`, seguro contra crash (o evento é gravado com fsync antes do snapshot trocar atomicamente — um crash no meio da escrita é reparado por replay, não perdido). `.executor/checkpoint.json` é um índice leve (`execucao_atual`, `historico[]`) apontando para a execução ativa. Retome com:
+
+```bash
+/executor resume
+```
+
+Uma task `RUNNING` interrompida sempre volta como `UNKNOWN` — nunca um `FAILED`/`DONE` presumido — e é reconciliada contra Git/arquivos/validações antes de qualquer redelegação. Ver `skills/executor-subagents/references/persistent-state.md`.
+
+## Gates proporcionais ao risco
+
+Execuções `risco: LOW` continuam exatamente tão rápidas quanto antes — nenhum gate extra. `MEDIUM` em diante acrescenta validadores determinísticos (`inspect-diff`, `validate-scope`) e, quando escalado (`HIGH`, plano pré-definido ou modo conjunto com o Orchestrador), evidência de resultado de teste, validação de wire format, review Codex high plano-vs-entrega e — quando front-end e back-end são origens separadas — verificação E2E no navegador real (Playwright MCP). Um comando decide a lista:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/executor-gates.mjs" plan --risk MEDIUM --agent-count 2
+```
+
+Cinco gates de conclusão (`verificacao`, `review`, `e2e`, `reports`, `handoff`) precisam fechar antes de uma execução ser marcada `DONE`. Ver `skills/executor-subagents/references/persistent-state.md` e `references/programmatic-intelligence.md`.
+
 ## Quando usar
 
 Use `/executor` para:

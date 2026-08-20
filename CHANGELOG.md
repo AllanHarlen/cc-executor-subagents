@@ -2,6 +2,25 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.0.0] - Layout por estagio, gates de conclusao e documentacao
+
+Fase 2.0 (final) do port Tier 1/Tier 2 de capacidades do `cc-orchestrador-subagents`. Fecha o ciclo: os artefatos passam a viver agrupados por estagio, e uma run so pode fechar `DONE` com os gates de conclusao fechados — nao so com as tasks terminais.
+
+### Alterado (mudanca de contrato)
+
+- **`ARTIFACT_LAYOUT_VERSION` 1 → 2**: runs novas agrupam artefatos por estagio (`plan/`, `run/`, `review/`, `report/`, `evidence/`) em vez de tudo na raiz. `handoff.json`, `initial-plan-baseline.md`, `state.json`, `events.jsonl` e `.state.lock` continuam **sempre** na raiz — a infraestrutura de layout 2 (`scripts/lib/artifact-layout.mjs`) ja existia desde a Fase 1.2, essa versao so muda o default. Runs criadas nas Fases 1.1/1.2 (layout 1) continuam legiveis, sem migracao automatica: leitura sempre tenta layout 2 e cai para a raiz.
+- `SKILL.md` ganha uma tabela "Layout de artefatos" traduzindo `{artefatos_dir}/<nome>` para o subcaminho real — testada contra `LAYOUT_V2_FILE_DIRECTORIES` por um guard de doc-sync (`tests/artifact-layout.test.mjs`), para prosa e codigo nao divergirem.
+
+### Adicionado
+
+- **Gates de conclusao**: cinco gates (`verificacao`, `review`, `e2e`, `reports`, `handoff`) no `state.json`, geridos por `executor-state.mjs gate`. `run --status DONE` falha com `RUN_GATES_NOT_CLOSED` enquanto um gate `required` nao estiver `DONE` nem `N/A`. `verificacao`/`reports` sao sempre obrigatorios e nunca aceitam `N/A`; `review`/`e2e`/`handoff` sao condicionais — `N/A` por padrao, viram obrigatorios com `--required true` quando a condicao que os aciona se aplica a run (plano pre-definido, front-end separado, modo conjunto). Campo `completionGates` e opcional no snapshot: runs de fases anteriores nao tem e nao sao migradas.
+- `references/mcp-context.md`: protocolo do Context7 MCP (o Executor nao usa Codebase Memory MCP nesta fase — o custo de indexar um grafo nao se paga numa execucao curta).
+- README/README.pt-BR: secoes "Persistent state and resume" e "Gates proportional to risk".
+
+### Fora de escopo (decisao explicita, nao entra em versao futura deste port)
+
+SQLite/FTS5 e historico pesquisavel; Learning Recipes e Curator; telemetria OTLP; worktrees fisicas; routing adaptativo por historico; OpenSpec. Todos contrariam a premissa de velocidade do Executor ou exigem volume de historico que ele nao acumula — ver o plano original (Tier 1/Tier 2) para o raciocinio completo. `.executor/project-facts.md` (fatos de projeto validados, cortando redescoberta entre runs) tambem ficou fora desta entrega: o valor so aparece com o lado de leitura integrado, e construir so a escrita seria um recurso pela metade.
+
 ## [1.3.0] - Validadores deterministicos e gates proporcionais ao risco
 
 Fase 1.3 do port de capacidades do `cc-orchestrador-subagents`: as promessas de prosa do `SKILL.md` ("verifique ownership", "valide wire format") ganham ferramenta. Tudo entra proporcional ao risco — `risco: LOW` sem plano pre-definido nem modo conjunto continua sem nenhum gate extra.

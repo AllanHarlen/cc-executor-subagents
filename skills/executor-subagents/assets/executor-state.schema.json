@@ -38,6 +38,11 @@
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/task" }
     },
+    "completionGates": {
+      "description": "Optional: absent on runs created before Phase 2.0 of the port.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/completionGate" }
+    },
     "phaseHistory": { "type": "object" },
     "repository": { "type": "object" },
     "lifecycle": {
@@ -96,6 +101,22 @@
     },
     "taskStatus": {
       "enum": ["PENDING", "RUNNING", "DONE", "FAILED", "BLOCKED", "STALLED", "CANCELLED", "UNKNOWN"]
+    },
+    "gateStatus": {
+      "enum": ["PENDING", "DONE", "BLOCKED", "N/A"]
+    },
+    "completionGate": {
+      "type": "object",
+      "required": ["id", "phase", "required", "status", "evidence", "updatedAt"],
+      "properties": {
+        "id": { "enum": ["verificacao", "review", "e2e", "reports", "handoff"] },
+        "phase": { "type": "number" },
+        "required": { "type": "boolean" },
+        "status": { "$ref": "#/$defs/gateStatus" },
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "reason": { "type": ["string", "null"] },
+        "updatedAt": { "type": "string" }
+      }
     },
     "task": {
       "type": "object",

@@ -4,12 +4,10 @@ import { join, resolve } from "node:path";
 /**
  * Resolucao de caminho dos artefatos de uma run do Executor.
  *
- * Layout 1 (default nesta fase do port): todos os artefatos na raiz de
- * `{artefatos_dir}`, igual ao comportamento historico do plugin.
- *
- * Layout 2 (infra pronta para a Fase 2.0 do port, ainda nao usada por
- * `initRun`): artefatos agrupados por estagio (`plan/`, `run/`, `review/`,
- * `report/`, `evidence/`).
+ * Layout 2 (default desde a Fase 2.0 do port): artefatos agrupados por
+ * estagio (`plan/`, `run/`, `review/`, `report/`, `evidence/`). Runs criadas
+ * nas Fases 1.1/1.2 do port ficaram em layout 1 (tudo na raiz) — elas
+ * continuam legiveis, sem migracao automatica (ver `detectArtifactLayout`).
  *
  * `state.json`, `events.jsonl`, `.state.lock`, `handoff.json` e
  * `initial-plan-baseline.md` permanecem **sempre** na raiz, nos dois layouts:
@@ -28,7 +26,7 @@ import { join, resolve } from "node:path";
  * nunca duplica um artefato que ja existe no outro layout.
  */
 
-export const ARTIFACT_LAYOUT_VERSION = 1;
+export const ARTIFACT_LAYOUT_VERSION = 2;
 export const SUPPORTED_ARTIFACT_LAYOUT_VERSIONS = Object.freeze([1, 2]);
 
 export const LAYOUT_ROOT_FILES = Object.freeze([
@@ -39,7 +37,7 @@ export const LAYOUT_ROOT_FILES = Object.freeze([
   "initial-plan-baseline.md",
 ]);
 
-const LAYOUT_V2_FILE_DIRECTORIES = Object.freeze({
+export const LAYOUT_V2_FILE_DIRECTORIES = Object.freeze({
   "execution-brief.md": "plan",
   "interface-contract.md": "plan",
   "monitoring.md": "run",

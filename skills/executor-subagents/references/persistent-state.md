@@ -57,12 +57,36 @@ tasks a partir de um arquivo de planejamento — cada task nasce quando o
 executor principal delega ("`codex-1`", "`agy-frontend`", qualquer string
 nao-vazia serve).
 
+## Gates de conclusao (Fase 2.0)
+
+Cinco gates fecham uma run: `verificacao` (Fase 6, sempre obrigatorio),
+`review` (Fase 6.5, condicional a `plano_predefinido`), `e2e` (Fase 6.6,
+condicional a front-end separado do back), `reports` (Fase 9, sempre
+obrigatorio) e `handoff` (Fase 9, condicional a modo conjunto).
+
+`run --status DONE` falha com `RUN_GATES_NOT_CLOSED` se algum gate `required`
+nao estiver `DONE` nem `N/A`. Um gate so aceita `N/A` quando e "waivable"
+(`review`, `e2e`, `handoff`) — `verificacao` e `reports` nunca podem ser
+`N/A`. Use `--required true` para declarar que a condicao de um gate
+condicional se aplica a esta run (ex.: `review` quando `plano_predefinido:
+true` for detectado na Fase 1) — sem isso, o gate nao bloqueia o fechamento.
+
+```bash
+node "$STATE" gate --dir <dir> --gate verificacao --status DONE --evidence <evidenceId>
+node "$STATE" gate --dir <dir> --gate e2e --status N/A --reason "sem front-end separado"
+node "$STATE" gate --dir <dir> --gate review --status PENDING --required true
+```
+
+Runs criadas antes da Fase 2.0 nao tem `completionGates` no snapshot — o
+campo e opcional, `run --status DONE` nao aplica o check de gates quando ele
+esta ausente (sem migracao automatica de run existente).
+
 ## Fora de escopo nesta fase
 
-Waves, completion gates, leases, worktrees, aplicacao de Project_Config em
-execucao ja iniciada (o `resume` reporta o drift, mas nao aplica sozinho), e
-protocolo formal de cancelamento (`run --status CANCELLED` exige apenas que
-nenhuma task fique nao-terminal). Esses itens sao Fase 2.0 do port.
+Waves, leases, worktrees, aplicacao de Project_Config em execucao ja
+iniciada (o `resume` reporta o drift, mas nao aplica sozinho), e protocolo
+formal de cancelamento (`run --status CANCELLED` exige apenas que nenhuma
+task fique nao-terminal).
 
 ## Protocolo de resume
 

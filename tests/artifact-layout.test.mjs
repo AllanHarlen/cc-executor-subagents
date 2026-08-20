@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   ARTIFACT_LAYOUT_VERSION,
   LAYOUT_ROOT_FILES,
+  LAYOUT_V2_FILE_DIRECTORIES,
   artifactRelativePath,
   artifactWritePath,
   detectArtifactLayout,
@@ -52,8 +54,8 @@ test("state.json, events.jsonl and .state.lock also never move, in every layout 
   }
 });
 
-test("ARTIFACT_LAYOUT_VERSION defaults to 1 (flat) for this phase of the port", () => {
-  assert.equal(ARTIFACT_LAYOUT_VERSION, 1);
+test("ARTIFACT_LAYOUT_VERSION defaults to 2 (grouped by stage) since Phase 2.0 of the port", () => {
+  assert.equal(ARTIFACT_LAYOUT_VERSION, 2);
 });
 
 test("a layout-2 file (e.g. implementation-report.md) moves under report/ only in layout 2", () => {
@@ -94,4 +96,20 @@ test("ensureArtifactLayout on layout 1 does not create any subdirectory", () => 
   ensureArtifactLayout(root, 1);
   assert.equal(existsSync(join(root, "plan")), false);
   assert.equal(existsSync(join(root, "report")), false);
+});
+
+// Doc-sync guard: the "Layout de artefatos" table in SKILL.md must list the
+// exact same file -> subdirectory mapping as LAYOUT_V2_FILE_DIRECTORIES, or
+// the LLM-facing prose silently drifts from what the code actually resolves.
+test("SKILL.md's layout table matches LAYOUT_V2_FILE_DIRECTORIES exactly", () => {
+  const skillPath = fileURLToPath(
+    new URL("../skills/executor-subagents/SKILL.md", import.meta.url),
+  );
+  const content = readFileSync(skillPath, "utf8");
+  for (const [file, directory] of Object.entries(LAYOUT_V2_FILE_DIRECTORIES)) {
+    assert.ok(
+      content.includes(`\`${file}\``) && content.includes(`\`${directory}/<nome>\``),
+      `SKILL.md layout table is missing or mismatched for ${file} -> ${directory}/`,
+    );
+  }
 });

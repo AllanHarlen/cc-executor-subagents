@@ -14,6 +14,7 @@ import {
   reconcileRunAtDirectory,
   resumeRunAtDirectory,
   sweepStalledTasks,
+  updateCompletionGate,
   updateRunStatus,
   updateTaskStatus,
   verifyRun,
@@ -235,6 +236,11 @@ test("run cannot be DONE while a task remains non-terminal", () => {
   );
 
   updateTaskStatus(artifactDir, "codex-1", "DONE", { evidence: "done" });
+
+  // Task terminal is necessary but no longer sufficient: the two non-waivable
+  // completion gates (verificacao, reports) must also close before DONE.
+  updateCompletionGate(artifactDir, "verificacao", "DONE");
+  updateCompletionGate(artifactDir, "reports", "DONE");
   const done = updateRunStatus(artifactDir, "DONE");
   assert.equal(done.state.status, "DONE");
 });
