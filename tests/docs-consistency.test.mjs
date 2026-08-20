@@ -11,7 +11,11 @@
  * `tests/` is excluded from the scan because it necessarily contains the
  * forbidden tokens as string/regex literals. `CHANGELOG.md` is excluded only
  * from the retired-identifier guard: a changelog is expected to name what was
- * removed, historically.
+ * removed, historically. Any `.tmp-*` directory is excluded too: other test
+ * files create and tear down `mkdtempSync(join(process.cwd(), ".tmp-*-test-"))`
+ * fixtures concurrently (node:test runs files in parallel), so scanning them
+ * here is both irrelevant and a source of ENOENT races against a sibling
+ * test's afterEach cleanup.
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -37,7 +41,7 @@ const SCAN_EXT = new Set([".md", ".mjs", ".js", ".json"]);
 function collectFiles(dir = REPO_ROOT) {
   const out = [];
   for (const entry of readdirSync(dir)) {
-    if (SKIP_DIRS.has(entry)) continue;
+    if (SKIP_DIRS.has(entry) || entry.startsWith(".tmp-")) continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       out.push(...collectFiles(full));
@@ -98,12 +102,18 @@ test("every WORK_TYPES entry appears backtick-quoted in SKILL.md and workflow.md
   }
 });
 
-// CHANGELOG.md is expected to name what it retired. executor-spec.mjs is the
-// spec module itself: it necessarily declares the identifier as a string
-// literal in RETIRED_IDENTIFIERS, so it cannot be a violation of its own rule.
+// CHANGELOG.md and references/persistent-state.md are expected to name what
+// they retired/migrated, historically. executor-spec.mjs is the spec module
+// itself: it necessarily declares the identifier as a string literal in
+// RETIRED_IDENTIFIERS, so it cannot be a violation of its own rule.
+// checkpoint-index.mjs is the migration code that reads a legacy
+// `codex_excluido` field on old checkpoints specifically to surface a
+// migration note and drop it - referencing the retired name is the point.
 const RETIRED_IDENTIFIER_SCAN_EXCLUDES = new Set([
   "CHANGELOG.md",
   "skills/executor-subagents/scripts/executor-spec.mjs",
+  "skills/executor-subagents/scripts/lib/checkpoint-index.mjs",
+  "skills/executor-subagents/references/persistent-state.md",
 ]);
 
 test("no file reintroduces a retired identifier (CHANGELOG.md and executor-spec.mjs excluded)", () => {

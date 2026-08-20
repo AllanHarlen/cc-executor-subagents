@@ -41,16 +41,22 @@ Sob `/goal`, nao devolva controle so porque uma etapa acabou. Continue ate haver
 
 **Verificar checkpoint antes de tudo:**
 
-Se `.executor/checkpoint.json` existir, leia-o. Avalie o campo `status` da execucao atual:
+`.executor/checkpoint.json` e um **indice**, nao o estado detalhado da execucao — esse vive em `{artefatos_dir}/state.json`, gerenciado por `executor-state.mjs` (escrita atomica, log de eventos, replay; ver `references/persistent-state.md`). Leia o indice:
 
-- `status: RUNNING` e `fase_atual >= 1`: pergunte ao usuario se quer **retomar** da fase `fase_atual` ou **iniciar nova execucao**. Em retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint. Em nova execucao, arquive a execucao atual em `historico` com `status: ABANDONED` e `timestamp_fim` preenchido, limpe os campos da execucao corrente e siga normalmente.
-- `status: DONE`, `FAILED` ou `CANCELLED`: arquive automaticamente em `historico` (sem perguntar) e inicie nova execucao. O `artefatos_dir` anterior permanece intacto em disco.
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" status
+```
 
-Se o checkpoint nao existir, crie-o com `historico: []` e `execucao_atual: ""`.
+Sem `--dir`, o comando resolve a execucao ativa via `execucao_atual` do indice. Avalie o resultado:
 
-Ao arquivar uma execucao em `historico`, registre: `demanda`, `demanda_slug`, `artefatos_dir`, `tipo_trabalho`, `risco`, `status` (DONE | FAILED | CANCELLED | ABANDONED), `fase_final` (valor de `fase_atual` no momento do arquivamento), `timestamp_inicio`, `timestamp_fim` (timestamp atual se ainda vazio), `agentes_count` (comprimento de `agentes[]`), `fallbacks_acionados` e `plano_predefinido`.
+- **execucao ativa encontrada** (`summary.status: RUNNING`, `BLOCKED`, `FAILED`, `STALLED` ou `UNKNOWN`): pergunte ao usuario se quer **retomar** (`/executor resume`, que roda `executor-state.mjs resume` — converte task `RUNNING` interrompida em `UNKNOWN` e reconcilia) ou **iniciar nova execucao**. Em nova execucao, registre a execucao atual em `historico` do checkpoint com `status: ABANDONED` (sem tocar `state.json` dela) e siga normalmente.
+- **execucao ativa terminal** (`DONE`/`CANCELLED`) **ou nenhuma execucao ativa**: siga direto para a nova execucao.
+- **nenhum `.executor/checkpoint.json`**: nada a fazer aqui — sera criado quando `artefatos_dir` for definido e `executor-state.mjs init` rodar.
+- **checkpoint em formato antigo (v4, sem `state.json`)**: `executor-state.mjs status`/`readCheckpointIndex` migra o indice em memoria automaticamente e reporta `migrationNotes`; se houver uma execucao ativa v4, a nota indica rodar `executor-state.mjs init --dir <artefatos_dir>` para lhe dar um `state.json` antes de retomar.
 
-Mantenha `execucao_atual` sempre apontando para o `artefatos_dir` da execucao em andamento. Atualize-o logo apos calcular o novo `artefatos_dir` na Fase 0.
+Ao arquivar uma execucao em `historico`, registre: `demanda`, `demanda_slug`, `artefatos_dir`, `tipo_trabalho`, `risco`, `status` (DONE | FAILED | CANCELLED | ABANDONED), `fase_final`, `timestamp_inicio`, `timestamp_fim` (timestamp atual se ainda vazio), `agentes_count`, `fallbacks_acionados` e `plano_predefinido` (mais `plano_predefinido_fonte` quando houver — exigido por `references/handoff-contract.md` secao 7).
+
+Mantenha `execucao_atual` sempre apontando para o `artefatos_dir` da execucao em andamento.
 
 Execute:
 
@@ -78,8 +84,13 @@ Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/che
 2. Exemplo: `/executor desenvolva uma pagina clientes` vira `desenvolva-pagina-clientes`.
 3. Se `.executor/{demanda_slug}` nao existir, defina `artefatos_dir = .executor/{demanda_slug}/artefatos`.
 4. Se ja existir, acrescente o primeiro sufixo livre: `.executor/{demanda_slug}-n2/artefatos`, depois `-n3`, e assim por diante.
-5. Salve `artefatos_dir` no `.executor/checkpoint.json`.
-6. Nao crie a pasta ainda - crie somente ao escrever o primeiro artefato.
+5. Inicialize o estado da execucao (isso ja cria `artefatos_dir` e grava `execucao_atual` no indice atomicamente):
+
+   ```bash
+   node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" init --slug {demanda_slug} --dir {artefatos_dir} --phase 0
+   ```
+
+   `init` e idempotente: rodar de novo no mesmo `artefatos_dir` devolve a execucao existente em vez de recriar.
 
 **Regra absoluta:** nenhum artefato `.md` deve ser criado na raiz do projeto ou em qualquer caminho fora de `artefatos_dir`. Qualquer arquivo gerado pelo executor (plano, monitoring, logs, relatorios, contratos) vai exclusivamente dentro de `artefatos_dir`.
 
@@ -397,6 +408,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/handoff-contract.md` | modo conjunto: ingerir o handoff do Orchestrador/Pensador e emitir o proprio |
 | `references/preflight-check.md` | entender/remediar preflight |
 | `references/project-config.md` | as 4 perguntas de stack, protocolo do Dependency_Installer, roteamento derivado |
+| `references/persistent-state.md` | entender `state.json`/`events.jsonl`, os 5 invariantes e o protocolo de `/executor resume` |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
 | `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |
@@ -404,3 +416,5 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `assets/implementation-report-template.md` | gerar `{artefatos_dir}/implementation-report.md` (Fase 9) |
 | `scripts/preflight.mjs` | validar ambiente minimo (obrigatoriedade derivada da Project_Config) |
 | `scripts/project-config.mjs` | ler/gravar `.executor/project-config.md` |
+| `scripts/executor-state.mjs` | init/task/heartbeat/sweep/phase/reconcile/resume/run/status/verify da execucao |
+| `scripts/executor-probe.mjs` | normalizar retorno bruto de subagente em probe estavel para `reconcile`/`resume` |

@@ -62,6 +62,24 @@ Se o primeiro argumento for `project-config`, este ramo substitui a execucao da 
 
 6. Se o preflight ainda reprovar uma CLI obrigatoria ou o plugin que a conecta, mostre a `remediation` e pergunte se o usuario quer corrigir a dependencia ou trocar o papel de novo. Depois disso encerre o comando; nenhuma execucao e iniciada.
 
+## Modo resume
+
+Se o primeiro argumento for `resume`, este ramo substitui o inicio de uma execucao nova. Trate o segundo argumento, quando presente, como o `artefatos_dir` explicito a retomar; sem ele, o comando resolve a execucao ativa sozinho.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/executor-state.mjs" resume [--dir <artefatos_dir>]
+```
+
+Sem `--dir`, `resume` le `execucao_atual` do indice (`.executor/checkpoint.json`) para achar a execucao ativa. Se nao houver nenhuma (`RUN_NOT_FOUND`), informe o erro e encerre sem iniciar uma execucao nova implicitamente.
+
+O comando faz: reparo de tail de evento incompleto -> replay -> qualquer task `RUNNING` interrompida vira `UNKNOWN` (nunca `FAILED`/`DONE` presumido) -> reconciliacao contra Git/arquivos/validacoes -> devolve `resumeFromPhase`, `unknownTasks`, `pendingExternalProbes`, `recommendations` e `projectConfigDrift`.
+
+Para cada task em `pendingExternalProbes`, correlacione pelo `sessionId` (Codex) ou `conversationId` (AGY) com a capacidade de status/retomada do subagente instalado. Se a integracao nao expuser status autoritativo, mantenha `UNKNOWN` e trate Git/arquivos/validacoes como corroboracao, nunca como prova isolada de sucesso — grave um probe file (formato em `references/persistent-state.md`) e rode `executor-state.mjs reconcile --dir <artefatos_dir> --probe-file <path>` antes de decidir reexecutar.
+
+Nao redelegue uma task `UNKNOWN` sem antes confirmar que a sessao/conversa anterior nao segue ativa. Se `projectConfigDrift.changed` for `true`, informe a diferenca papel a papel ao usuario antes de continuar — a Fase 1.2 do port so reporta o drift, nao o aplica automaticamente.
+
+Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhase`, pulando as fases ja concluidas. Nao trate `resume` como uma demanda nova: nao rode a Fase 1 (triagem) nem redefina `artefatos_dir`.
+
 ## Execucao normal
 
 1. Rode o preflight:

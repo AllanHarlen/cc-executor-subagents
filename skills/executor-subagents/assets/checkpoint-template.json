@@ -1,30 +1,7 @@
 {
-  "version": "4",
+  "version": "5",
   "execucao_atual": "",
   "historico": [],
-  "demanda": "",
-  "demanda_slug": "",
-  "fase_atual": 0,
-  "timestamp_inicio": "",
-  "timestamp_fim": "",
-  "status": "RUNNING",
-  "agy_disponivel": true,
-  "tipo_trabalho": "",
-  "risco": "LOW",
   "plano_predefinido": false,
-  "plano_predefinido_fonte": "",
-  "baseline_plano_path": "",
-  "review_plano_vs_entrega": {
-    "obrigatorio": false,
-    "status": "N/A",
-    "path": ""
-  },
-  "slices": [],
-  "waves": [],
-  "interface_contract": false,
-  "agentes": [],
-  "arquivos_alterados": [],
-  "fallbacks_acionados": [],
-  "proxima_acao": "",
-  "artefatos_dir": ".executor/<demanda-slug>/artefatos"
+  "plano_predefinido_fonte": ""
 }

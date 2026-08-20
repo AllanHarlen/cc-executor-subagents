@@ -2,6 +2,26 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [1.2.0] - Estado persistente e `/executor resume`
+
+Fase 1.2 do port de capacidades do `cc-orchestrador-subagents`: o Executor ganha um motor de estado seguro contra crash, portado do state engine do Orchestrador e reduzido ao que o fluxo rapido precisa. Ver `references/persistent-state.md` para o detalhamento.
+
+### Adicionado
+
+- **`{artefatos_dir}/state.json` + `events.jsonl` + `.state.lock`**: fonte da verdade por execucao, gerenciada por `scripts/lib/executor-state.mjs` e pela CLI `scripts/executor-state.mjs` (`init`, `task`, `heartbeat`, `sweep`, `phase`, `reconcile`, `resume`, `run`, `status`, `verify`). Evento gravado com `fsync` **antes** do snapshot atomico (arquivo temporario + `fsync` + `rename`); um crash entre os dois passos e reparado por replay.
+- **`/executor resume [--dir <artefatos_dir>]`**: reparo de tail de evento incompleto → replay → toda task `RUNNING` interrompida vira `UNKNOWN` (nunca `FAILED`/`DONE` presumido) → reconciliacao contra Git/arquivos/validacoes → continuacao a partir de `resumeFromPhase`. Ver o novo modo `resume` em `commands/executor.md`.
+- `scripts/lib/checkpoint-index.mjs`: `.executor/checkpoint.json` **schemaVersion 5** — o checkpoint deixa de guardar o estado detalhado da execucao (isso agora vive em `state.json`) e volta a ser so um indice (`execucao_atual`, `historico[]`), mais `plano_predefinido`/`plano_predefinido_fonte` (que continuam ali por exigencia literal de `references/handoff-contract.md` secao 7). Migracao de checkpoints v4 e automatica, em memoria, na leitura — nunca reescreve o arquivo v4 sozinha.
+- `scripts/lib/artifact-layout.mjs`, `scripts/lib/executor-adapters.mjs` (aceita `codex`, `agy` e `claude-code`), `scripts/executor-probe.mjs`: infraestrutura de layout de artefatos e normalizacao de retorno de subagente para `reconcile`/`resume`.
+- `skills/executor-subagents/assets/executor-state.schema.json`, `executor-event.schema.json`.
+
+### Alterado (mudanca de contrato)
+
+- `assets/checkpoint-template.json`: template v5, so com `version`, `execucao_atual`, `historico`, `plano_predefinido`, `plano_predefinido_fonte`. Os campos por-run antigos (`fase_atual`, `slices`, `agentes`, `arquivos_alterados`, ...) nao aparecem mais aqui — eles vivem em `state.json`.
+
+### Fora de escopo nesta fase
+
+Waves, completion gates, leases, worktrees, aplicacao automatica de drift de Project_Config numa execucao ja iniciada, e protocolo formal de cancelamento — ver `references/persistent-state.md` "Fora de escopo nesta fase". Ficam para a Fase 2.0 do port.
+
 ## [1.1.0] - Fundacao, testes e Project_Config
 
 Primeira fase de um port de capacidades do `cc-orchestrador-subagents` para o `cc-executor-subagents`, mantendo a filosofia de execucao rapida do Executor. Ver `references/project-config.md`, `references/preflight-check.md` e `references/workflow.md` para o detalhamento.

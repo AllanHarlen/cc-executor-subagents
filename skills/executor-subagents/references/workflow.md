@@ -172,4 +172,6 @@ O fechamento deve ser curto:
 
 ## Retomada
 
-Se a sessao parar, leia `.executor/checkpoint.json`. O campo `execucao_atual` aponta para o `artefatos_dir` da execucao ativa; use-o para localizar `{artefatos_dir}/subagents-context.md` (fonte de verdade) e `{artefatos_dir}/workflow-log.md` (auditoria). O campo `historico` lista todas as execucoes anteriores com `demanda_slug`, `artefatos_dir`, `status` e timestamps para referencia rapida — cada entrada aponta para a pasta de artefatos correspondente caso seja necessario inspecionar uma execucao passada.
+Se a sessao parar, use `/executor resume`. Sem argumento, o comando resolve a execucao ativa via `execucao_atual` do indice (`.executor/checkpoint.json`) e roda `executor-state.mjs resume --dir <artefatos_dir>`: qualquer task `RUNNING` interrompida vira `UNKNOWN` (nunca `FAILED`/`DONE` presumido), a execucao e reconciliada contra Git/arquivos/validacoes, e o resultado traz `resumeFromPhase` e `pendingExternalProbes` para orientar a continuacao. Ver `references/persistent-state.md` para o protocolo completo e os cinco invariantes.
+
+`historico` (dentro do indice) lista todas as execucoes anteriores com `demanda_slug`, `artefatos_dir`, `status` e timestamps para referencia rapida — cada entrada aponta para a pasta de artefatos correspondente caso seja necessario inspecionar uma execucao passada. Para inspecionar sem retomar: `{artefatos_dir}/subagents-context.md` (fonte de verdade em prosa) e `{artefatos_dir}/workflow-log.md` (auditoria), quando existirem.

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-executor-subagents/schemas/executor-event.schema.json",
+  "title": "Executor state event",
+  "type": "object",
+  "required": ["eventSchemaVersion", "eventId", "runId", "revision", "occurredAt", "type", "actor", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "eventSchemaVersion": { "const": 1 },
+    "eventId": { "type": "string" },
+    "runId": { "type": "string" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "actor": { "type": "string" },
+    "type": {
+      "enum": [
+        "RUN_INITIALIZED",
+        "PHASE_UPDATED",
+        "TASK_UPDATED",
+        "TASK_HEARTBEAT",
+        "STALL_SWEEP_COMPLETED",
+        "RUN_RESUMED",
+        "RUN_RECONCILED",
+        "RUN_STATUS_UPDATED"
+      ]
+    },
+    "payload": { "type": "object" }
+  }
+}
