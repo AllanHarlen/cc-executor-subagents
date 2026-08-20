@@ -166,6 +166,8 @@ Ownership:
 Design system/padroes:
 <TOKENS, COMPONENTES, CONVENCOES>
 
+Quando houver design system (Open Design — `tokens.css`/`components.html`/`preview/` do handoff do Orchestrador/Pensador, ver `references/handoff-contract.md` secao 6): consuma `tokens.css` verbatim via `var(--*)`, sem inventar hex/raio/espacamento fora dos tokens, e bata os componentes com os estados de `components.html`. Ver a secao "Gate de design system" no fim deste arquivo — o review da Fase 6/6.5 aplica esse gate e trata violacao de requisito explicito como bloqueante.
+
 Estados obrigatorios:
 - loading:
 - error:
@@ -380,3 +382,17 @@ Retorne:
 5. Pendencias
 6. Skills utilizadas
 ```
+
+## 9. Gate de design system (review)
+
+Aplique este checklist na Fase 6 (verificacao) e na Fase 6.5 (review plano vs entrega) sempre que a task consumir um design system (Open Design). Sem design system, ignore esta secao.
+
+- o estilo consome `tokens.css` via custom properties (`var(--*)`); SEM hex/raio/espacamento inventado fora dos tokens;
+- componentes batem com seletores/estados de `components.html` (default/hover/focus/active/disabled/loading/empty/error);
+- **elementos interativos (botoes, links, cards clicaveis) tem estado `:hover`/`:focus` real, implementado como regra CSS/CSS-Modules/styled/Tailwind — NAO como `style={{}}` inline.** Inline style e estruturalmente incapaz de expressar `:hover`/`:focus`/`@keyframes`; se `components.html` especifica hover (ex.: `.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }`), o componente entregue precisa do equivalente real, nao so o estado default. Grep rapido de sanidade: proporcao alta de `style={{` sem nenhuma regra `:hover`/`:focus` no CSS do projeto e sinal de gate falho;
+- accent usado no maximo 2x por pagina (hero + CTA) alem de links; sem flood; sem emoji como icone; sem sombra se Depth & Elevation = minimal;
+- telas-chave conferidas contra o diretorio `preview/` (diferenca de layout/hierarquia/contraste; abrir `colors.html`, `spacing.html` ou `typography.html` conforme os arquivos disponiveis no system);
+- anti-padroes da secao 9 do `DESIGN.md` ausentes do codigo final.
+
+Trate violacao de design system como problema **BLOQUEANTE** quando contrariar requisito explicito (override sem justificativa, token inventado, accent flood, elemento interativo sem hover/focus real). Registre o achado em `{artefatos_dir}/plan-vs-output-review.md` (plano pre-definido) ou no fechamento da Fase 6 (execucao avulsa).
+

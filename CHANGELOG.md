@@ -2,6 +2,26 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [1.3.0] - Validadores deterministicos e gates proporcionais ao risco
+
+Fase 1.3 do port de capacidades do `cc-orchestrador-subagents`: as promessas de prosa do `SKILL.md` ("verifique ownership", "valide wire format") ganham ferramenta. Tudo entra proporcional ao risco — `risco: LOW` sem plano pre-definido nem modo conjunto continua sem nenhum gate extra.
+
+### Adicionado
+
+- `scripts/lib/gates.mjs` + `scripts/executor-gates.mjs plan`: tabela pura risco → lista de gates. Uma unica chamada substitui a arvore de decisao "se risco X e plano pre-definido entao..." no `SKILL.md`.
+- `scripts/check-agy-prompt.mjs`: mede um prompt AGY contra o limite de 28.000 caracteres antes de delegar — essa regra so existia como prosa em todos os tres plugins do workflow; nada media de fato antes deste script.
+- `scripts/lib/intelligence.mjs`, `scripts/inspect-diff.mjs`, `scripts/validate-wire-format.mjs`, `scripts/collect-test-results.mjs`: portados do Orchestrador, adaptados para o `executor-state.mjs` local e para funcionar tambem em modo stateless (sem `--dir`, sem execucao ativa).
+- `scripts/validate-scope.mjs`: reescrito para o Executor — `--own`/`--deny` explicitos (uso avulso) ou `state.tasks[<task>].allowedPaths` de uma task registrada via `executor-state.mjs task register --allowed-path ...` (uso com execucao ativa). `--deny` sempre vence, mesmo quando `--own` tambem bate.
+- `scripts/lib/dependency-plan.mjs`: catalogo puro de dependencias ausentes (Context7, `codex`, `agy` e os plugins que os conectam), usado pelo Dependency_Installer do modo `/executor project-config`.
+- `references/subagent-prompts.md`: gate de design system (tokens via `var(--*)`, componentes batendo com `components.html`, `:hover`/`:focus` real — nunca `style={{}}` inline, accent ≤ 2x/pagina) — antes disso o Executor ingeria `design-system-files` do handoff do Orchestrador e ignorava.
+- `SKILL.md` Fase 6.6 (nova, condicional): verificacao E2E no navegador real quando front-end e back-end sao origens separadas — CORS, casing de resposta e resolucao de tenant so aparecem com um browser de verdade dirigindo a app.
+- `references/contracts.md`: regra de wire format, casing C#↔TypeScript (DTO `PascalCase` vs payload `camelCase`) e checklist de 11 itens de validacao cruzada — nenhum dos tres existia antes.
+- `references/programmatic-intelligence.md`, `assets/intelligence-result.schema.json`.
+
+### Alterado
+
+- `references/subagent-prompts.md` (prompt AGY front-end) referencia o gate de design quando houver Open Design.
+
 ## [1.2.0] - Estado persistente e `/executor resume`
 
 Fase 1.2 do port de capacidades do `cc-orchestrador-subagents`: o Executor ganha um motor de estado seguro contra crash, portado do state engine do Orchestrador e reduzido ao que o fluxo rapido precisa. Ver `references/persistent-state.md` para o detalhamento.

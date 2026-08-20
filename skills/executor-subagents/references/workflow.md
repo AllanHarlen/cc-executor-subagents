@@ -1,6 +1,6 @@
 # Workflow Rapido
 
-Este documento expande o fluxo do `SKILL.md`. A regra e simples: use somente o detalhe necessario para entregar rapido. A numeracao de fases e identica a do `SKILL.md` (0, 1, 2, 3, 4, 5, 6, 6.5, 7, 8, 9) — `Fase 8` (monitoramento) roda em paralelo das Fases 4-6.5, nao depois delas.
+Este documento expande o fluxo do `SKILL.md`. A regra e simples: use somente o detalhe necessario para entregar rapido. A numeracao de fases e identica a do `SKILL.md` (0, 1, 2, 3, 4, 5, 6, 6.5, 6.6, 7, 8, 9) — `Fase 8` (monitoramento) roda em paralelo das Fases 4-6.5, nao depois delas; `Fase 6.6` (E2E) e condicional, so roda quando ha front-end separado do back-end.
 
 ## Fase 0 - Preflight leve
 
@@ -36,6 +36,8 @@ Extraia em poucos minutos:
 Use pesquisa local (`rg`, `rg --files`, leitura de arquivos) antes de perguntar. Pergunte somente quando uma suposicao errada geraria retrabalho relevante.
 
 Se houver plano pre-definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md`, registre `plano_predefinido: true` no checkpoint e trate esse baseline como fonte de verdade para slices, criterios de aceite e verificacao final.
+
+**Gates por risco:** depois de fixar `risco`, rode `node "${CLAUDE_SKILL_DIR}/scripts/executor-gates.mjs" plan --risk <risco> ...` (ver `SKILL.md` Fase 1). A lista devolvida e o que roda nas Fases 6/6.5/6.6 — em `risco: LOW` sem plano pre-definido nem modo conjunto, vem vazia.
 
 **Modo conjunto (Orchestrador → Executor):** procure `.orchestration/<slug>/handoff.json` antes de tratar a demanda como avulsa. Se existir, o executor entra no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador: adote o handoff como plano pre-definido baseline, siga `upstream` ate o Pensador para rastreabilidade (`prd`/`api-contract`/`design-system-files`) e mantenha obrigatorio o review Codex high plano-vs-entrega. Ver `references/handoff-contract.md` (secao 7).
 
@@ -99,6 +101,8 @@ Roteamento padrao (o Executor deriva o agente do papel efetivo na Project_Config
 - analise pura: AGY `--read-only` quando `frontendExecutor` for AGY;
 - backend, testes, integracao e review: `backendExecutor`/`backendReviewer` (default Codex).
 
+Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>`. Acima de 28.000 caracteres, divida a task em subtasks por entregaveis independentes antes de delegar.
+
 ## Fase 5 - Integracao
 
 Ao receber retornos:
@@ -124,6 +128,14 @@ Se uma verificacao falhar, tente corrigir no mesmo ciclo. Se nao der, feche como
 ## Fase 6.5 - Review plano vs entrega
 
 Execute somente quando `plano_predefinido: true`. Peca review Codex high (ou o `backendReviewer` efetivo) read-only antes de fechar, mesmo em UI/front-end puro. O review deve comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e a entrega gerada, cobrindo requisitos, criterios de aceite, entregaveis, contratos, arquivos planejados/alterados e verificacoes planejadas/executadas. Salve em `{artefatos_dir}/plan-vs-output-review.md`. Se houver `DESALINHADO`, corrija ou bloqueie com evidencia.
+
+Quando houver design system (Open Design), aplique o "Gate de design system" de `references/subagent-prompts.md` como parte deste review.
+
+## Fase 6.6 - Verificacao E2E no navegador real
+
+Condicional: roda somente quando `executor-gates.mjs plan` (Fase 1) devolveu o gate `browser-e2e` — front-end presente **e** front/back sao origens separadas. Review de codigo e build sao cegos a CORS, resolucao de tenant a partir do browser, e casing de resposta que falha silenciosamente com `200`.
+
+Suba a app real, dirija os fluxos criticos (Playwright MCP ou equivalente, incluindo login com credenciais de seed), verifique console/network sem CORS, cada chamada 2xx com a UI refletindo dado real, e o efeito final de cada acao. Evidencia em `{artefatos_dir}/review/e2e-verification.md` + `review/screenshots/`. Achado aqui e bloqueante; sem ferramenta de navegador, feche como `PARTIAL`, nunca `DONE`. Ver `SKILL.md` Fase 6.6 para o detalhamento completo.
 
 ## Fase 7 - Fechamento interno
 

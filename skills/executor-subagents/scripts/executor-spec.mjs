@@ -16,14 +16,11 @@
 /**
  * Ordem canonica das fases do fluxo rapido, identica em `SKILL.md` e
  * `references/workflow.md`. A Fase 8 (monitoramento) e a excecao ao avanco
- * sequencial: roda em paralelo das Fases 4-6.5, nao depois delas.
- *
- * A Fase 1.3 do port Tier 1/Tier 2 acrescenta a Fase 6.6 (verificacao E2E no
- * navegador real, condicional) — quando isso acontecer, adicione `6.6` aqui
- * **no mesmo commit** que introduz a secao `### Fase 6.6` em `SKILL.md`, para
- * o guard de doc-sync continuar valendo.
+ * sequencial: roda em paralelo das Fases 4-6.5, nao depois delas. A Fase 6.6
+ * (verificacao E2E no navegador real) e condicional: so roda quando ha
+ * front-end e front/back sao origens separadas.
  */
-export const PHASE_ORDER = Object.freeze([0, 1, 2, 3, 4, 5, 6, 6.5, 7, 8, 9]);
+export const PHASE_ORDER = Object.freeze([0, 1, 2, 3, 4, 5, 6, 6.5, 6.6, 7, 8, 9]);
 
 /** Nome curto de cada fase, na mesma ordem de `PHASE_ORDER`. */
 export const PHASE_NAMES = Object.freeze({
@@ -35,6 +32,7 @@ export const PHASE_NAMES = Object.freeze({
   5: "Integracao",
   6: "Verificacao",
   6.5: "Review plano vs entrega",
+  6.6: "Verificacao E2E no navegador real",
   7: "Fechamento interno",
   8: "Monitoramento",
   9: "Relatorio final",

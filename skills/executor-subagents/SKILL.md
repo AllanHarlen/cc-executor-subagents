@@ -108,6 +108,8 @@ Antes de delegar, levante somente o que muda a execucao:
 
 Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte uma vez, com opcoes concretas.
 
+**Gates por risco.** Depois de fixar `risco`, rode `node "${CLAUDE_SKILL_DIR}/scripts/executor-gates.mjs" plan --risk <risco> --agent-count <N> --predefined-plan <bool> --joint-mode <bool> --interface-contract <bool> --frontend-separate-origin <bool>`. Ele devolve a lista exata de gates das Fases 6/6.5/6.6 — comandos prontos quando `kind: "script"`, acao a tomar quando `kind: "action"`. Em `risco: LOW` sem plano pre-definido nem modo conjunto, a lista vem vazia e nada muda em relacao ao fluxo direto de hoje.
+
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
 **Modo conjunto (Orchestrador → Executor):** antes de tratar a demanda como avulsa, procure `.orchestration/<slug>/handoff.json` (`stage: orchestrador`). Se existir, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem `handoff.json`, leia `.orchestration/<slug>/implementation-report.md` + `tasks-classification.md` + `waves.md` + `contracts/`. Detalhes em `references/handoff-contract.md` (secao 7).
@@ -187,6 +189,8 @@ Roteamento padrao:
 
 **Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-imagem`.
 
+**Limite de prompt AGY.** Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>` (ou `--stdin`). Acima de 28.000 caracteres o bridge pode falhar com `ENAMETOOLONG` no Windows — divida a task em subtasks por entregaveis independentes antes de delegar, nunca envie o prompt acima do limite.
+
 Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar listagem de skills, o subagente deve consultalas, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Se nao houver listagem disponivel, o subagente deve seguir com `skills nao acessiveis`.
 
 **Checkpoint apos Fase 4:** atualize `.executor/checkpoint.json` com `fase_atual: 4` e o status inicial de cada agente em `agentes`.
@@ -213,6 +217,8 @@ Execute verificacoes proporcionais ao risco:
 - `MEDIUM`: testes da area + typecheck/build quando aplicavel.
 - `HIGH`: suite relevante, review Codex high e plano de rollback.
 
+Execute os gates `kind: "script"` devolvidos por `executor-gates.mjs plan` (Fase 1) nesta fase — `inspect-diff` sempre que MEDIUM+, `validate-scope` quando 2+ agentes, `collect-test-results`/`validate-wire-format` quando escalado (HIGH, plano pre-definido ou modo conjunto). Anexe a evidencia (`evidenceId`) ao fechamento.
+
 Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario deve rodar depois.
 
 ### Fase 6.5 - Review plano vs entrega
@@ -227,6 +233,19 @@ Execute esta fase somente quando `plano_predefinido: true`.
 6. Atualize `.executor/checkpoint.json` em `review_plano_vs_entrega` com `status: REVIEWED | BLOCKED | FALLBACK_INTERNAL` e `path`.
 
 Se Codex high falhar por quota nessa fase, siga a politica de "Codex bate a cota em revisao": faca review interno read-only, salve no mesmo `{artefatos_dir}/plan-vs-output-review.md` e registre o fallback explicitamente.
+
+### Fase 6.6 - Verificacao E2E no navegador real
+
+Execute esta fase somente quando `executor-gates.mjs plan` devolver o gate `browser-e2e` — ou seja, quando ha front-end na entrega **e** front-end e back-end sao origens/deploys separados (SPA/Next.js chamando uma API em outra porta/host). Sem isso, pule direto para a Fase 7.
+
+**Por que esta fase existe.** Review de codigo, `dotnet build`, `npm run build`, `tsc` e `curl` sao cegos a uma classe inteira de defeitos de integracao runtime: CORS ausente que so quebra no browser, resolucao de tenant/host que o `curl` mascara ao passar `Host` manualmente, e casing de resposta divergente que falha silenciosamente com `200` e a UI vazia.
+
+1. Suba a app de verdade (ex.: `docker compose up --build`) e confirme os servicos saudaveis. Se subir a stack falhar, isso ja e achado bloqueante.
+2. Dirija os fluxos de usuario criticos num navegador real via Playwright MCP (ou equivalente): navegue, preencha formularios, clique, submeta — incluindo fluxos que exigem login, com credenciais de seed/demo documentadas.
+3. Em cada fluxo, verifique: console/network sem erros de CORS; cada chamada de API retorna 2xx **e** a UI reflete o dado real (desconfie de "200 mas tela vazia/inalterada" — sintoma classico de casing divergente); o efeito final da acao aconteceu de fato; resolucao multi-tenant/host funciona a partir do browser; estados de tela (vazio/carregando/erro/sucesso) se comportam como especificado.
+4. Capture evidencia (screenshot e/ou resumo de console+network) em `{artefatos_dir}/review/e2e-verification.md` e screenshots em `{artefatos_dir}/review/screenshots/`.
+
+Achados desta fase sao **bloqueantes**. Se a ferramenta de navegador nao estiver disponivel, nao invente aprovacao: registre a limitacao e marque o `handoff.json` (quando houver) como `PARTIAL`, nunca `DONE`.
 
 ### Fase 7 - Fechamento interno
 
@@ -409,6 +428,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/preflight-check.md` | entender/remediar preflight |
 | `references/project-config.md` | as 4 perguntas de stack, protocolo do Dependency_Installer, roteamento derivado |
 | `references/persistent-state.md` | entender `state.json`/`events.jsonl`, os 5 invariantes e o protocolo de `/executor resume` |
+| `references/programmatic-intelligence.md` | scripts deterministicos (inspect-diff, validate-wire-format, validate-scope, collect-test-results) |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
 | `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |
@@ -418,3 +438,9 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `scripts/project-config.mjs` | ler/gravar `.executor/project-config.md` |
 | `scripts/executor-state.mjs` | init/task/heartbeat/sweep/phase/reconcile/resume/run/status/verify da execucao |
 | `scripts/executor-probe.mjs` | normalizar retorno bruto de subagente em probe estavel para `reconcile`/`resume` |
+| `scripts/executor-gates.mjs` | `plan`: lista exata de gates por risco/plano-predefinido/modo-conjunto (Fase 1) |
+| `scripts/check-agy-prompt.mjs` | medir prompt AGY contra o limite de 28.000 chars antes de delegar (Fase 4) |
+| `scripts/inspect-diff.mjs` | estatisticas e riscos mecanicos do diff (Fase 6) |
+| `scripts/validate-scope.mjs` | arquivos alterados x ownership declarado (Fase 6, 2+ agentes) |
+| `scripts/validate-wire-format.mjs` | payload x contrato/schema (Fase 6, `interface_contract: true`) |
+| `scripts/collect-test-results.mjs` | resultado de teste estruturado (JUnit/TRX/JSON) (Fase 6) |
