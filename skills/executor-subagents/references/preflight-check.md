@@ -1,6 +1,6 @@
 # Preflight Check
 
-O preflight do `cc-executor-subagents` valida o minimo para execucao rapida com subagentes.
+O preflight do `cc-executor-subagents` valida o minimo para execucao rapida com subagentes. A obrigatoriedade de cada CLI/plugin deriva da **Project_Config** do projeto (`.executor/project-config.md`), nao de uma regra fixa.
 
 ## Como rodar
 
@@ -14,21 +14,33 @@ Em desenvolvimento local:
 node skills/executor-subagents/scripts/preflight.mjs
 ```
 
-## Obrigatorio
+## Project_Config
 
-| Item | Por que importa |
-|---|---|
-| `codex` CLI | executa agentes de backend, testes e review |
-| `agy` CLI | executa agentes de front-end, imagem e analise em contexto largo |
-| plugin `openai-codex` | expoe `codex:codex-rescue` |
-| plugin `cc-antigravity-plugin` `>= 3.6.0` | expoe `cc-antigravity-plugin:antigravity-agent` e o bridge com flags atuais (incluindo `--parallel` e `--subagent-model`) |
-| permissao Bash para Codex companion | evita aprovacoes no meio de agentes em background |
-| `agy --help` com flags essenciais | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
-| bridge do AGY com flags atuais | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
+Quatro papeis decidem quem implementa e quem revisa: `backendExecutor`, `frontendExecutor`, `backendReviewer`, `frontendReviewer`. Cada um vale `codex`, `agy` ou `claude-code`. Defaults: `codex`/`agy`/`codex`/`agy`.
 
-Falha de Codex bloqueia apenas para tasks que nao sejam puramente front-end, exceto quando houver plano pre-definido. Se a demanda for `UI_FRONTEND` ou `IMAGE_ASSET` sem plano pre-definido, falha de Codex nao cancela — prossiga sem ele. Se houver plano pre-definido, Codex high e necessario para o review read-only plano-vs-entrega; remedeie Codex ou registre aceite explicito do usuario para seguir sem esse review. Para qualquer outra natureza de task, falha de Codex cancela com remediacao.
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" show
+node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write \
+  --backend-executor codex --frontend-executor agy \
+  --backend-reviewer codex --frontend-reviewer agy
+```
 
-Falha somente de AGY deve pausar o fluxo e pedir decisao do usuario: remediar, continuar so com Codex, ou cancelar.
+Ver `references/project-config.md` para o catalogo completo de perguntas e o protocolo de instalacao assistida.
+
+## Obrigatorio (condicional a Project_Config)
+
+| Item | Obrigatorio quando | Por que importa |
+|---|---|---|
+| Project_Config valida | sempre, se o arquivo existir | arquivo invalido bloqueia sem nunca ser sobrescrito automaticamente |
+| `codex` CLI + plugin `openai-codex` | `backendExecutor` ou `backendReviewer` = `codex` | executa agentes de backend, testes e review |
+| `agy` CLI + plugin `cc-antigravity-plugin` `>= 3.6.0` | `frontendExecutor` ou `frontendReviewer` = `agy` | executa agentes de front-end, imagem e analise em contexto largo |
+| `agy --help` com flags essenciais | igual ao `agy` CLI | garante `--print`, `--add-dir`, `--dangerously-skip-permissions`, `--print-timeout`, `--prompt-interactive` |
+| bridge do AGY com flags atuais | igual ao `agy` CLI | garante `--read-only`, `--model`, `--generate-imagem`, `--generate-image`, `--parallel`, `--subagent-model`, `--timeout`, `--continue`, `--conversation`, `--print-command` |
+| permissao Bash para Codex companion | sempre | evita aprovacoes no meio de agentes em background — **auto-remediado** quando possivel |
+
+Quando os quatro papeis apontam para `claude-code`, nenhuma CLI externa e exigida e o preflight passa mesmo sem `codex`/`agy` no PATH.
+
+Se um item obrigatorio falhar, mostre a `remediation` do relatorio e pergunte ao usuario se quer: (a) corrigir a dependencia, (b) trocar o papel afetado para `claude-code` (`node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor claude-code ...` ou o papel equivalente) para o Executor (Claude) assumir a task diretamente, ou (c) cancelar. Depois de qualquer mudanca, rode o preflight de novo.
 
 ## Opcional
 
@@ -42,22 +54,43 @@ Falha em item opcional nao cancela. Apenas ajuste a estrategia:
 - sem `/goal`: trabalhe no turno atual e entregue comando de retomada;
 - sem Context7: siga padroes locais e registre limitacao quando docs atuais importarem.
 
-## Saida
+## Saida (schemaVersion 2)
 
 ```json
 {
+  "schemaVersion": 2,
   "status": "ok",
-  "checks": {
-    "required": { "...": {} },
-    "optional": { "...": {} }
+  "projectConfig": {
+    "source": "file",
+    "path": ".executor/project-config.md",
+    "updatedAt": "2026-02-14T18:05:31Z",
+    "roles": { "...": "..." },
+    "requiredCliSet": ["codex", "agy"]
   },
+  "checks": {
+    "config": { "project-config": {} },
+    "cli": { "codex": {}, "agy": {} },
+    "plugins": { "openai-codex": {}, "cc-antigravity-plugin": {} },
+    "permissions": { "codex-companion-bash": {}, "goal-hooks-enabled": {} },
+    "capabilities": { "agy-help": {}, "cc-antigravity-bridge": {} },
+    "optional": { "mcp": { "context7": {} } }
+  },
+  "autoRemediation": { "attempted": false, "changed": false, "action": "none", "ok": true },
   "failed": [],
   "warnings": [],
   "remediation": null
 }
 ```
 
-`status` e `failed` consideram os itens obrigatorios. `warnings` lista apenas opcionais ausentes.
+`checks` e **plano**: `config`, `cli`, `plugins`, `permissions` e `capabilities` sao os cinco grupos de checks obrigatorios-por-condicao; `optional.mcp` nunca bloqueia. Cada check individual carrega `required: true|false`, resolvido a partir da Project_Config. `category` em `failed`/`warnings` usa o rotulo singular (`config`, `cli`, `plugin`, `permission`, `capability`, `mcp`).
+
+`status` e `failed` consideram apenas os itens que a Project_Config torna obrigatorios. `warnings` lista itens opcionais ausentes e itens que falharam mas nao sao exigidos pela configuracao atual (`reason: "NOT_REQUIRED_BY_PROJECT_CONFIG"`).
+
+> **Mudanca de contrato (schemaVersion 1 -> 2):** a versao anterior aninhava tudo em `checks.required.*`/`checks.optional.*`, com obrigatoriedade fixa por posicao. A versao atual e plana e deriva obrigatoriedade da Project_Config. Nao ha compatibilidade retroativa no formato do relatorio — leia sempre o `schemaVersion` antes de assumir a forma do JSON.
+
+## Auto-remediacao
+
+O preflight tenta corrigir sozinho a permissao `codex-companion-bash` quando ela falha: cria ou atualiza `.claude/settings.json` do projeto acrescentando `Bash(node:*)` a `permissions.allow`, preservando o restante do arquivo. Recusa a mudanca (e reporta o motivo em `autoRemediation.action`) quando o arquivo existente e JSON invalido, tem raiz que nao e objeto, `permissions` que nao e objeto, ou `permissions.allow` que nao e array — nesses casos o arquivo anterior permanece intacto e a remediacao precisa ser manual.
 
 ## Remediacao comum
 
@@ -66,6 +99,13 @@ Falha em item opcional nao cancela. Apenas ajuste a estrategia:
 ```bash
 npm install -g @openai/codex
 codex login
+```
+
+Ou, se Codex nao for necessario neste projeto:
+
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor claude-code \
+  --frontend-executor agy --backend-reviewer claude-code --frontend-reviewer agy
 ```
 
 ### Plugin OpenAI Codex
@@ -77,7 +117,7 @@ codex login
 
 ### Permissao Bash
 
-No projeto alvo:
+Normalmente auto-remediado. Se a auto-remediacao recusar (JSON invalido, por exemplo), corrija manualmente no projeto alvo:
 
 ```json
 {
@@ -111,6 +151,13 @@ irm https://antigravity.google/cli/install.ps1 | iex
 /reload-plugins
 ```
 
+Ou, se AGY nao for necessario neste projeto:
+
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor codex \
+  --frontend-executor claude-code --backend-reviewer codex --frontend-reviewer claude-code
+```
+
 ### Context7 opcional
 
 ```bash
@@ -119,4 +166,4 @@ npx ctx7 setup --claude
 
 ## Politica
 
-Nao faca fallback silencioso se Codex falhar em tasks que nao sejam front-end puro. Para tasks `UI_FRONTEND` ou `IMAGE_ASSET` sem plano pre-definido, falha de Codex e ignorada silenciosamente (registre no checkpoint como `codex_excluido: true`). Se houver plano pre-definido, Codex high deve ficar disponivel para a Fase 6.5 ou a ausencia dele precisa ser aceita explicitamente pelo usuario. Para AGY, exponha a falha, mostre a remediacao e peca uma decisao explicita antes de seguir so com Codex.
+Toda obrigatoriedade de CLI/plugin vem da Project_Config — nao ha mais excecao ad-hoc para tasks front-end puras. Se uma dependencia obrigatoria falhar, exponha a falha, mostre a remediacao (incluindo a opcao de trocar o papel para `claude-code`) e peca uma decisao explicita ao usuario antes de seguir.

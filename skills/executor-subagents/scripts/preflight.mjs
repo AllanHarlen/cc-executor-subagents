@@ -2,27 +2,64 @@
 /**
  * Preflight check for cc-executor-subagents.
  *
- * Required:
- * - codex CLI
- * - agy CLI
- * - openai-codex Claude Code plugin
- * - cc-antigravity-plugin >= 3.6.0
- * - Bash permission for the Codex companion
+ * Validates that every dependency the executor needs is present, with the
+ * Required_CLI_Set derived from the Project_Config of the target project:
+ *  - The Project_Config itself (`.executor/project-config.md`), when present
+ *  - CLIs on PATH: codex, agy (required only when some role uses them)
+ *  - Claude Code plugins: openai-codex, cc-antigravity-plugin (same condition)
+ *  - AGY capability set (`agy --help` flags, bridge flags) - required only when
+ *    `frontendExecutor`/`frontendReviewer` route to `agy`
+ *  - A compatible Bash permission for the Codex companion runtime (auto-remediated)
+ *  - Claude Code hook settings compatible with /goal (optional)
+ *  - Context7 MCP (optional, reported, never blocking)
  *
- * Optional:
- * - /goal hook compatibility
- * - Context7 MCP
+ * Report contract (schemaVersion 2):
+ *  - `projectConfig` carries the four effective roles, the file path, `updatedAt`,
+ *    the derived `requiredCliSet` and `source` ("file" or "default").
+ *  - `checks` is FLAT: `checks.{config,cli,plugins,permissions,capabilities,optional}`.
+ *    Every check under `config`, `cli`, `plugins`, `permissions` and
+ *    `capabilities` carries `required: true|false`.
+ *  - `failed` holds only failing **required** checks; failing optional checks and
+ *    missing MCPs go to `warnings` with a `reason`
+ *    (`NOT_DETECTED` or `NOT_REQUIRED_BY_PROJECT_CONFIG`).
+ *  - `category` labels are singular: `config`, `cli`, `plugin`, `permission`,
+ *    `capability`, `mcp`.
+ *  - Exit code is 0 if and only if `status === "ok"`. A warning never changes it.
+ *
+ * This is a deliberate breaking change from schemaVersion 1 (the old nested
+ * `checks.required.*` / `checks.optional.*` tree): required-ness now derives
+ * from the Project_Config instead of being hardcoded by position. See
+ * references/preflight-check.md and CHANGELOG.md.
+ *
+ * Outputs a JSON report to stdout.
+ *
+ * Usage:
+ *   node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
+ *   node scripts/preflight.mjs # compatibility wrapper
  */
 
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import {
+  DEFAULT_PROJECT_CONFIG,
+  PROJECT_CONFIG_RELATIVE_PATH,
+  ProjectConfigError,
+  ROLES,
+  deriveRequiredCliSet,
+  readProjectConfig,
+} from "./lib/project-config.mjs";
+
 const HOME = homedir();
+const PROJECT_ROOT = process.cwd();
 const PLUGINS_CACHE = join(HOME, ".claude", "plugins", "cache");
-const PROJECT_CLAUDE_DIR = join(process.cwd(), ".claude");
+const PROJECT_CLAUDE_DIR = join(PROJECT_ROOT, ".claude");
+const PROJECT_SETTINGS_FILE = join(PROJECT_CLAUDE_DIR, "settings.json");
 const MIN_ANTIGRAVITY_PLUGIN_VERSION = "3.6.0";
+const PREFLIGHT_SCHEMA_VERSION = 2;
+
 const REQUIRED_AGY_FLAGS = [
   "--print",
   "--add-dir",
@@ -175,7 +212,7 @@ function checkAntigravityBridge() {
 
 function checkCodexCompanionBashPermission() {
   const candidates = [
-    join(PROJECT_CLAUDE_DIR, "settings.json"),
+    PROJECT_SETTINGS_FILE,
     join(PROJECT_CLAUDE_DIR, "settings.local.json"),
     join(HOME, ".claude", "settings.json"),
     join(HOME, ".claude", "settings.local.json"),
@@ -225,6 +262,124 @@ function isCodexCompanionBashRule(rule) {
     /^Bash\(node:.*codex-companion\.mjs.*\)$/.test(normalized) ||
     /^Bash\(node .*codex-companion\.mjs.*\)$/.test(normalized)
   );
+}
+
+function isPlainObject(value) {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Auto-remediates a missing `codex-companion-bash` permission by appending
+ * `Bash(node:*)` to the project's `.claude/settings.json`. Refuses to touch
+ * the file when it exists but is invalid JSON, has a non-object root, a
+ * non-object `permissions`, or a non-array `permissions.allow` - in every
+ * refusal case the prior file is left byte-for-byte intact.
+ */
+function autoRemediateCodexCompanionBashPermission(initialCheck) {
+  const fileExistedBefore = existsSync(PROJECT_SETTINGS_FILE);
+  const result = {
+    attempted: false,
+    changed: false,
+    target: PROJECT_SETTINGS_FILE,
+    action: "none",
+    revalidated: false,
+    ok: initialCheck.ok,
+  };
+
+  if (initialCheck.ok) {
+    return result;
+  }
+
+  const projectParseError = initialCheck.parseErrors?.find(
+    (entry) => entry.path === PROJECT_SETTINGS_FILE,
+  );
+
+  if (projectParseError) {
+    return {
+      ...result,
+      attempted: true,
+      action: "blocked-invalid-json",
+      error:
+        "Auto-remediation skipped because .claude/settings.json exists but contains invalid JSON. Fix the file manually and rerun preflight.",
+      ok: false,
+    };
+  }
+
+  let settings = {};
+  if (fileExistedBefore) {
+    try {
+      settings = JSON.parse(readFileSync(PROJECT_SETTINGS_FILE, "utf8"));
+    } catch (err) {
+      return {
+        ...result,
+        attempted: true,
+        action: "blocked-invalid-json",
+        error:
+          err.message?.split(/\r?\n/)[0] ??
+          "Auto-remediation skipped because .claude/settings.json could not be parsed.",
+        ok: false,
+      };
+    }
+  }
+
+  if (!isPlainObject(settings)) {
+    return {
+      ...result,
+      attempted: true,
+      action: "blocked-non-object-root",
+      error:
+        "Auto-remediation skipped because .claude/settings.json must contain a JSON object at the root.",
+      ok: false,
+    };
+  }
+
+  const permissions = settings.permissions;
+  if (permissions != null && !isPlainObject(permissions)) {
+    return {
+      ...result,
+      attempted: true,
+      action: "blocked-invalid-permissions-shape",
+      error:
+        "Auto-remediation skipped because .claude/settings.json has a non-object permissions field.",
+      ok: false,
+    };
+  }
+
+  const allow = permissions?.allow;
+  if (allow != null && !Array.isArray(allow)) {
+    return {
+      ...result,
+      attempted: true,
+      action: "blocked-invalid-allow-shape",
+      error:
+        "Auto-remediation skipped because .claude/settings.json has permissions.allow in a non-array format.",
+      ok: false,
+    };
+  }
+
+  const nextSettings = {
+    ...settings,
+    permissions: {
+      ...(permissions ?? {}),
+      allow: [...(allow ?? []), "Bash(node:*)"],
+    },
+  };
+
+  mkdirSync(PROJECT_CLAUDE_DIR, { recursive: true });
+  writeFileSync(PROJECT_SETTINGS_FILE, `${JSON.stringify(nextSettings, null, 2)}\n`, "utf8");
+
+  const revalidated = checkCodexCompanionBashPermission();
+  return {
+    attempted: true,
+    changed: true,
+    target: PROJECT_SETTINGS_FILE,
+    action: fileExistedBefore ? "updated-settings-json" : "created-settings-json",
+    revalidated: revalidated.ok,
+    ok: revalidated.ok,
+    rules: revalidated.rules ?? [],
+    path: revalidated.path ?? PROJECT_SETTINGS_FILE,
+    error: revalidated.ok ? null : revalidated.error,
+  };
 }
 
 function checkGoalHookSettings() {
@@ -279,7 +434,7 @@ function checkContext7Mcp() {
   }
 
   const configCandidates = [
-    join(process.cwd(), ".mcp.json"),
+    join(PROJECT_ROOT, ".mcp.json"),
     join(HOME, ".claude.json"),
     join(HOME, ".claude", "mcp.json"),
     join(HOME, ".config", "claude", "mcp.json"),
@@ -303,74 +458,229 @@ function checkContext7Mcp() {
   }
 
   if (evidence.some((item) => item.type !== "mcp-config-unreadable")) {
-    return { ok: true, optional: true, evidence };
+    return { ok: true, evidence };
   }
 
   return {
     ok: false,
-    optional: true,
     error: "Context7 MCP not detected in known locations.",
     install: ["npx ctx7 setup --claude"],
   };
 }
 
+/**
+ * Resolves the Project_Config that decides which CLIs (and their plugins and
+ * capabilities) are required. Three outcomes:
+ *
+ *  - File present and valid: roles come from the file, `source: "file"`.
+ *  - File absent: roles come from the default stack `codex`/`agy`/`codex`/`agy`,
+ *    `source: "default"`.
+ *  - File present and invalid: the parser error becomes a failing **required**
+ *    check (`checks.config.project-config`), which makes `status` be `failed`,
+ *    and the Required_CLI_Set falls back to the default only so the report
+ *    stays complete. The file is never rewritten: reading it does not touch
+ *    the filesystem.
+ */
+function resolveProjectConfigState(projectRoot) {
+  try {
+    const resolved = readProjectConfig(projectRoot);
+    const requiredCliSet = deriveRequiredCliSet(resolved.config);
+    const roles = {};
+    for (const role of ROLES) roles[role] = resolved.config[role];
+
+    return {
+      requiredCliSet,
+      block: {
+        source: resolved.source,
+        path: PROJECT_CONFIG_RELATIVE_PATH,
+        updatedAt: resolved.config.updatedAt ?? null,
+        roles,
+        requiredCliSet: [...requiredCliSet.clis],
+      },
+      check: {
+        ok: true,
+        required: true,
+        exists: resolved.exists,
+        source: resolved.source,
+        path: PROJECT_CONFIG_RELATIVE_PATH,
+      },
+    };
+  } catch (error) {
+    if (!(error instanceof ProjectConfigError)) throw error;
+
+    // Fallback apenas para manter o relatorio completo: o status ja e
+    // "failed", entao nenhuma decisao de workflow e tomada a partir destes
+    // papeis.
+    const requiredCliSet = deriveRequiredCliSet(DEFAULT_PROJECT_CONFIG);
+    const path = error.details?.path ?? PROJECT_CONFIG_RELATIVE_PATH;
+
+    return {
+      requiredCliSet,
+      block: {
+        source: "default",
+        path: PROJECT_CONFIG_RELATIVE_PATH,
+        updatedAt: null,
+        roles: { ...DEFAULT_PROJECT_CONFIG },
+        requiredCliSet: [...requiredCliSet.clis],
+      },
+      check: {
+        ok: false,
+        required: true,
+        exists: true,
+        source: "invalid",
+        path,
+        code: error.code,
+        error: error.message,
+        field: error.details?.field ?? null,
+        received: error.details?.received ?? null,
+        accepted: error.details?.accepted ?? null,
+        expected: "um Project_Config_File valido ou nenhum arquivo",
+      },
+    };
+  }
+}
+
+// A Project_Config e resolvida antes de qualquer outro check: e ela que
+// decide quais CLIs, plugins e capabilities sao obrigatorios.
+const projectConfigState = resolveProjectConfigState(PROJECT_ROOT);
+const requiredCliSet = projectConfigState.requiredCliSet;
+
+const initialCodexCompanionBash = checkCodexCompanionBashPermission();
+const autoRemediation = autoRemediateCodexCompanionBashPermission(initialCodexCompanionBash);
+const finalCodexCompanionBash = checkCodexCompanionBashPermission();
+
 const checks = {
-  required: {
-    cli: {
-      codex: checkCli("codex"),
-      agy: checkCli("agy"),
-    },
-    plugins: {
-      "openai-codex": checkPlugin("openai-codex", "codex"),
-      "cc-antigravity-plugin": checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin"),
-    },
-    permissions: {
-      "codex-companion-bash": checkCodexCompanionBashPermission(),
-    },
-    capabilities: {
-      "agy-help": checkAgyHelp(),
-      "cc-antigravity-bridge": checkAntigravityBridge(),
-    },
+  config: {
+    "project-config": projectConfigState.check,
+  },
+  cli: {
+    codex: checkCli("codex"),
+    agy: checkCli("agy"),
+  },
+  plugins: {
+    "openai-codex": checkPlugin("openai-codex", "codex"),
+    "cc-antigravity-plugin": checkPlugin("cc-antigravity-plugin", "cc-antigravity-plugin"),
+  },
+  permissions: {
+    "codex-companion-bash": finalCodexCompanionBash,
+    "goal-hooks-enabled": checkGoalHookSettings(),
+  },
+  capabilities: {
+    "agy-help": checkAgyHelp(),
+    "cc-antigravity-bridge": checkAntigravityBridge(),
   },
   optional: {
-    permissions: {
-      "goal-hooks-enabled": checkGoalHookSettings(),
-    },
     mcp: {
       context7: checkContext7Mcp(),
     },
   },
 };
 
+/**
+ * Obrigatoriedade por check.
+ *
+ * `cli.codex`/`plugins.openai-codex` sao obrigatorios se e somente se algum
+ * papel da Project_Config usa `codex`; `cli.agy`/`plugins.cc-antigravity-plugin`
+ * seguem a mesma regra para `agy`. A decisao vem inteira de
+ * `deriveRequiredCliSet`: este script nao reimplementa a condicao.
+ *
+ * `capabilities.*` (flags de `agy --help` e do bridge) so importam quando o
+ * `agy` e de fato obrigatorio - sem `agy` no Required_CLI_Set nao ha bridge a
+ * validar.
+ *
+ * `config.project-config` e os itens de `permissions` sao obrigatorios em
+ * qualquer configuracao.
+ */
+const REQUIRED_BY_CHECK = {
+  config: { "project-config": true },
+  cli: { codex: requiredCliSet.codex, agy: requiredCliSet.agy },
+  plugins: {
+    "openai-codex": requiredCliSet.codex,
+    "cc-antigravity-plugin": requiredCliSet.agy,
+  },
+  permissions: { "codex-companion-bash": true, "goal-hooks-enabled": true },
+  capabilities: {
+    "agy-help": requiredCliSet.agy,
+    "cc-antigravity-bridge": requiredCliSet.agy,
+  },
+};
+
+/** Categoria usada em `failed` e em `warnings` por grupo de checks (singular). */
+const CATEGORY_LABEL = {
+  config: "config",
+  cli: "cli",
+  plugins: "plugin",
+  permissions: "permission",
+  capabilities: "capability",
+};
+
+/** Motivo de aviso para check reprovado que a Project_Config nao exige. */
+const NOT_REQUIRED_BY_PROJECT_CONFIG = "NOT_REQUIRED_BY_PROJECT_CONFIG";
+
 const failed = [];
 const warnings = [];
 
-collectFailures(checks.required, failed);
-collectFailures(checks.optional, warnings);
+// MCP ausente e sempre aviso, nunca bloqueio: entra primeiro porque contexto
+// de codigo e documentacao valem para qualquer executor.
+for (const [name, result] of Object.entries(checks.optional.mcp)) {
+  if (result.ok) continue;
+  warnings.push({
+    category: "mcp",
+    name,
+    required: false,
+    reason: result.reason ?? "NOT_DETECTED",
+  });
+}
+
+for (const [group, results] of Object.entries(REQUIRED_BY_CHECK)) {
+  for (const [name, required] of Object.entries(results)) {
+    const result = checks[group][name];
+    result.required = required;
+    if (result.ok) continue;
+    if (required) {
+      failed.push({ category: CATEGORY_LABEL[group], name, ...result });
+      continue;
+    }
+    warnings.push({
+      category: CATEGORY_LABEL[group],
+      name,
+      required: false,
+      reason: NOT_REQUIRED_BY_PROJECT_CONFIG,
+    });
+  }
+}
+
+const status = failed.length === 0 ? "ok" : "failed";
 
 const report = {
-  status: failed.length === 0 ? "ok" : "failed",
+  schemaVersion: PREFLIGHT_SCHEMA_VERSION,
+  status,
   generatedAt: new Date().toISOString(),
+  projectConfig: projectConfigState.block,
   checks,
-  failed,
+  autoRemediation,
   warnings,
+  failed,
   remediation: failed.length === 0 ? null : failed.map(remediationFor),
 };
 
 console.log(JSON.stringify(report, null, 2));
-process.exit(report.status === "ok" ? 0 : 1);
-
-function collectFailures(group, target) {
-  for (const [category, values] of Object.entries(group)) {
-    for (const [name, result] of Object.entries(values)) {
-      if (!result.ok) target.push({ category, name, ...result });
-    }
-  }
-}
+process.exit(status === "ok" ? 0 : 1);
 
 function remediationFor(f) {
   const key = `${f.category}:${f.name}`;
   switch (key) {
+    case "config:project-config":
+      return {
+        target: ".executor/project-config.md",
+        steps: [
+          "The Project_Config file exists but is invalid. Fix it manually or regenerate it:",
+          "  node \"${CLAUDE_SKILL_DIR}/scripts/project-config.mjs\" write --backend-executor <codex|agy|claude-code> " +
+            "--frontend-executor <v> --backend-reviewer <v> --frontend-reviewer <v>",
+          "The file is never overwritten automatically - fix or regenerate it explicitly.",
+        ],
+        docs: null,
+      };
     case "cli:codex":
       return {
         target: "codex-cli",
@@ -380,6 +690,9 @@ function remediationFor(f) {
           "Authenticate:",
           "  codex login",
           "Make sure the codex binary is on the global PATH.",
+          "Or set backendExecutor/backendReviewer to claude-code in .executor/project-config.md " +
+            "to drop this requirement:",
+          "  node \"${CLAUDE_SKILL_DIR}/scripts/project-config.mjs\" write --backend-executor claude-code ...",
         ],
         docs: "https://github.com/openai/codex",
       };
@@ -392,10 +705,13 @@ function remediationFor(f) {
           "  Windows: irm https://antigravity.google/cli/install.ps1 | iex",
           "Authenticate once in an interactive terminal:",
           "  agy",
+          "Or set frontendExecutor/frontendReviewer to claude-code in .executor/project-config.md " +
+            "to drop this requirement:",
+          "  node \"${CLAUDE_SKILL_DIR}/scripts/project-config.mjs\" write --frontend-executor claude-code ...",
         ],
         docs: "https://antigravity.google/docs/cli-using",
       };
-    case "plugins:openai-codex":
+    case "plugin:openai-codex":
       return {
         target: "Claude Code plugin: openai-codex",
         steps: [
@@ -405,7 +721,7 @@ function remediationFor(f) {
         ],
         docs: "https://github.com/openai/codex-plugin-cc",
       };
-    case "plugins:cc-antigravity-plugin":
+    case "plugin:cc-antigravity-plugin":
       return {
         target: "Claude Code plugin: cc-antigravity-plugin",
         steps: [
@@ -416,17 +732,26 @@ function remediationFor(f) {
         ],
         docs: "https://github.com/AllanHarlen/cc-antigravity-plugin",
       };
-    case "permissions:codex-companion-bash":
+    case "permission:codex-companion-bash":
       return {
         target: "Claude Code permission: codex-companion via Bash",
         steps: [
+          "Auto-remediation attempted and failed - see autoRemediation.error in this report.",
           "Create or update .claude/settings.json in the target project:",
           '  { "permissions": { "allow": ["Bash(node:*)"] } }',
           "Reload Claude Code before running /executor again.",
         ],
         docs: "https://docs.anthropic.com/en/docs/claude-code/settings",
       };
-    case "capabilities:agy-help":
+    case "permission:goal-hooks-enabled":
+      return {
+        target: "Claude Code /goal hook settings",
+        steps: [
+          "Ensure disableAllHooks and allowManagedHooksOnly are not set to true in the inspected settings files.",
+        ],
+        docs: null,
+      };
+    case "capability:agy-help":
       return {
         target: "agy CLI capability set",
         steps: [
@@ -436,7 +761,7 @@ function remediationFor(f) {
         ],
         docs: "https://antigravity.google/docs/cli-using",
       };
-    case "capabilities:cc-antigravity-bridge":
+    case "capability:cc-antigravity-bridge":
       return {
         target: "cc-antigravity-plugin bridge compatibility",
         steps: [

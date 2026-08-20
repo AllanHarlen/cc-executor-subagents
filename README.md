@@ -13,9 +13,35 @@ Focus has shifted from "architectural orchestrator with OpenSpec" to **practical
 - no fixed back-end/front-end pairs;
 - independent slices by ownership;
 - support for pre-defined plans, preserving baseline and comparing final delivery with Codex high;
-- Codex as main executor for backend, tests, and review;
-- Antigravity (AGY) mandatory for front-end/UI, images, and wide context;
+- Codex as the default backend/test/review executor, Antigravity (AGY) as the default front-end/image/wide-context executor — both configurable per project (see below);
 - lean verification and reporting.
+
+## Agent stack (Project_Config)
+
+The executor stack is not hardcoded. Four roles decide who implements and who reviews, each set to `codex`, `agy`, or `claude-code`:
+
+| Role | Decides | Default |
+|---|---|---|
+| `backendExecutor` | backend/test/refactor tasks | `codex` |
+| `frontendExecutor` | front-end/UI/image tasks | `agy` |
+| `backendReviewer` | backend review + plan-vs-delivery review | `codex` |
+| `frontendReviewer` | front-end review | `agy` |
+
+Setting a role to `claude-code` means that work is delegated to a Claude Code subagent directly, with no external CLI required. Configure with:
+
+```bash
+/executor project-config
+```
+
+or directly:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write \
+  --backend-executor claude-code --frontend-executor claude-code \
+  --backend-reviewer claude-code --frontend-reviewer claude-code
+```
+
+Preflight (`/executor preflight`) derives which CLIs/plugins are required from this configuration — with all four roles set to `claude-code`, no external CLI is required at all. See `skills/executor-subagents/references/project-config.md`.
 
 ## When to Use
 

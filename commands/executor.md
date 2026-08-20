@@ -29,6 +29,39 @@ Mostre:
 
 Depois encerre.
 
+## Modo project-config
+
+Se o primeiro argumento for `project-config`, este ramo substitui a execucao da demanda. Nao inicialize `artefatos_dir`, nao crie checkpoint nem delegue agentes.
+
+1. Mostre a configuracao vigente e a origem (`file` = `.executor/project-config.md`; `default` = `codex`/`agy`/`codex`/`agy`):
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" show --root "."
+   ```
+
+2. Se `show` retornar `ok: false` com erro do parser, apresente o erro nomeando campo, valor recebido, conjunto aceito e caminho, e ofereca por `AskUserQuestion` a regravacao do arquivo a partir de novas respostas. Nao sobrescreva o arquivo sem confirmacao explicita.
+
+3. Apresente as quatro perguntas de `AskUserQuestion` (`backendExecutor`, `frontendExecutor`, `frontendReviewer`, `backendReviewer`) com o texto, as descricoes de papel e a CLI exigida por opcao de `references/project-config.md`, marcando o **valor vigente** de cada papel como default.
+
+4. Grave as respostas. Papel sem resposta entra em `--default-applied`:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write --root "." \
+     --backend-executor "<codex|agy|claude-code>" \
+     --frontend-executor "<codex|agy|claude-code>" \
+     --backend-reviewer "<codex|agy|claude-code>" \
+     --frontend-reviewer "<codex|agy|claude-code>" \
+     --default-applied "<papel,papel>"
+   ```
+
+5. Rode o preflight uma vez, sempre, inclusive quando `changed` vier vazio:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
+   ```
+
+6. Se o preflight ainda reprovar uma CLI obrigatoria ou o plugin que a conecta, mostre a `remediation` e pergunte se o usuario quer corrigir a dependencia ou trocar o papel de novo. Depois disso encerre o comando; nenhuma execucao e iniciada.
+
 ## Execucao normal
 
 1. Rode o preflight:
@@ -37,15 +70,15 @@ Depois encerre.
    node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
    ```
 
-2. Se `status: "failed"` e a falha envolver Codex, verifique o `$ARGUMENTS` antes de cancelar: se a demanda for claramente front-end puro (UI, componente, layout, imagem, asset visual) **e nao houver plano pre-definido**, prossiga sem Codex — Codex nao e necessario para implementar tasks `UI_FRONTEND` ou `IMAGE_ASSET`. Se houver plano pre-definido, Codex high e necessario para o review read-only plano-vs-entrega; mostre `remediation` e pergunte se o usuario quer corrigir Codex, continuar assumindo o risco sem esse review, ou cancelar. Para qualquer outra natureza de task, cancele e mostre `remediation`.
+   O preflight deriva a obrigatoriedade de `codex`/`agy` e seus plugins da Project_Config (`.executor/project-config.md`). Sem arquivo, usa o default `codex`/`agy`/`codex`/`agy`. Nao ha mais excecao ad-hoc por tipo de demanda: a obrigatoriedade vem inteira da configuracao.
 
-3. Se `status: "failed"` e somente AGY ou o `cc-antigravity-plugin` falharem, mostre `remediation` e pergunte ao usuario se quer:
+2. Se `status: "failed"`, mostre `remediation` e pergunte ao usuario se quer:
 
-   - corrigir AGY e tentar de novo;
-   - continuar so com Codex;
+   - corrigir a CLI/plugin ausente e tentar de novo;
+   - trocar o papel afetado para `claude-code` (`node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write --backend-executor claude-code ...` ou o papel equivalente), rodar o preflight de novo e deixar o Executor (Claude) assumir essas tasks diretamente;
    - cancelar.
 
-4. Carregue a skill:
+3. Carregue a skill:
 
    ```text
    Skill(skill="cc-executor-subagents:executor-subagents")
@@ -53,23 +86,23 @@ Depois encerre.
 
    Se a tool de Skill recusar por `disable-model-invocation: true`, leia `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/SKILL.md` e siga diretamente.
 
-5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/handoff.json`, siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
+4. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/handoff.json`, siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
 
-6. Decida:
+5. Decida:
 
    - executar direto;
    - usar 1 agente;
    - usar multiplos agentes independentes.
 
-7. Roteie por padrao:
+6. Roteie pelo papel efetivo na Project_Config (`frontendExecutor`/`backendExecutor`, default `agy`/`codex`), nao por uma regra fixa:
 
-   - front-end/UI: `cc-antigravity-plugin:antigravity-agent`;
-   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex): `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo); adicione `--subagent-model gemini-3.5-flash-medium` para subagentes mais baratos;
-   - imagem explicita: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
-   - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
-   - backend/testes/review: Codex.
+   - front-end/UI: `frontendExecutor` (default `cc-antigravity-plugin:antigravity-agent`; `claude-code` delega a um subagente Task do proprio Claude);
+   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex), quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --parallel` (fan-out nativo); adicione `--subagent-model gemini-3.5-flash-medium` para subagentes mais baratos;
+   - imagem explicita, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --generate-imagem`;
+   - analise pura, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --read-only`;
+   - backend/testes/review: `backendExecutor`/`backendReviewer` (default Codex; `claude-code` delega a um subagente Task do proprio Claude).
 
-8. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
+7. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
 
    ```text
    {artefatos_dir}/initial-plan-baseline.md (somente se houver plano pre-definido)
@@ -80,13 +113,13 @@ Depois encerre.
 
    Mantenha `{artefatos_dir}/monitoring.md` atualizado durante as Fases 4-8: status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase. **Nunca crie artefatos .md na raiz do projeto.**
 
-9. Delegue em paralelo por ownership, nao por dupla fixa.
+8. Delegue em paralelo por ownership, nao por dupla fixa.
 
-10. Integre e rode verificacoes.
+9. Integre e rode verificacoes.
 
-11. Se `plano_predefinido: true`, execute a **Fase 6.5 - Review plano vs entrega**: use Codex high read-only para comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e os arquivos gerados. Salve o parecer em `{artefatos_dir}/plan-vs-output-review.md`; se houver desalinhamento, corrija ou registre o bloqueio antes de fechar.
+10. Se `plano_predefinido: true`, execute a **Fase 6.5 - Review plano vs entrega**: use Codex high read-only para comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e os arquivos gerados. Salve o parecer em `{artefatos_dir}/plan-vs-output-review.md`; se houver desalinhamento, corrija ou registre o bloqueio antes de fechar.
 
-12. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH, plano pre-definido ou rastreabilidade solicitada, gere em `{artefatos_dir}/`:
+11. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH, plano pre-definido ou rastreabilidade solicitada, gere em `{artefatos_dir}/`:
 
    ```text
    {artefatos_dir}/workflow-log.md

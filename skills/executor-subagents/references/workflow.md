@@ -1,6 +1,6 @@
 # Workflow Rapido
 
-Este documento expande o fluxo do `SKILL.md`. A regra e simples: use somente o detalhe necessario para entregar rapido.
+Este documento expande o fluxo do `SKILL.md`. A regra e simples: use somente o detalhe necessario para entregar rapido. A numeracao de fases e identica a do `SKILL.md` (0, 1, 2, 3, 4, 5, 6, 6.5, 7, 8, 9) — `Fase 8` (monitoramento) roda em paralelo das Fases 4-6.5, nao depois delas.
 
 ## Fase 0 - Preflight leve
 
@@ -10,10 +10,14 @@ Rode:
 node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
 ```
 
-Se `codex`, `agy`, o plugin `openai-codex` ou o `cc-antigravity-plugin` falharem, nao siga no piloto automatico:
+O preflight deriva quais CLIs sao obrigatorias da Project_Config (`.executor/project-config.md`, papeis `backendExecutor`/`frontendExecutor`/`backendReviewer`/`frontendReviewer`). Sem arquivo, usa o default `codex`/`agy`/`codex`/`agy`.
 
-- falha de Codex: cancele com remediacao para backend/testes/review; para UI/asset puro sem plano pre-definido, prossiga sem Codex; se houver plano pre-definido, remedeie Codex ou obtenha aceite explicito do usuario para seguir sem review plano-vs-entrega;
-- falha somente de AGY: pause e pergunte se o usuario quer remediar, continuar so com Codex, ou cancelar.
+Se um item **obrigatorio** falhar:
+
+- falha de Codex (quando `backendExecutor` ou `backendReviewer` aponta para `codex`): mostre a remediacao, que inclui a opcao de rodar `node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor claude-code ...` para o Executor (Claude) assumir essas tasks sem CLI externa;
+- falha de AGY (quando `frontendExecutor` ou `frontendReviewer` aponta para `agy`): mesma logica, com `--frontend-executor claude-code`/`--frontend-reviewer claude-code`.
+
+Pergunte ao usuario se ele quer remediar a CLI, trocar o papel para `claude-code`, ou cancelar. Nao ha mais excecao ad-hoc para tasks front-end puras: a obrigatoriedade vem inteira da Project_Config.
 
 Context7 e `/goal` continuam opcionais.
 
@@ -25,7 +29,7 @@ Extraia em poucos minutos:
 - arquivos/modulos provaveis;
 - se existe plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente);
 - risco (`LOW`, `MEDIUM`, `HIGH`);
-- tipo de trabalho;
+- tipo de trabalho (`BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`);
 - verificacoes obvias;
 - pergunta bloqueante, se houver.
 
@@ -88,16 +92,46 @@ Cada agente precisa receber:
 - instrucao para nao reverter trabalho alheio;
 - formato de retorno.
 
-Roteamento padrao:
+Roteamento padrao (o Executor deriva o agente do papel efetivo na Project_Config, nao de uma regra fixa por tipo de trabalho):
 
-- front-end/UI: AGY agentic;
-- imagem/asset explicito: AGY `--generate-imagem`;
-- analise pura: AGY `--read-only`;
-- backend, testes, integracao e review: Codex.
+- front-end/UI: `frontendExecutor` (default AGY agentic);
+- imagem/asset explicito: `frontendExecutor` com `--generate-imagem` quando for AGY;
+- analise pura: AGY `--read-only` quando `frontendExecutor` for AGY;
+- backend, testes, integracao e review: `backendExecutor`/`backendReviewer` (default Codex).
 
-## Fase 5 - Monitoramento leve
+## Fase 5 - Integracao
 
-Nao faca polling continuo. Registre status em `{artefatos_dir}/monitoring.md` somente para execucoes com 2+ agentes ou sessoes longas.
+Ao receber retornos:
+
+1. Compare arquivos alterados com ownership.
+2. Leia diffs de areas compartilhadas.
+3. Rode verificacoes incrementais.
+4. Corrija glue pequeno diretamente se for seguro.
+5. Redelegue correcoes grandes ou arriscadas.
+
+Se houver falha de AGY em task obrigatoria, pause para alinhamento com o usuario antes de fallback para Codex.
+
+## Fase 6 - Verificacao
+
+Para risco baixo, teste local especifico e suficiente.
+
+Para risco medio, rode testes da area, typecheck/build quando aplicavel e revise os diffs principais.
+
+Para risco alto, peca review Codex high antes de fechar.
+
+Se uma verificacao falhar, tente corrigir no mesmo ciclo. Se nao der, feche como `BLOCKED` com causa e proximo comando.
+
+## Fase 6.5 - Review plano vs entrega
+
+Execute somente quando `plano_predefinido: true`. Peca review Codex high (ou o `backendReviewer` efetivo) read-only antes de fechar, mesmo em UI/front-end puro. O review deve comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e a entrega gerada, cobrindo requisitos, criterios de aceite, entregaveis, contratos, arquivos planejados/alterados e verificacoes planejadas/executadas. Salve em `{artefatos_dir}/plan-vs-output-review.md`. Se houver `DESALINHADO`, corrija ou bloqueie com evidencia.
+
+## Fase 7 - Fechamento interno
+
+Conclua integracao, verificacao e decisoes. Em tarefas pequenas (execucao direta ou 1 agente de baixo risco), responda no chat com: o que mudou, arquivos principais, verificacoes e proximo passo. Em seguida, prossiga para a Fase 9 (relatorio final) quando aplicavel.
+
+## Fase 8 - Monitoramento
+
+Roda em paralelo das Fases 4 a 6.5. Nao faca polling continuo. Registre status em `{artefatos_dir}/monitoring.md` somente para execucoes com 2+ agentes ou sessoes longas.
 
 Status sugeridos:
 
@@ -114,35 +148,9 @@ Status sugeridos:
 
 Normalize `QUOTA_EXAUSTED` do bridge para `QUOTA_EXHAUSTED` no contexto do executor.
 
-## Fase 6 - Integracao
+## Fase 9 - Relatorio final
 
-Ao receber retornos:
-
-1. Compare arquivos alterados com ownership.
-2. Leia diffs de areas compartilhadas.
-3. Rode verificacoes incrementais.
-4. Corrija glue pequeno diretamente se for seguro.
-5. Redelegue correcoes grandes ou arriscadas.
-
-Se houver falha de AGY em task obrigatoria, pause para alinhamento com o usuario antes de fallback para Codex.
-
-## Fase 7 - Review e verificacao
-
-Para risco baixo, teste local especifico e suficiente.
-
-Para risco medio, rode testes da area, typecheck/build quando aplicavel e revise os diffs principais.
-
-Para risco alto, peca review Codex high antes de fechar.
-
-Para plano pre-definido, sempre peca review Codex high read-only antes de fechar, mesmo em UI/front-end puro. O review deve comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e a entrega gerada, cobrindo requisitos, criterios de aceite, entregaveis, contratos, arquivos planejados/alterados e verificacoes planejadas/executadas. Salve em `{artefatos_dir}/plan-vs-output-review.md`. Se houver `DESALINHADO`, corrija ou bloqueie com evidencia.
-
-Se uma verificacao falhar, tente corrigir no mesmo ciclo. Se nao der, feche como `BLOCKED` com causa e proximo comando.
-
-## Fase 8 - Fechamento
-
-Em tarefas pequenas, responda no chat.
-
-Em tarefas com varios agentes, crie:
+Em tarefas com varios agentes, risco MEDIUM/HIGH, plano pre-definido, ou rastreabilidade solicitada, crie:
 
 ```text
 {artefatos_dir}/workflow-log.md

@@ -58,25 +58,19 @@ Execute:
 node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
 ```
 
-O preflight valida apenas o que e necessario para execucao rapida:
+O preflight deriva quais itens sao obrigatorios da **Project_Config** (`.executor/project-config.md`, papeis `backendExecutor`, `frontendExecutor`, `backendReviewer`, `frontendReviewer` — cada um `codex`, `agy` ou `claude-code`). Sem arquivo, usa o default `codex`/`agy`/`codex`/`agy`. Isso substitui a antiga excecao ad-hoc de "front-end puro pode seguir sem Codex": a obrigatoriedade agora vem inteira da configuracao, nao de uma pre-triagem do enunciado da tarefa.
 
-| Item | Obrigatorio | Uso |
-|---|---:|---|
-| `codex` CLI | Sim | agentes Codex para backend, testes, review e recuperacao |
-| `agy` CLI | Sim | agentes AGY para front-end, imagem e contexto largo |
-| plugin `openai-codex` | Sim | subagente `codex:codex-rescue` |
-| plugin `cc-antigravity-plugin` `>= 3.6.0` | Sim | subagente `cc-antigravity-plugin:antigravity-agent` (inclui `--parallel` e `--subagent-model` para fan-out nativo) |
-| permissao Bash do Codex companion | Sim | evita bloqueio de aprovacao em background |
-| `/goal` hooks | Opcional | autonomia entre turnos |
-| Context7 MCP | Opcional | docs atuais para libs/frameworks/APIs |
+| Item | Obrigatorio quando | Uso |
+|---|---|---|
+| `codex` CLI + plugin `openai-codex` | `backendExecutor` ou `backendReviewer` = `codex` | subagente `codex:codex-rescue` para backend, testes, review e recuperacao |
+| `agy` CLI + plugin `cc-antigravity-plugin` `>= 3.6.0` | `frontendExecutor` ou `frontendReviewer` = `agy` | subagente `cc-antigravity-plugin:antigravity-agent` (inclui `--parallel` e `--subagent-model` para fan-out nativo) |
+| permissao Bash do Codex companion | sempre | evita bloqueio de aprovacao em background — auto-remediado quando possivel |
+| `/goal` hooks | opcional | autonomia entre turnos |
+| Context7 MCP | opcional | docs atuais para libs/frameworks/APIs |
 
-Se Codex falhar, verifique o tipo da demanda antes de cancelar: faca uma pre-triagem rapida (leia o enunciado da tarefa) para checar se e puramente `UI_FRONTEND` ou `IMAGE_ASSET` e se ha plano pre-definido. Se for front-end puro sem plano pre-definido, prossiga sem Codex e registre `codex_excluido: true` no checkpoint — Codex nao e necessario para implementacao de tasks puramente front-end. Se houver plano pre-definido, Codex continua necessario para o review read-only da Fase 6.5. Se nao for front-end puro, cancele com a remediacao do JSON.
+Se um item **obrigatorio** falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir a CLI/plugin ausente, (b) trocar o papel afetado para `claude-code` via `node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor claude-code ...` (ou `--frontend-executor`/`--backend-reviewer`/`--frontend-reviewer`) para o Executor (Claude) assumir essas tasks diretamente, ou (c) cancelar. Depois de trocar o papel, rode o preflight de novo.
 
-Se a demanda tiver plano pre-definido, Codex high e necessario para o review plano-vs-entrega, mesmo quando a implementacao for puramente front-end/UI ou imagem. Se Codex falhar nesse caso, mostre a remediacao e pergunte se o usuario quer corrigir Codex, continuar assumindo o risco sem esse review comparativo, ou cancelar.
-
-Se somente AGY falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir AGY, (b) continuar so com Codex, (c) deixar o executor (Claude) assumir as tasks de front-end/UI diretamente, ou (d) cancelar.
-
-Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp_inicio`.
+Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0` e `timestamp_inicio`.
 
 **Determinar `artefatos_dir` (obrigatorio antes da Fase 2):**
 
@@ -96,9 +90,7 @@ Antes de delegar, levante somente o que muda a execucao:
 - objetivo final em uma frase;
 - arquivos/modulos provaveis;
 - tipo de trabalho: `BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`;
-- se `tipo_trabalho` for `UI_FRONTEND` ou `IMAGE_ASSET`, marque `codex_excluido: true` — Codex nao participa do fluxo para tasks puramente front-end;
 - se a demanda trouxer plano pre-definido (texto estruturado, arquivo citado, artefato existente, checkpoint, ou termos como "siga este plano", "plano aprovado", "plano ja definido"), marque `plano_predefinido: true`;
-- se `plano_predefinido: true`, Codex fica excluido da implementacao de UI/asset, mas nao do review read-only de plano-vs-entrega;
 - risco: `LOW`, `MEDIUM`, `HIGH`;
 - comandos de verificacao obvios;
 - perguntas bloqueantes, se existirem.
@@ -404,9 +396,11 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
 | `references/handoff-contract.md` | modo conjunto: ingerir o handoff do Orchestrador/Pensador e emitir o proprio |
 | `references/preflight-check.md` | entender/remediar preflight |
+| `references/project-config.md` | as 4 perguntas de stack, protocolo do Dependency_Installer, roteamento derivado |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
 | `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |
 | `assets/subagents-context-template.md` | gerar `{artefatos_dir}/subagents-context.md` (Fase 9) |
 | `assets/implementation-report-template.md` | gerar `{artefatos_dir}/implementation-report.md` (Fase 9) |
-| `scripts/preflight.mjs` | validar ambiente minimo |
+| `scripts/preflight.mjs` | validar ambiente minimo (obrigatoriedade derivada da Project_Config) |
+| `scripts/project-config.mjs` | ler/gravar `.executor/project-config.md` |

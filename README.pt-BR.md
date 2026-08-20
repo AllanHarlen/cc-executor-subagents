@@ -9,9 +9,35 @@ O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor prátic
 - sem duplas fixas back-end/front-end;
 - com slices independentes por ownership;
 - com suporte a plano pré-definido, preservando baseline e comparando entrega final com Codex high;
-- com Codex como executor principal de backend, testes e review;
-- com Antigravity (AGY) obrigatório para front-end/UI, imagem e contexto largo;
+- com Codex como executor padrão de backend/testes/review e Antigravity (AGY) como executor padrão de front-end/imagem/contexto largo — ambos configuráveis por projeto (ver abaixo);
 - com verificação e reporte enxutos.
+
+## Stack de agentes (Project_Config)
+
+A stack do executor não é fixa. Quatro papéis decidem quem implementa e quem revisa, cada um configurado como `codex`, `agy` ou `claude-code`:
+
+| Papel | Decide | Default |
+|---|---|---|
+| `backendExecutor` | tasks de backend/teste/refactor | `codex` |
+| `frontendExecutor` | tasks de front-end/UI/imagem | `agy` |
+| `backendReviewer` | review de backend + review plano-vs-entrega | `codex` |
+| `frontendReviewer` | review de front-end | `agy` |
+
+Configurar um papel como `claude-code` significa que aquele trabalho vai para um subagente do próprio Claude Code, sem exigir CLI externa. Configure com:
+
+```bash
+/executor project-config
+```
+
+ou diretamente:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write \
+  --backend-executor claude-code --frontend-executor claude-code \
+  --backend-reviewer claude-code --frontend-reviewer claude-code
+```
+
+O preflight (`/executor preflight`) deriva quais CLIs/plugins são obrigatórios dessa configuração — com os quatro papéis em `claude-code`, nenhuma CLI externa é exigida. Ver `skills/executor-subagents/references/project-config.md`.
 
 ## Quando usar
 
