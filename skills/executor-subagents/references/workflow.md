@@ -39,7 +39,7 @@ Se houver plano pre-definido, preserve o conteudo original em `{artefatos_dir}/i
 
 **Gates por risco:** depois de fixar `risco`, rode `node "${CLAUDE_SKILL_DIR}/scripts/executor-gates.mjs" plan --risk <risco> ...` (ver `SKILL.md` Fase 1). A lista devolvida e o que roda nas Fases 6/6.5/6.6 — em `risco: LOW` sem plano pre-definido nem modo conjunto, vem vazia.
 
-**Modo conjunto (Orchestrador → Executor):** procure `.orchestration/<slug>/handoff.json` antes de tratar a demanda como avulsa. Se existir, o executor entra no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador: adote o handoff como plano pre-definido baseline, siga `upstream` ate o Pensador para rastreabilidade (`prd`/`api-contract`/`design-system-files`) e mantenha obrigatorio o review Codex high plano-vs-entrega. Ver `references/handoff-contract.md` (secao 7).
+**Modo conjunto (Orchestrador → Executor):** procure `.orchestration/<slug>/report/handoff.json` antes de tratar a demanda como avulsa (caia para `.orchestration/<slug>/handoff.json` na raiz apenas em runs anteriores ao layout v2 do Orchestrador, que ainda nao agrupava `handoff.json` sob `report/`). Se existir, o executor entra no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador: adote o handoff como plano pre-definido baseline, siga `upstream` ate o Pensador para rastreabilidade (`prd`/`api-contract`/`design-system-files`) e mantenha obrigatorio o review Codex high plano-vs-entrega. Ver `references/handoff-contract.md` (secao 7).
 
 ## Fase 2 - Plano curto
 
@@ -173,7 +173,7 @@ Em tarefas com varios agentes, risco MEDIUM/HIGH, plano pre-definido, ou rastrea
 
 Em tarefas com plano pre-definido, crie tambem `{artefatos_dir}/plan-vs-output-review.md` e referencie `{artefatos_dir}/initial-plan-baseline.md` nos tres relatorios finais.
 
-**Modo conjunto:** quando a execucao veio de `.orchestration/<slug>/handoff.json`, grave tambem `{artefatos_dir}/handoff.json` (`stage: executor`, `upstream` apontando o handoff do Orchestrador) conforme `references/handoff-contract.md`, com os roles do estagio Executor (`plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots` quando houver). E o estagio terminal: `nextStage` pode ser `null`.
+**Modo conjunto:** quando a execucao veio de `.orchestration/<slug>/report/handoff.json` (ou de `.orchestration/<slug>/handoff.json` na raiz, em runs no layout anterior ao v2), grave tambem `{artefatos_dir}/handoff.json` (`stage: executor`, `upstream` apontando o handoff do Orchestrador) conforme `references/handoff-contract.md`, com os roles do estagio Executor (`plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots` quando houver). E o estagio terminal: `nextStage` pode ser `null`.
 
 O fechamento deve ser curto:
 

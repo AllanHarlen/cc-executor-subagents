@@ -73,9 +73,16 @@ function overlap(left, right) {
   }));
 }
 
+// Only the Executor's own coordination artifacts are exempt from scope checks — a run
+// necessarily writes its own workflow-log.md/state.json/etc. under `.executor/`, and that
+// bookkeeping isn't a product-code violation of the declared ownership. `.orchestration/`
+// (the Orchestrador's own coordination tree) is deliberately NOT exempt: the handoff
+// contract's rule that "o consumidor nunca edita artefatos do produtor" makes any write
+// there a real scope violation, not bookkeeping — see references/handoff-contract.md
+// section 8.
 function ignoredPrefix(path) {
   const normalized = path.replaceAll("\\", "/");
-  return normalized.startsWith(".executor/") || normalized.startsWith(".orchestration/");
+  return normalized.startsWith(".executor/");
 }
 
 function main(argv) {

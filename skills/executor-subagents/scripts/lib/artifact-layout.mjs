@@ -9,17 +9,28 @@ import { join, resolve } from "node:path";
  * nas Fases 1.1/1.2 do port ficaram em layout 1 (tudo na raiz) — elas
  * continuam legiveis, sem migracao automatica (ver `detectArtifactLayout`).
  *
- * `state.json`, `events.jsonl`, `.state.lock`, `handoff.json` e
- * `initial-plan-baseline.md` permanecem **sempre** na raiz, nos dois layouts:
- * `state.json`/`events.jsonl`/`.state.lock` porque a descoberta de run
- * (`findRunDirectory`, `resume`) depende disso; `handoff.json` e
- * `initial-plan-baseline.md` porque `references/handoff-contract.md` — documento
- * byte-identico nos tres plugins (`cc-pensador`, `cc-orchestrador-subagents`,
- * `cc-executor-subagents`) — nomeia esses dois caminhos literalmente como
- * relativos a raiz da pasta de artefatos (secoes 4 e 7). Mover qualquer um dos
- * dois para uma subpasta e exatamente a divergencia que ja quebrou a copia do
- * `cc-orchestrador-subagents` (ele moveu para `report/handoff.json`) — nao
- * repita esse erro aqui.
+ * `state.json`, `events.jsonl`, `.state.lock` e `initial-plan-baseline.md`
+ * permanecem **sempre** na raiz, nos dois layouts: `state.json`/`events.jsonl`/
+ * `.state.lock` porque a descoberta de run (`findRunDirectory`, `resume`)
+ * depende disso; `initial-plan-baseline.md` porque `references/handoff-contract.md`
+ * nomeia esse caminho literalmente como relativo a raiz da pasta de artefatos
+ * (secao 7).
+ *
+ * O Executor's PROPRIO `handoff.json` (o que ele grava ao final, sem nenhum
+ * consumidor a jusante — o Executor e o ultimo estagio) tambem fica na raiz,
+ * por simplicidade e por nao ter motivo para seguir o agrupamento por
+ * subpasta. Isso e diferente do `handoff.json` do Orchestrador, que fica em
+ * `report/handoff.json` (LAYOUT_V2_FILE_DIRECTORIES em
+ * `cc-orchestrador-subagents/.../lib/artifact-layout.mjs`) por design: o
+ * Orchestrador agrupa todo artefato de categoria "report"
+ * (implementation-report.md, workflow-log.md, subagents-context.md,
+ * handoff.json) sob `report/`. Ao **ler** o handoff do Orchestrador (secao 7
+ * do contrato, modo conjunto), procure primeiro
+ * `.orchestration/<slug>/report/handoff.json` e caia para
+ * `.orchestration/<slug>/handoff.json` apenas em runs anteriores ao layout v2
+ * do Orchestrador (sem `report/`). Nao confunda os dois: cada lado grava o
+ * proprio handoff onde seu proprio layout manda; o Executor so precisa
+ * acertar onde *ler* o do Orchestrador.
  *
  * Leitura sempre tenta layout 2 e cai para layout 1, para que uma run antiga
  * continue legivel. Escrita usa o layout declarado em `state.layoutVersion` e
