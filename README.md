@@ -308,4 +308,4 @@ cc-executor-subagents/
 - **Front-end with AGY.** UI and visual assets go through `cc-antigravity-plugin`.
 - **Explicit fallback.** AGY failure is not a silent fallback; the executor asks the user for a decision.
 - **Proportional verification.** Test enough for the risk of the change.
-- **No OpenSpec.** This plugin does not depend on OpenSpec.
+- **No OpenSpec.** This plugin does not depend on OpenSpec and never invokes `/opsx:*`/`openspec-*`. It can still consume an `openspec-change` handoff artifact from the Orchestrator as a read-only baseline (see `references/handoff-contract.md`).

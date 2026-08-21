@@ -22,7 +22,7 @@ Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce
 - **Executor pode integrar.** O executor principal pode fazer pequenos ajustes de integracao, documentacao e glue code quando for mais rapido e seguro do que redelegar.
 - **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 4.0.0+ via `antigravity-coder` (implementacao). `antigravity-agent` e somente leitura e nunca implementa. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
 - **Context7 quando houver docs de libs.** Se a task envolver biblioteca, framework, SDK, API, CLI ou cloud service, use Context7 quando disponivel.
-- **Sem OpenSpec.** Nao crie `openspec/`, nao chame `/openspec-*`, nao bloqueie por ausencia de OpenSpec.
+- **Nao aciona OpenSpec.** O Executor nao cria `openspec/`, nao chama `/opsx:*`/`openspec-*` e nao bloqueia por ausencia do CLI OpenSpec. Ele pode, no entanto, **consumir** um handoff do Orchestrador que traga um artefato de role `openspec-change` (`openspec/changes/<nome>/`, ver `references/handoff-contract.md`) como baseline somente-leitura — nunca escreve nem move nada dentro de `openspec/`.
 - **Sem teatralidade.** Updates curtos, decisao rapida, evidencia final.
 
 ## Modo /goal autonomo
@@ -363,7 +363,7 @@ O executor (Claude) assume a task diretamente quando todos os degraus acima falh
 Todo subagente (Codex ou Antigravity) deve, como **primeiro passo antes de implementar qualquer coisa**:
 
 1. **Listar as skills disponiveis** no ambiente se essa capacidade existir (ex: `/skills` ou equivalente). Se o ambiente nao expuser um inventario de skills, registre `skills nao acessiveis`.
-2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` - essas sao exclusivas do orquestrador.
+2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` - essas pertencem ao fluxo do Pensador (modo Spec) e nao devem ser acionadas pelo subagente do Executor.
 3. **Identificar e usar as compativeis:** das skills restantes, usar as que se aplicam a task em execucao durante a implementacao.
 4. **Reportar no retorno:** no campo obrigatorio `Skills utilizadas`, listar quais foram usadas (ou "nenhuma").
 

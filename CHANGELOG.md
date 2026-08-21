@@ -2,6 +2,21 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.2.0] - Correcao da postura sobre OpenSpec
+
+O SKILL mandava os subagentes ignorarem toda skill `openspec`/`opsx`, ao mesmo tempo em que o
+proprio plugin publicava a tabela de ingestao do artefato de handoff `openspec-change` — uma
+contradicao. Reformulado para: o Executor **nao aciona** OpenSpec (nao cria `openspec/`, nao chama
+`/opsx:*`/`openspec-*`, nao bloqueia por ausencia do CLI), mas **pode consumir** um handoff do
+Orchestrador com role `openspec-change` como baseline somente-leitura.
+
+- `skills/executor-subagents/SKILL.md`, `README.md`, `README.pt-BR.md`: texto ajustado (ver acima).
+- `references/handoff-contract.md`: papel `openspec-change` atualizado (specs opcionais/aninhadas,
+  mudanca gerida por `/opsx:propose`). Sincronizado byte-a-byte com a copia canonica em
+  `cc-pensador`.
+- `.claude/settings.json`: removida a entrada `Bash(openspec publish:*)` (comando inexistente; este
+  plugin nao chama o CLI OpenSpec).
+
 ## [2.1.0] - Alinhamento com o cc-antigravity-plugin 4.0
 
 Atualiza o Executor para o contrato do `cc-antigravity-plugin` 4.0.0 (AGY 1.1.8+, `1.1.16`
