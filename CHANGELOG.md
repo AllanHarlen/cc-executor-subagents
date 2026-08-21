@@ -17,6 +17,21 @@ Orchestrador com role `openspec-change` como baseline somente-leitura.
 - `.claude/settings.json`: removida a entrada `Bash(openspec publish:*)` (comando inexistente; este
   plugin nao chama o CLI OpenSpec).
 
+### Teste de reconciliacao deixou de depender da arvore de trabalho do proprio repo
+
+`tests/executor-state.test.mjs` — "reconcile without an authoritative probe keeps an UNKNOWN task
+UNKNOWN" chamava `initRun({ slug, artifactDir })` sem `projectRoot`. Com isso
+`resolveProjectRoot` caia no fallback `process.cwd()`, que e o **repositorio do plugin**, nao o
+fixture: `pathEvidence` procurava `src/output.txt` na raiz errada (`exists: false`) e `inspectGit`
+inspecionava o repo errado.
+
+O teste so passava quando a arvore de trabalho do plugin estava suja — ai `changedFiles` vinha
+nao-vazio e satisfazia o mesmo ramo `VERIFY_BEFORE_REEXECUTE` **pelo motivo errado**. Com o repo
+limpo, falhava. Agora passa `projectRoot: root`, alinhado com a convencao que
+`tests/completion-gates.test.mjs` ja usava, e a assercao passa a se sustentar na evidencia do
+proprio fixture. O teste vizinho que faz `process.chdir(root)` de proposito (para exercitar a
+recuperacao por `artifactRoot` com `artifactDir` de 2 niveis) foi preservado como esta.
+
 ## [2.1.0] - Alinhamento com o cc-antigravity-plugin 4.0
 
 Atualiza o Executor para o contrato do `cc-antigravity-plugin` 4.0.0 (AGY 1.1.8+, `1.1.16`

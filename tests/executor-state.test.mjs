@@ -124,7 +124,14 @@ test("resume converts an interrupted RUNNING task to UNKNOWN, never FAILED or DO
 
 test("reconcile without an authoritative probe keeps an UNKNOWN task UNKNOWN, using Git/file evidence only as corroboration", () => {
   const { root, artifactDir, slug } = fixture();
-  initRun({ slug, artifactDir });
+  // `projectRoot` e obrigatorio aqui: este e o unico teste do arquivo cuja
+  // assercao depende de evidencia local (arquivo esperado + commit Git). Sem ele,
+  // `resolveProjectRoot` cai no fallback `process.cwd()` — o proprio repositorio
+  // do plugin, nao o fixture — e entao `pathEvidence` procura `src/output.txt` na
+  // raiz errada (exists: false) e `inspectGit` inspeciona o repo errado. O teste
+  // passava somente quando a arvore de trabalho do plugin estava suja, porque ai
+  // `changedFiles` vinha nao-vazio e satisfazia o mesmo ramo pelo motivo errado.
+  initRun({ slug, artifactDir, projectRoot: root });
   registerTask(artifactDir, "codex-1", { expectedFiles: ["src/output.txt"] });
   updateTaskStatus(artifactDir, "codex-1", "RUNNING", { executor: "codex" });
   resumeRunAtDirectory(artifactDir); // RUNNING -> UNKNOWN
