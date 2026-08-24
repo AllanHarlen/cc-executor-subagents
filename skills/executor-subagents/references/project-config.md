@@ -100,7 +100,9 @@ Required_CLI_Set: `codex` e obrigatoria se e somente se ao menos um dos quatro p
 
 ## Protocolo do Dependency_Installer
 
-Depois que a Project_Config esta resolvida e o preflight rodou com ela, monte a lista de dependencias ausentes: Context7_MCP ausente e, para cada CLI do Required_CLI_Set, a CLI (quando `checks.cli.*` reprova) seguida do plugin do Claude Code que a conecta (quando `checks.plugins.*` reprova). MCP primeiro, depois CLI+plugin por CLI, na ordem `codex` antes de `agy`.
+Depois que a Project_Config esta resolvida e o preflight rodou com ela, monte a lista de dependencias ausentes: os MCPs opcionais ausentes (Context7_MCP, depois Codebase_Memory_MCP — `MCP_CHECK_KEYS` do catalogo) e, para cada CLI do Required_CLI_Set, a CLI (quando `checks.cli.*` reprova) seguida do plugin do Claude Code que a conecta (quando `checks.plugins.*` reprova). MCPs primeiro, depois CLI+plugin por CLI, na ordem `codex` antes de `agy`.
+
+Este passo roda sempre, na Fase 0, mesmo quando o preflight nao reprova nenhum item **obrigatorio** — MCP ausente nunca aparece em `failed`, so em `warnings`, e sem esta etapa o Executor nunca ofereceria a instalacao. Ver `references/workflow.md` Fase 0.
 
 **A CLI sozinha nao basta.** `codex` e `agy` sao processos externos; e o plugin do Claude Code — `openai-codex` para `codex`, `cc-antigravity-plugin` para `agy` — que registra os agentes e comandos pelos quais o Executor invoca aquele processo. As duas reprovacoes sao **independentes**: um ambiente pode ter a CLI instalada e autenticada com o plugin ainda ausente (ou vice-versa), e o plano so oferece o que de fato esta faltando — nunca assume que aprovar uma implica a outra.
 
@@ -111,6 +113,7 @@ Cada pergunta informa quatro coisas: nome da dependencia, beneficio, impacto de 
 | Dependencia | Beneficio | Impacto de seguir sem | Comando |
 |---|---|---|---|
 | `context7` (opcional) | documentacao atual e versionada da biblioteca injetada no contexto antes de escrever codigo que a usa | o subagente segue apenas os padroes do projeto e a memoria do modelo, com risco de API obsoleta | `npx ctx7 setup --claude` (alternativa: registrar manualmente a URL `https://mcp.context7.com/mcp`) |
+| `codebase-memory` (opcional) | grafo de codigo para localizar simbolos (Fase 1) e mapear o raio de impacto do diff (Fase 5) mais barato em tokens que varrer arquivos | Fase 1 usa Read/Glob/Grep e Fase 5 usa `inspect-diff.mjs`/`rg` — mais lento em bases de codigo grandes | instalador oficial do Codebase Memory para o SO detectado |
 | CLI `codex` (obrigatoria quando algum papel e `codex`) | executor/revisor dos papeis configurados como `codex` | as tasks desses papeis ficam sem executor | `npm install -g @openai/codex` |
 | plugin `openai-codex` (obrigatoria junto com a CLI `codex`) | da ao Claude Code os agentes/comandos para invocar o Codex | a CLI `codex` instalada nao basta: o Claude Code nao consegue delegar as tasks desses papeis | `/plugin marketplace add openai/codex-plugin-cc` seguido de `/plugin install codex@openai-codex` |
 | CLI `agy` (obrigatoria quando algum papel e `agy`) | executor/revisor dos papeis configurados como `agy` | as tasks desses papeis ficam sem executor | instalador oficial do Antigravity para o SO detectado |

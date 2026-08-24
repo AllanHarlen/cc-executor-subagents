@@ -14,12 +14,12 @@ import {
 
 const SEEDED_SECRET = "sk-token-que-nunca-deve-ser-registrado";
 
-test("the executor's catalog drops codebase-memory (not used in this port phase)", () => {
-  assert.deepEqual([...MCP_CHECK_KEYS], ["context7"]);
-  assert.throws(
-    () => buildDependencyPlanItem("codebase-memory"),
-    (error) => error instanceof DependencyPlanError && error.code === "DEPENDENCY_PLAN_UNKNOWN_DEPENDENCY",
-  );
+test("the executor's catalog offers both optional MCPs, context7 before codebase-memory", () => {
+  assert.deepEqual([...MCP_CHECK_KEYS], ["context7", "codebase-memory"]);
+  const item = buildDependencyPlanItem("codebase-memory", { platform: "linux" });
+  assert.equal(item.kind, "mcp");
+  assert.equal(item.optional, true);
+  assert.match(item.command[0], /install\.sh/);
 });
 
 test("codex installs via npm and delegates `codex login` to the user on any OS", () => {
@@ -53,29 +53,61 @@ test("buildMissingDependencies derives from a preflight-shaped report: CLI and i
     checks: {
       cli: { codex: { ok: false }, agy: { ok: true } },
       plugins: { "openai-codex": { ok: true }, "cc-antigravity-plugin": { ok: false } },
-      optional: { mcp: { context7: { ok: true } } },
+      optional: { mcp: { context7: { ok: true }, "codebase-memory": { ok: true } } },
     },
   };
   const plan = buildMissingDependencies(report, { platform: "linux" });
   const keys = plan.map((item) => item.checkKey);
   // codex CLI failed (its plugin passed) and cc-antigravity-plugin failed (its
-  // CLI passed) -- both surface, proving the two checks are independent.
+  // CLI passed) -- both surface, proving the two checks are independent. Both
+  // optional MCPs are `ok: true` here so neither dilutes this assertion.
   assert.deepEqual(keys, ["codex", "cc-antigravity-plugin"]);
 });
 
 test("buildMissingDependencies lists context7 first when it fails, before any CLI/plugin", () => {
   const report = {
     projectConfig: { roles: { backendExecutor: "claude-code", frontendExecutor: "claude-code", backendReviewer: "claude-code", frontendReviewer: "claude-code" } },
-    checks: { cli: {}, plugins: {}, optional: { mcp: { context7: { ok: false } } } },
+    checks: { cli: {}, plugins: {}, optional: { mcp: { context7: { ok: false }, "codebase-memory": { ok: true } } } },
   };
   const plan = buildMissingDependencies(report, { platform: "linux" });
   assert.deepEqual(plan.map((item) => item.checkKey), ["context7"]);
 });
 
+test("buildMissingDependencies lists both optional MCPs, context7 before codebase-memory, ahead of any CLI/plugin", () => {
+  const report = {
+    projectConfig: {
+      roles: { backendExecutor: "codex", frontendExecutor: "claude-code", backendReviewer: "claude-code", frontendReviewer: "claude-code" },
+    },
+    checks: {
+      cli: { codex: { ok: false } },
+      plugins: { "openai-codex": { ok: false } },
+      optional: { mcp: { context7: { ok: false }, "codebase-memory": { ok: false } } },
+    },
+  };
+  const plan = buildMissingDependencies(report, { platform: "linux" });
+  assert.deepEqual(
+    plan.map((item) => item.checkKey),
+    ["context7", "codebase-memory", "codex", "openai-codex"],
+  );
+});
+
+test("a missing MCP check in the report counts as absent, same as ok: false", () => {
+  const report = {
+    projectConfig: { roles: { backendExecutor: "claude-code", frontendExecutor: "claude-code", backendReviewer: "claude-code", frontendReviewer: "claude-code" } },
+    checks: { cli: {}, plugins: {}, optional: { mcp: { context7: { ok: true } } } }, // codebase-memory absent
+  };
+  const plan = buildMissingDependencies(report, { platform: "linux" });
+  assert.deepEqual(plan.map((item) => item.checkKey), ["codebase-memory"]);
+});
+
 test("all-claude-code Project_Config produces an empty plan even with no CLI on PATH", () => {
   const report = {
     projectConfig: { roles: { backendExecutor: "claude-code", frontendExecutor: "claude-code", backendReviewer: "claude-code", frontendReviewer: "claude-code" } },
-    checks: { cli: { codex: { ok: false }, agy: { ok: false } }, plugins: {}, optional: { mcp: { context7: { ok: true } } } },
+    checks: {
+      cli: { codex: { ok: false }, agy: { ok: false } },
+      plugins: {},
+      optional: { mcp: { context7: { ok: true }, "codebase-memory": { ok: true } } },
+    },
   };
   const plan = buildMissingDependencies(report, { platform: "linux" });
   assert.deepEqual(plan, []);

@@ -96,7 +96,9 @@ Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhas
    - trocar o papel afetado para `claude-code` (`node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write --backend-executor claude-code ...` ou o papel equivalente), rodar o preflight de novo e deixar o Executor (Claude) assumir essas tasks diretamente;
    - cancelar.
 
-3. Carregue a skill:
+3. Verifique `checks.optional.mcp.context7.ok` e `checks.optional.mcp["codebase-memory"].ok`. Para cada um `false`, acione o Dependency_Installer (`references/project-config.md`, `references/workflow.md` Fase 0): uma `AskUserQuestion` por dependencia ausente ("instalar" / "seguir sem instalar"), nomeando beneficio, impacto de seguir sem e o comando de `buildMissingDependencies(report, { platform })` (`scripts/lib/dependency-plan.mjs`). So execute o comando apos "instalar"; depois de qualquer instalacao confirmada, rode o preflight de novo antes de seguir. MCP ausente nunca bloqueia — "seguir sem instalar" registra a limitacao e segue.
+
+4. Carregue a skill:
 
    ```text
    Skill(skill="cc-executor-subagents:executor-subagents")
@@ -104,15 +106,15 @@ Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhas
 
    Se a tool de Skill recusar por `disable-model-invocation: true`, leia `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/SKILL.md` e siga diretamente.
 
-4. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/report/handoff.json` (raiz `.orchestration/<slug>/handoff.json` apenas em runs anteriores ao layout v2 do Orchestrador), siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
+5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/report/handoff.json` (raiz `.orchestration/<slug>/handoff.json` apenas em runs anteriores ao layout v2 do Orchestrador), siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
 
-5. Decida:
+6. Decida:
 
    - executar direto;
    - usar 1 agente;
    - usar multiplos agentes independentes.
 
-6. Roteie pelo papel efetivo na Project_Config (`frontendExecutor`/`backendExecutor`, default `agy`/`codex`), nao por uma regra fixa:
+7. Roteie pelo papel efetivo na Project_Config (`frontendExecutor`/`backendExecutor`, default `agy`/`codex`), nao por uma regra fixa:
 
    - front-end/UI: `frontendExecutor` (default `cc-antigravity-plugin:antigravity-coder`; `claude-code` delega a um subagente Task do proprio Claude);
    - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex), quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo); adicione `--subagent-model flash` para subagentes mais baratos;

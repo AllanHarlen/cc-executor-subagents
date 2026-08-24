@@ -22,6 +22,7 @@ Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce
 - **Executor pode integrar.** O executor principal pode fazer pequenos ajustes de integracao, documentacao e glue code quando for mais rapido e seguro do que redelegar.
 - **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 4.0.0+ via `antigravity-coder` (implementacao). `antigravity-agent` e somente leitura e nunca implementa. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
 - **Context7 quando houver docs de libs.** Se a task envolver biblioteca, framework, SDK, API, CLI ou cloud service, use Context7 quando disponivel.
+- **Codebase Memory quando disponivel.** Na Fase 1 (Triagem), prefira `search_graph`/`trace_path`/`get_code_snippet` a varrer arquivos; na Fase 5 (Integracao), use `detect_changes` sobre o diff antes de decidir o alcance da verificacao. Ver `references/mcp-context.md`, Parte 1.
 - **Nao aciona OpenSpec.** O Executor nao cria `openspec/`, nao chama `/opsx:*`/`openspec-*` e nao bloqueia por ausencia do CLI OpenSpec. Ele pode, no entanto, **consumir** um handoff do Orchestrador que traga um artefato de role `openspec-change` (`openspec/changes/<nome>/`, ver `references/handoff-contract.md`) como baseline somente-leitura — nunca escreve nem move nada dentro de `openspec/`.
 - **Sem teatralidade.** Updates curtos, decisao rapida, evidencia final.
 
@@ -73,8 +74,11 @@ O preflight deriva quais itens sao obrigatorios da **Project_Config** (`.executo
 | permissao Bash do Codex companion | sempre | evita bloqueio de aprovacao em background — auto-remediado quando possivel |
 | `/goal` hooks | opcional | autonomia entre turnos |
 | Context7 MCP | opcional | docs atuais para libs/frameworks/APIs |
+| Codebase Memory MCP | opcional | grafo de codigo para Fase 1 (localizar simbolos) e Fase 5 (impacto do diff) |
 
 Se um item **obrigatorio** falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir a CLI/plugin ausente, (b) trocar o papel afetado para `claude-code` via `node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor claude-code ...` (ou `--frontend-executor`/`--backend-reviewer`/`--frontend-reviewer`) para o Executor (Claude) assumir essas tasks diretamente, ou (c) cancelar. Depois de trocar o papel, rode o preflight de novo.
+
+Se um MCP **opcional** (Context7, Codebase Memory) faltar, acione o Dependency_Installer antes da Fase 1 — uma `AskUserQuestion` por dependencia ausente, nunca bloqueante. Ver `references/workflow.md` Fase 0 e `references/project-config.md`.
 
 Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0` e `timestamp_inicio`.
 
@@ -447,7 +451,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/project-config.md` | as 4 perguntas de stack, protocolo do Dependency_Installer, roteamento derivado |
 | `references/persistent-state.md` | entender `state.json`/`events.jsonl`, os 5 invariantes e o protocolo de `/executor resume` |
 | `references/programmatic-intelligence.md` | scripts deterministicos (inspect-diff, validate-wire-format, validate-scope, collect-test-results) |
-| `references/mcp-context.md` | protocolo do Context7 MCP |
+| `references/mcp-context.md` | protocolo do Context7 MCP e do Codebase Memory MCP |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
 | `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |

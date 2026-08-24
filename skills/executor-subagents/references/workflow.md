@@ -19,7 +19,9 @@ Se um item **obrigatorio** falhar:
 
 Pergunte ao usuario se ele quer remediar a CLI, trocar o papel para `claude-code`, ou cancelar. Nao ha mais excecao ad-hoc para tasks front-end puras: a obrigatoriedade vem inteira da Project_Config.
 
-Context7 e `/goal` continuam opcionais.
+`/goal` continua opcional, sem oferta de instalacao (nao e uma dependencia externa).
+
+**MCPs opcionais (Context7, Codebase Memory):** mesmo sendo opcionais — nunca aparecem em `failed`, so em `warnings` — a ausencia de qualquer um aciona o Dependency_Installer (`references/project-config.md`) antes da Fase 1: monte a lista com `buildMissingDependencies(report, { platform })` (`scripts/lib/dependency-plan.mjs`, chaves de `MCP_CHECK_KEYS`) e faca **uma `AskUserQuestion` por dependencia ausente** ("instalar" / "seguir sem instalar"), nomeando beneficio, impacto de seguir sem e o comando exato. So execute o comando apos "instalar"; apos qualquer instalacao confirmada, rode o preflight de novo (mesmo que a lista de ausentes fique vazia) antes de seguir para a Fase 1 — e esse novo preflight que confirma que o servidor MCP recem-instalado ficou visivel (o agente de codigo precisa ser reiniciado para carregar um MCP novo; se a instalacao pedir reinicio, informe e retome dali). "Seguir sem instalar" registra a limitacao e a Fase 1/5 seguem pelo caminho deterministico (Read/Glob/Grep e `inspect-diff.mjs`/`rg`) — nunca bloqueia.
 
 ## Fase 1 - Triagem
 

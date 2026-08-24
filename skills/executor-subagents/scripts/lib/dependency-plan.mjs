@@ -18,15 +18,16 @@ import {
  * Duas responsabilidades:
  *
  * - `buildMissingDependencies(report, { platform })`: derivacao exata do
- *   relatorio de preflight. Context7_MCP ausente primeiro (contexto antes de
- *   execucao), depois cada CLI do Required_CLI_Set com check reprovado, em
- *   ordem canonica (`codex` antes de `agy`), cada uma seguida imediatamente
- *   pelo plugin do Claude Code que a conecta (`openai-codex` para `codex`,
- *   `cc-antigravity-plugin` para `agy`) quando `checks.plugins` reprova esse
- *   plugin — a CLI resolve o processo externo, o plugin e o que da ao Claude
- *   Code os agentes/comandos para falar com ele, e as duas reprovacoes sao
- *   independentes (CLI instalada nao implica plugin instalado). Ordem
- *   estavel: a mesma entrada produz sempre a mesma lista.
+ *   relatorio de preflight. MCPs opcionais ausentes primeiro, na ordem de
+ *   `MCP_CHECK_KEYS` (contexto antes de execucao), depois cada CLI do
+ *   Required_CLI_Set com check reprovado, em ordem canonica (`codex` antes de
+ *   `agy`), cada uma seguida imediatamente pelo plugin do Claude Code que a
+ *   conecta (`openai-codex` para `codex`, `cc-antigravity-plugin` para `agy`)
+ *   quando `checks.plugins` reprova esse plugin — a CLI resolve o processo
+ *   externo, o plugin e o que da ao Claude Code os agentes/comandos para
+ *   falar com ele, e as duas reprovacoes sao independentes (CLI instalada nao
+ *   implica plugin instalado). Ordem estavel: a mesma entrada produz sempre a
+ *   mesma lista.
  * - `summarizeInstallOutcome(item, outcome)`: registro allowlisted por
  *   dependencia, com exatamente as chaves `name`, `decision`, `command`,
  *   `exitCode` e `durationMs`.
@@ -38,9 +39,11 @@ import {
  * item — nunca de uma linha de comando reconstruida pelo chamador, que
  * poderia carregar variavel de ambiente ou token.
  *
- * Diferenca em relacao ao catalogo do Orchestrador: o Executor nao usa
- * Codebase Memory MCP nesta fase do port, entao `codebase-memory` nao entra
- * no catalogo nem em `MCP_CHECK_KEYS`.
+ * `MCP_CHECK_KEYS` inclui `context7` e `codebase-memory` — o Executor usa os
+ * dois (ver `references/mcp-context.md`, Parte 1, para o escopo reduzido do
+ * grafo numa execucao curta); a diferenca em relacao ao catalogo do
+ * Orchestrador e so a profundidade do uso na Fase 1/5, nao a disponibilidade
+ * do MCP em si.
  */
 
 /** Tipos de dependencia reconhecidos. */
@@ -60,8 +63,8 @@ export const INSTALL_OUTCOME_FIELDS = Object.freeze([
   "durationMs",
 ]);
 
-/** Chave dos checks de MCP no relatorio de preflight. */
-export const MCP_CHECK_KEYS = Object.freeze(["context7"]);
+/** Chaves dos checks de MCP no relatorio de preflight, na ordem de oferta. */
+export const MCP_CHECK_KEYS = Object.freeze(["context7", "codebase-memory"]);
 
 export class DependencyPlanError extends Error {
   constructor(code, message, details = {}) {
@@ -135,6 +138,31 @@ const DEPENDENCY_SPECS = Object.freeze({
       "A chave de API do Context7, quando usada, e configurada pelo proprio usuario e nunca entra em "
       + "prompt, artefato da execucao ou telemetria.",
     docs: "https://github.com/upstash/context7",
+  },
+  "codebase-memory": {
+    name: "codebase-memory",
+    kind: "mcp",
+    optional: true,
+    benefit:
+      "Grafo de codigo persistente (arquitetura, quem chama o que, impacto de diff) para localizar o "
+      + "simbolo da task na Fase 1 (Triagem) e o raio de impacto do diff na Fase 5 (Integracao), mais "
+      + "barato em tokens que varrer arquivos.",
+    impact:
+      "Sem ele, a Fase 1 usa Read/Glob/Grep e a Fase 5 usa inspect-diff.mjs/rg — o caminho de sempre, "
+      + "mais lento para localizar simbolos e mapear chamadores em bases de codigo grandes.",
+    commands: {
+      [PLATFORM_WINDOWS]: [
+        "Invoke-WebRequest -Uri https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.ps1 -OutFile install.ps1; .\\install.ps1",
+      ],
+      posix: [
+        "curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash",
+      ],
+    },
+    alternatives: Object.freeze([]),
+    interactiveFollowUp: null,
+    interactiveFollowUpNote:
+      "Depois de instalar, o agente de codigo precisa ser reiniciado para carregar o servidor MCP.",
+    docs: "https://github.com/DeusData/codebase-memory-mcp",
   },
   codex: {
     name: "codex",
@@ -381,8 +409,9 @@ function failedPluginNames(report) {
  *
  * Composicao, em ordem estavel:
  *
- * 1. `context7`, quando `checks.optional.mcp.context7.ok` nao e `true` (check
- *    ausente conta como ausente).
+ * 1. Cada chave de `MCP_CHECK_KEYS` (`context7`, depois `codebase-memory`),
+ *    quando `checks.optional.mcp.<chave>.ok` nao e `true` (check ausente
+ *    conta como ausente).
  * 2. Para cada CLI do Required_CLI_Set, na ordem canonica (`codex`, depois
  *    `agy`): a CLI, quando seu check `cli.*` esta reprovado, seguida
  *    imediatamente pelo plugin do Claude Code que a conecta (`openai-codex`

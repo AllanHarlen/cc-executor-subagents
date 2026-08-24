@@ -12,6 +12,7 @@
  *  - A compatible Bash permission for the Codex companion runtime (auto-remediated)
  *  - Claude Code hook settings compatible with /goal (optional)
  *  - Context7 MCP (optional, reported, never blocking)
+ *  - Codebase Memory MCP (optional, reported, never blocking)
  *
  * Report contract (schemaVersion 2):
  *  - `projectConfig` carries the four effective roles, the file path, `updatedAt`,
@@ -51,6 +52,20 @@ import {
   deriveRequiredCliSet,
   readProjectConfig,
 } from "./lib/project-config.mjs";
+import {
+  CODEBASE_MEMORY_BINARY_NAMES,
+  CODEBASE_MEMORY_CONFIG_CANDIDATES,
+  CODEBASE_MEMORY_DEFINITION_MARKERS,
+  CODEBASE_MEMORY_SERVER_NAMES,
+  CODEBASE_MEMORY_SKILL_CANDIDATES,
+  CONTEXT7_BINARY_NAMES,
+  CONTEXT7_CONFIG_CANDIDATES,
+  CONTEXT7_DEFINITION_MARKERS,
+  CONTEXT7_MCP_DIRECTORY_CANDIDATES,
+  CONTEXT7_SERVER_NAMES,
+  CONTEXT7_SKILL_CANDIDATES,
+  resolveCandidate,
+} from "./lib/mcp-candidates.mjs";
 
 const HOME = homedir();
 const PROJECT_ROOT = process.cwd();
@@ -499,49 +514,192 @@ function checkGoalHookSettings() {
   return { ok: true, inspected, parseErrors };
 }
 
-function checkContext7Mcp() {
-  const evidence = [];
-  const skillCandidates = [
-    join(HOME, ".claude", "skills", "context7", "SKILL.md"),
-    join(HOME, ".claude", "skills", "context7-mcp", "SKILL.md"),
-  ];
-
-  for (const file of skillCandidates) {
-    if (existsSync(file)) evidence.push({ type: "skill", path: file });
+/**
+ * Reads one JSON MCP config file into its `{ servers, disabled }` maps: the
+ * top-level `mcpServers` (if any) and, for `~/.claude.json` specifically, the
+ * `projects.<cwd>.mcpServers` block for the CURRENT project (matched with
+ * `normalizePathKey`, so backslash/forward-slash and trailing separators
+ * don't cause a false negative), together with that project's
+ * `disabledMcpjsonServers`. Returns `[]` for a missing/unparseable file — an
+ * unreadable config is not evidence either way.
+ */
+function readMcpServerMaps(file, cwd) {
+  let json;
+  try {
+    if (!existsSync(file)) return [];
+    json = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return [];
   }
+  if (!json || typeof json !== "object") return [];
 
-  const configCandidates = [
-    join(PROJECT_ROOT, ".mcp.json"),
-    join(HOME, ".claude.json"),
-    join(HOME, ".claude", "mcp.json"),
-    join(HOME, ".config", "claude", "mcp.json"),
-    join(HOME, ".codex", "config.toml"),
-  ];
-
-  for (const file of configCandidates) {
-    if (!existsSync(file)) continue;
-    try {
-      const contents = readFileSync(file, "utf8");
-      if (/\bcontext7\b|@upstash\/context7-mcp|mcp\.context7\.com|ctx7/i.test(contents)) {
-        evidence.push({ type: "mcp-config", path: file });
+  const maps = [];
+  if (json.mcpServers && typeof json.mcpServers === "object") {
+    maps.push({ servers: json.mcpServers, disabled: [] });
+  }
+  if (json.projects && typeof json.projects === "object") {
+    const wanted = normalizePathKey(cwd);
+    for (const [key, project] of Object.entries(json.projects)) {
+      if (normalizePathKey(key) !== wanted) continue;
+      if (project?.mcpServers && typeof project.mcpServers === "object") {
+        maps.push({
+          servers: project.mcpServers,
+          disabled: Array.isArray(project.disabledMcpjsonServers)
+            ? project.disabledMcpjsonServers
+            : [],
+        });
       }
-    } catch (err) {
-      evidence.push({
-        type: "mcp-config-unreadable",
-        path: file,
-        error: err.message?.split(/\r?\n/)[0] ?? "cannot read file",
-      });
     }
   }
+  return maps;
+}
 
-  if (evidence.some((item) => item.type !== "mcp-config-unreadable")) {
-    return { ok: true, evidence };
+/** `<path>` normalized for the `projects` key match in `~/.claude.json`. */
+function normalizePathKey(p) {
+  return String(p).replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+/**
+ * Finds an MCP server registration across `files`, matching either the
+ * server's NAME (against `names`) or a marker inside its definition
+ * (`markers` — package spec or endpoint, for a server registered under a
+ * custom name). Servers listed in `disabledMcpjsonServers` do not count.
+ *
+ * Parses the JSON rather than substring-scanning the raw text — this matters
+ * most for `~/.claude.json`, Claude Code's entire user config (100+ KB of
+ * per-project `allowedTools`, example paths and history), where a bare
+ * substring hit is not evidence of anything.
+ */
+function findMcpServer(files, cwd, names, markers = []) {
+  const wanted = names.map((n) => n.toLowerCase());
+  const wantedMarkers = markers.map((m) => m.toLowerCase());
+  for (const file of files) {
+    for (const { servers, disabled } of readMcpServerMaps(file, cwd)) {
+      const off = new Set(disabled.map((n) => String(n).toLowerCase()));
+      for (const [name, definition] of Object.entries(servers)) {
+        const key = name.toLowerCase();
+        if (off.has(key)) continue;
+        if (wanted.includes(key)) return { path: file, server: name };
+        if (wantedMarkers.length === 0) continue;
+        let blob = "";
+        try {
+          blob = JSON.stringify(definition ?? "").toLowerCase();
+        } catch {
+          blob = "";
+        }
+        if (wantedMarkers.some((m) => blob.includes(m))) return { path: file, server: name };
+      }
+    }
   }
+  return null;
+}
+
+/**
+ * Same search as `findMcpServer()`, but over the `{ base, segments, format }`
+ * candidates of `scripts/lib/mcp-candidates.mjs` instead of plain paths.
+ * `"json"` candidates go through `findMcpServer()`. The one `"toml"`
+ * candidate (`~/.codex/config.toml`) has no structured parser here — matched
+ * by raw substring, since writing a TOML parser for a single candidate is not
+ * worth the maintenance cost (see the header comment in `mcp-candidates.mjs`).
+ */
+function findMcpServerAcrossCandidates(candidates, ctx, names, markers = []) {
+  const jsonPaths = candidates
+    .filter((c) => c.format !== "toml")
+    .map((c) => resolveCandidate(c, ctx));
+  const hit = findMcpServer(jsonPaths, ctx.cwd, names, markers);
+  if (hit) return hit;
+
+  const needles = [...names, ...markers].map((s) => s.toLowerCase());
+  for (const candidate of candidates.filter((c) => c.format === "toml")) {
+    const path = resolveCandidate(candidate, ctx);
+    let text = "";
+    try {
+      text = existsSync(path) ? readFileSync(path, "utf8").toLowerCase() : "";
+    } catch {
+      text = "";
+    }
+    if (text && needles.some((n) => text.includes(n))) return { path, server: null };
+  }
+  return null;
+}
+
+/**
+ * OPTIONAL: Context7 MCP — current, versioned library/framework/SDK/API/cloud
+ * documentation, consulted before implementing or debugging against one.
+ * Candidate locations, server names and definition markers live in
+ * `scripts/lib/mcp-candidates.mjs` (canonical union kept in sync with
+ * Pensador/Orchestrator by `cc-pensador/test/mcp-detection-parity.test.js`).
+ */
+function checkContext7Mcp() {
+  const ctx = { home: HOME, cwd: PROJECT_ROOT };
+  const evidence = [];
+
+  for (const candidate of CONTEXT7_SKILL_CANDIDATES) {
+    const path = resolveCandidate(candidate, ctx);
+    if (existsSync(path)) evidence.push({ type: "skill", path });
+  }
+  for (const candidate of CONTEXT7_MCP_DIRECTORY_CANDIDATES) {
+    const path = resolveCandidate(candidate, ctx);
+    if (existsSync(path)) evidence.push({ type: "mcp-directory", path });
+  }
+  const cli = checkCli(CONTEXT7_BINARY_NAMES[0]);
+  if (cli.ok) evidence.push({ type: "binary", path: CONTEXT7_BINARY_NAMES[0] });
+
+  const hit = findMcpServerAcrossCandidates(
+    CONTEXT7_CONFIG_CANDIDATES,
+    ctx,
+    CONTEXT7_SERVER_NAMES,
+    CONTEXT7_DEFINITION_MARKERS,
+  );
+  if (hit) evidence.push({ type: "mcp-config", path: hit.path, server: hit.server });
+
+  if (evidence.length > 0) return { ok: true, evidence };
 
   return {
     ok: false,
     error: "Context7 MCP not detected in known locations.",
     install: ["npx ctx7 setup --claude"],
+  };
+}
+
+/**
+ * OPTIONAL: Codebase Memory MCP — the code graph (architecture, call chains,
+ * diff impact) the Orchestrator uses across its whole run. The Executor uses
+ * the same server but only in the phases a short, single-task run pays for:
+ * Fase 1 (Triagem — `search_graph`/`trace_path`/`get_code_snippet`) and Fase 5
+ * (Integração — `detect_changes` on the diff). See
+ * `references/mcp-context.md`, Parte 1. Candidate locations and server names
+ * live in `scripts/lib/mcp-candidates.mjs` (canonical union kept in sync with
+ * Pensador/Orchestrator by `cc-pensador/test/mcp-detection-parity.test.js`).
+ */
+function checkCodebaseMemoryMcp() {
+  const ctx = { home: HOME, cwd: PROJECT_ROOT };
+  const evidence = [];
+
+  for (const candidate of CODEBASE_MEMORY_SKILL_CANDIDATES) {
+    const path = resolveCandidate(candidate, ctx);
+    if (existsSync(path)) evidence.push({ type: "skill", path });
+  }
+  const cli = checkCli(CODEBASE_MEMORY_BINARY_NAMES[0]);
+  if (cli.ok) evidence.push({ type: "binary", path: CODEBASE_MEMORY_BINARY_NAMES[0] });
+
+  const hit = findMcpServerAcrossCandidates(
+    CODEBASE_MEMORY_CONFIG_CANDIDATES,
+    ctx,
+    CODEBASE_MEMORY_SERVER_NAMES,
+    CODEBASE_MEMORY_DEFINITION_MARKERS,
+  );
+  if (hit) evidence.push({ type: "mcp-config", path: hit.path, server: hit.server });
+
+  if (evidence.length > 0) return { ok: true, evidence };
+
+  return {
+    ok: false,
+    error: "Codebase Memory MCP not detected in known locations.",
+    install: [
+      "curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash",
+      "Invoke-WebRequest -Uri https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.ps1 -OutFile install.ps1; .\\install.ps1",
+    ],
   };
 }
 
@@ -652,6 +810,7 @@ const checks = {
   optional: {
     mcp: {
       context7: checkContext7Mcp(),
+      "codebase-memory": checkCodebaseMemoryMcp(),
     },
   },
 };
