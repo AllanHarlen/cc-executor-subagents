@@ -6,6 +6,7 @@ O preflight do `cc-executor-subagents` valida o minimo para execucao rapida com 
 
 ```bash
 node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
+node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs" --check-agent-mcp   # tambem sonda codex/agy ao vivo, ver abaixo
 ```
 
 Em desenvolvimento local:
@@ -49,11 +50,15 @@ Se um item obrigatorio falhar, mostre a `remediation` do relatorio e pergunte ao
 |---|---|
 | `/goal` hooks | autonomia entre turnos |
 | Context7 MCP | docs atuais para libs/frameworks/APIs |
+| Codebase Memory MCP | grafo de codigo para localizar simbolo/chamador antes de varrer arquivos (Fase 1 e 5) |
 
 Falha em item opcional nao cancela. Apenas ajuste a estrategia:
 
 - sem `/goal`: trabalhe no turno atual e entregue comando de retomada;
-- sem Context7: siga padroes locais e registre limitacao quando docs atuais importarem.
+- sem Context7: siga padroes locais e registre limitacao quando docs atuais importarem;
+- sem Codebase Memory: varra arquivos com Read/Glob/Grep normalmente.
+
+Ver `references/mcp-context.md` para o protocolo de uso de cada um.
 
 ## Saida (schemaVersion 2)
 
@@ -74,7 +79,7 @@ Falha em item opcional nao cancela. Apenas ajuste a estrategia:
     "plugins": { "openai-codex": {}, "cc-antigravity-plugin": {} },
     "permissions": { "codex-companion-bash": {}, "goal-hooks-enabled": {} },
     "capabilities": { "agy-help": {}, "cc-antigravity-bridge": {} },
-    "optional": { "mcp": { "context7": {} } }
+    "optional": { "mcp": { "context7": {}, "codebase-memory": {} } }
   },
   "autoRemediation": { "attempted": false, "changed": false, "action": "none", "ok": true },
   "failed": [],
@@ -88,6 +93,24 @@ Falha em item opcional nao cancela. Apenas ajuste a estrategia:
 `status` e `failed` consideram apenas os itens que a Project_Config torna obrigatorios. `warnings` lista itens opcionais ausentes e itens que falharam mas nao sao exigidos pela configuracao atual (`reason: "NOT_REQUIRED_BY_PROJECT_CONFIG"`).
 
 > **Mudanca de contrato (schemaVersion 1 -> 2):** a versao anterior aninhava tudo em `checks.required.*`/`checks.optional.*`, com obrigatoriedade fixa por posicao. A versao atual e plana e deriva obrigatoriedade da Project_Config. Nao ha compatibilidade retroativa no formato do relatorio — leia sempre o `schemaVersion` antes de assumir a forma do JSON.
+
+## `checks.optional.mcpPerAgent` (com `--check-agent-mcp`)
+
+`checks.optional.mcp.<servidor>.ok` e um agregado de varredura de arquivo: `true` pode significar so que o Claude Code local tem o servidor registrado, sem que o Codex ou o AGY o tenham. Com a flag `--check-agent-mcp`, o preflight roda `codex mcp list --json`/`agy mcp list` de verdade e publica `checks.optional.mcpPerAgent.<agent>.<servidor>`:
+
+```json
+{
+  "codex": {
+    "codebase-memory": { "checked": true, "reason": null, "matched": "codebase-memory-mcp", "ok": true, "install": null },
+    "context7": { "checked": true, "reason": null, "matched": null, "ok": false, "install": "codex mcp add context7 --url https://mcp.context7.com/mcp" }
+  },
+  "agy": { "...": "mesma forma" }
+}
+```
+
+- `checked: false` (`reason`: `BINARY_MISSING`, `TIMEOUT`, `EXEC_ERROR` ou `UNPARSEABLE_OUTPUT`) **nao e prova de ausencia** — cai para `checks.optional.mcp.<servidor>.ok`.
+- `install` so vem preenchido quando `checked: true, ok: false` — a CLI respondeu e o servidor genuinamente nao esta la. Traz o comando exato de registro (`scripts/lib/mcp-agent-install.mjs`), nunca disparado automaticamente: ver "Oferta de instalacao por agente" em `references/mcp-context.md`.
+- Off por padrao (custo real de subprocesso); passe `--check-agent-mcp` quando for delegar a uma task Codex/AGY que dependa de uma dessas ferramentas.
 
 ## Auto-remediacao
 
@@ -164,6 +187,21 @@ node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor c
 ```bash
 npx ctx7 setup --claude
 ```
+
+### Codebase Memory opcional
+
+```bash
+# macOS/Linux
+curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-codebase-memory-mcp.sh
+bash /tmp/install-codebase-memory-mcp.sh
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.ps1 -OutFile install-codebase-memory-mcp.ps1
+Unblock-File -Path install-codebase-memory-mcp.ps1
+& .\install-codebase-memory-mcp.ps1
+```
+
+Registrar em Codex/AGY especificamente (apos instalado e no PATH): ver "Oferta de instalacao por agente" em `references/mcp-context.md` — nunca rode `mcp add` sem confirmacao do usuario.
 
 ## Politica
 

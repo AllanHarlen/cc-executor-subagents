@@ -14,7 +14,7 @@
         {
             "name": "cc-executor-subagents",
             "description": "Executor skill + /executor slash command for quick multi-agent implementation. Runs a Project_Config-aware preflight, follows pre-defined plans when provided, routes work by configurable role (Codex/AGY/Claude Code), persists crash-safe run state with resume, gates completion proportionally to risk, then integrates and verifies without OpenSpec ceremony.",
-            "version": "2.2.0",
+            "version": "2.3.0",
             "author": {
                 "name": "allanharlen"
             },

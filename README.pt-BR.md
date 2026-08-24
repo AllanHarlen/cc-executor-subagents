@@ -139,7 +139,10 @@ Opcionais:
 | Item | Uso |
 |---|---|
 | Context7 MCP | docs atuais de libs/frameworks/APIs |
+| Codebase Memory MCP | grafo de codigo para localizar simbolo/chamador antes de varrer arquivos |
 | `/goal` hooks | autonomia entre turnos |
+
+O agregado `checks.optional.mcp.<servidor>.ok` acima so prova que o servidor esta registrado *em algum lugar* da maquina — nao que o Codex ou o AGY especificamente o tem. Rode `node scripts/preflight.mjs --check-agent-mcp` para tambem consultar `codex mcp list --json`/`agy mcp list` ao vivo e obter `checks.optional.mcpPerAgent.<agent>.<servidor>`, com um campo `install` trazendo o comando exato de `mcp add`. Nada instala sozinho — o executor so roda isso depois que o usuario aprova via `AskUserQuestion`, o mesmo padrao do instalador do Open Design. Ver `skills/executor-subagents/references/mcp-context.md`.
 
 Instalar Codex:
 

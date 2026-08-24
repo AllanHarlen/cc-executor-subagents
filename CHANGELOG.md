@@ -2,6 +2,33 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.3.0] - 2026-08-24 - Deteccao de MCP por agente (`--check-agent-mcp`) e oferta de instalacao
+
+O check agregado `checks.optional.mcp.<servidor>.ok` prova apenas que o Codebase Memory MCP ou o
+Context7 estao registrados *em algum lugar* da maquina — nao que o Codex ou o AGY especificamente
+os tem. Isso fazia o placeholder de grafo/Context7 ir para o prompt de uma task Codex/AGY mesmo
+quando aquela CLI especifica nao tinha a ferramenta.
+
+- `scripts/lib/mcp-agent-cli.mjs` (novo): introspeccao real via `codex mcp list --json`/`agy mcp
+  list`, em vez de adivinhar por convencao de arquivo. Redacao estrita — nunca extrai
+  `transport.http_headers`/`transport.env`/URL/comando (podem carregar uma chave de API real), so
+  `name`/`enabled`/`type`. Corrige um bug de plataforma: `execFileSync` sem shell falhava
+  silenciosamente contra o `codex.cmd`/`.ps1` do npm no Windows; trocado por `execSync`.
+- `scripts/lib/mcp-agent-install.mjs` (novo): registra (`installAgentMcp`) e remove
+  (`removeAgentMcp`) um servidor no CLI do agente, com os comandos reais confirmados ao vivo.
+  Nunca roda sozinho — so depois de aprovacao explicita via `AskUserQuestion`, mesmo padrao do
+  instalador do Open Design (`cc-pensador`).
+- `scripts/preflight.mjs`: nova flag opt-in `--check-agent-mcp` publica
+  `checks.optional.mcpPerAgent.<agent>.<servidor>`, com `install` preenchido so quando
+  `checked: true, ok: false`.
+- `references/mcp-context.md`, `references/subagent-prompts.md`, `references/preflight-check.md`:
+  documentam a ordem de preferencia (`mcpPerAgent` por agente > `mcp` agregado como fallback) e a
+  secao "Oferta de instalacao por agente". Placeholder `Codebase Memory:` adicionado ao lado de
+  cada `Context7:` no template real de prompts (antes so existia documentado, nao no template).
+- `tests/mcp-agent-cli.test.mjs`, `tests/mcp-agent-install.test.mjs`, `tests/mcp-prompt-wiring.test.mjs`
+  (novos): 26 testes, incluindo fixtures reais capturados ao vivo e um caso que garante que nenhum
+  comando de instalacao carrega uma chave de API.
+
 ## [2.2.0] - Correcao da postura sobre OpenSpec
 
 O SKILL mandava os subagentes ignorarem toda skill `openspec`/`opsx`, ao mesmo tempo em que o
