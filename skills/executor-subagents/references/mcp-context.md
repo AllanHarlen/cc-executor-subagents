@@ -4,6 +4,40 @@ O Executor usa dois MCPs opcionais: **Codebase Memory** (grafo de codigo) e **Co
 
 Regra universal: resultado de MCP e **evidencia corroborativa**, nunca prova isolada. Nao feche uma task `DONE` so porque o MCP "confirmou" algo — a evidencia real continua sendo arquivo produzido, teste passando ou delta de commit (ver `references/persistent-state.md`, invariante 4).
 
+### `checks.optional.mcp` e agregado por arquivo; `checks.optional.mcpPerAgent` e por agente e ao vivo
+
+`checks.optional.mcp.<servidor>.ok` vem de uma varredura de arquivo que nao distingue para qual CLI o MCP esta de fato registrado — `ok: true` pode significar so que o Claude Code local tem o servidor, sem que Codex ou AGY o tenham. Antes de prometer a ferramenta no prompt de uma task Codex/AGY (Fase 4), prefira `checks.optional.mcpPerAgent.<agent>.<servidor>`, obtido rodando `codex mcp list --json`/`agy mcp list` de verdade (ver `scripts/lib/mcp-agent-cli.mjs`). Esse bloco so existe no relatorio quando o preflight roda com `--check-agent-mcp` — e opt-in porque tem custo real de subprocesso.
+
+```text
+antes de incluir o placeholder de Codebase Memory/Context7 no prompt de uma task Codex/AGY:
+  se checks.optional.mcpPerAgent existir:
+    usar checks.optional.mcpPerAgent.<agent>.<servidor>.ok
+      checked: true, ok: true  -> inclua a instrucao
+      checked: true, ok: false -> NAO inclua (servidor nao registrado/desabilitado nesse agente)
+      checked: false           -> nao e prova de ausencia -> caia para checks.optional.mcp.<servidor>.ok
+  senao:
+    usar checks.optional.mcp.<servidor>.ok (agregado, mais fraco, mas e o unico sinal disponivel)
+```
+
+### Oferta de instalacao por agente (mesmo padrao do Open Design)
+
+Quando `checks.optional.mcpPerAgent.<agent>.<servidor>` chega com `checked: true, ok: false` — o CLI daquele agente respondeu de verdade e o servidor genuinamente nao esta registrado ali — o campo `install` traz o comando exato de registro (`mcp-agent-install.mjs`, confirmado ao vivo: `codex mcp add context7 --url https://mcp.context7.com/mcp`, `agy mcp add codebase-memory-mcp codebase-memory-mcp`, etc.). Isso **nunca** dispara sozinho. Mesmo padrao do Open Design (ver `references/open-design.md` do cc-pensador, secao Fallback): oferecer via `AskUserQuestion`.
+
+```text
+[Executor | Fase 0/4] O <servidor> nao esta registrado no <agent>.
+Registrar agora deixa a task usar a ferramenta em vez do fallback deterministico.
+
+Opcao A (recomendada): Registrar via `<comando de install>`
+  O Executor roda o comando de registro no CLI do <agent> e confirma com um novo check.
+
+Opcao B: Seguir sem registrar
+  A task roda pelo caminho deterministico (grafo/documentacao ausente para esse agente).
+```
+
+Se o usuario aprovar a Opcao A: rode `installAgentMcp(agent, server)` de `mcp-agent-install.mjs` (nunca construa o comando a mao), depois **re-verifique** com `detectAgentMcpServers`/um novo `--check-agent-mcp` antes de prometer a ferramenta no prompt do subagente — nao assuma sucesso so porque o comando nao lancou erro. Registre a decisao e o resultado no relatorio de fechamento. Nunca chame `installAgentMcp` a partir do prompt de um subagente Codex/AGY: e o Executor principal quem roda o comando, sempre depois da confirmacao do usuario.
+
+⚠️ `installAgentMcp` **sobrescreve** um registro existente do mesmo nome (`mcp add` e "add or update", confirmado ao vivo no AGY). So ofereca a Opcao A quando `checked: true, ok: false` — nunca quando `ok: true` ja, e nunca para "corrigir" uma configuracao existente sem o usuario pedir explicitamente, para nao substituir silenciosamente uma entrada que o usuario configurou com opcoes proprias (ex.: uma chave de API do Context7 ja embutida no comando).
+
 ## Parte 1 — Codebase Memory
 
 `checks.optional.mcp["codebase-memory"].ok` no relatorio de preflight indica se esta disponivel.

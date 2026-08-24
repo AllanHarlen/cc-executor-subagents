@@ -13,6 +13,11 @@
  *  - Claude Code hook settings compatible with /goal (optional)
  *  - Context7 MCP (optional, reported, never blocking)
  *  - Codebase Memory MCP (optional, reported, never blocking)
+ *  - `checks.optional.mcp` above is a file-based aggregate (any config
+ *    location, any agent); pass `--check-agent-mcp` to also probe
+ *    `codex mcp list --json` and `agy mcp list` directly and get
+ *    `checks.optional.mcpPerAgent`, live per-agent ground truth (see
+ *    `lib/mcp-agent-cli.mjs`).
  *
  * Report contract (schemaVersion 2):
  *  - `projectConfig` carries the four effective roles, the file path, `updatedAt`,
@@ -35,8 +40,8 @@
  * Outputs a JSON report to stdout.
  *
  * Usage:
- *   node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
- *   node scripts/preflight.mjs # compatibility wrapper
+ *   node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs" [--check-agent-mcp]
+ *   node scripts/preflight.mjs [--check-agent-mcp] # compatibility wrapper
  */
 
 import { execSync } from "node:child_process";
@@ -66,6 +71,8 @@ import {
   CONTEXT7_SKILL_CANDIDATES,
   resolveCandidate,
 } from "./lib/mcp-candidates.mjs";
+import { detectAgentMcpServers } from "./lib/mcp-agent-cli.mjs";
+import { agentMcpInstallCommand } from "./lib/mcp-agent-install.mjs";
 
 const HOME = homedir();
 const PROJECT_ROOT = process.cwd();
@@ -76,6 +83,17 @@ const MIN_ANTIGRAVITY_PLUGIN_VERSION = "4.0.0";
 const MIN_AGY_VERSION = "1.1.8";
 const RECOMMENDED_AGY_VERSION = "1.1.16";
 const PREFLIGHT_SCHEMA_VERSION = 2;
+
+/**
+ * Opt-in: probes each installed agent's own `mcp list` subcommand for live,
+ * per-agent ground truth (see `lib/mcp-agent-cli.mjs`), instead of just the
+ * file-based `checks.optional.mcp` aggregate. Off by default because it
+ * shells out (real wall-clock cost, up to `AGENT_CLI_TIMEOUT_MS` per agent per
+ * server) and depends on `codex`/`agy` being reachable on PATH — neither of
+ * which the rest of this script requires. Pass `--check-agent-mcp` to include
+ * `checks.optional.mcpPerAgent` in the report.
+ */
+const CHECK_AGENT_MCP = process.argv.includes("--check-agent-mcp");
 
 const REQUIRED_AGY_FLAGS = [
   "--print",
@@ -630,6 +648,43 @@ function findMcpServerAcrossCandidates(candidates, ctx, names, markers = []) {
  * `scripts/lib/mcp-candidates.mjs` (canonical union kept in sync with
  * Pensador/Orchestrator by `cc-pensador/test/mcp-detection-parity.test.js`).
  */
+/** Agents whose own CLI exposes a real `mcp list` subcommand (see `mcp-agent-cli.mjs`). */
+const MCP_INTROSPECTABLE_AGENTS = ["codex", "agy"];
+
+/**
+ * Live per-agent ground truth for the two MCP servers, via each agent's own
+ * `mcp list` subcommand. See `lib/mcp-agent-cli.mjs` for why this exists and
+ * what it does and does not extract, and `CHECK_AGENT_MCP` above for why it
+ * is opt-in rather than part of the default report.
+ *
+ * Callers deciding whether to promise the tool in a Codex- or AGY-targeted
+ * subagent prompt should prefer this result for that agent, and fall back to
+ * the aggregate `checks.optional.mcp.<server>.ok` only when `checked` is
+ * `false` here (binary unreachable, timeout, unparseable output — not proof
+ * of absence).
+ *
+ * `install` carries the exact `mcp add` command to offer via `AskUserQuestion`
+ * (see `mcp-agent-install.mjs`) whenever `checked: true, ok: false` — i.e. the
+ * agent's own CLI was reachable and genuinely does not have the server
+ * registered. It stays `null` when `ok: true` (nothing to install) or
+ * `checked: false` (absence not established — offering an install here would
+ * act on a guess).
+ */
+function withInstall(agent, server, detection) {
+  return { ...detection, install: detection.checked && !detection.ok ? agentMcpInstallCommand(agent, server) : null };
+}
+
+function checkAgentMcp() {
+  const result = {};
+  for (const agent of MCP_INTROSPECTABLE_AGENTS) {
+    result[agent] = {
+      "codebase-memory": withInstall(agent, "codebase-memory", detectAgentMcpServers(agent, CODEBASE_MEMORY_SERVER_NAMES)),
+      context7: withInstall(agent, "context7", detectAgentMcpServers(agent, CONTEXT7_SERVER_NAMES)),
+    };
+  }
+  return result;
+}
+
 function checkContext7Mcp() {
   const ctx = { home: HOME, cwd: PROJECT_ROOT };
   const evidence = [];
@@ -812,6 +867,7 @@ const checks = {
       context7: checkContext7Mcp(),
       "codebase-memory": checkCodebaseMemoryMcp(),
     },
+    ...(CHECK_AGENT_MCP ? { mcpPerAgent: checkAgentMcp() } : {}),
   },
 };
 

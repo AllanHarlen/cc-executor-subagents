@@ -15,6 +15,8 @@ Se encontrar o sinal bruto QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING
 
 Se ficar bloqueado, retorne Status: BLOCKED com a menor pergunta ou decisao necessaria.
 
+Antes de prometer Codebase Memory ou Context7 no prompt de uma task Codex/AGY, prefira `checks.optional.mcpPerAgent.<agent>.<servidor>.ok` (verdade ao vivo por agente, so existe quando o preflight rodou com `--check-agent-mcp`) em vez do agregado `checks.optional.mcp.<servidor>.ok`, que so prova registro em algum lugar da maquina, nao necessariamente na CLI que vai executar a task (ver `references/mcp-context.md`). Se o sinal aplicavel indicar disponibilidade do Codebase Memory e voce tiver acesso ao servidor, use search_graph/trace_path/get_code_snippet para localizar o simbolo, quem o chama e o que ele chama, antes de varrer arquivos com Read/Glob/Grep. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente.
+
 Nao amplie escopo. Nao instale dependencia nova sem justificar e sem autorizacao explicita no prompt.
 ```
 
@@ -48,6 +50,9 @@ Verificacao esperada:
 
 Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
+
+Codebase Memory:
+<SE DISPONIVEL: antes de varrer arquivos, use search_graph/trace_path/get_code_snippet para localizar o simbolo citado na demanda, quem o chama e o que ele chama. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente. SENAO: varra arquivos normalmente.>
 
 Regras:
 - Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo.
@@ -184,6 +189,9 @@ Estados obrigatorios:
 
 Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
+
+Codebase Memory:
+<SE DISPONIVEL: antes de varrer arquivos, use search_graph/trace_path/get_code_snippet para localizar o simbolo citado na demanda, quem o chama e o que ele chama. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente. SENAO: varra arquivos normalmente.>
 
 Regras:
 - Modo agentic ativo: implemente a UI diretamente; nao use --read-only.
@@ -347,6 +355,9 @@ Ownership:
 
 Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de gerar. Use resolve-library-id -> query-docs. SENAO: siga padroes locais.>
+
+Codebase Memory:
+<SE DISPONIVEL E OS ENTREGAVEIS TOCAM CODIGO EXISTENTE: use search_graph/trace_path/get_code_snippet para localizar simbolos afetados antes de varrer arquivos. Grafo e pista, nao prova. SENAO: varra arquivos normalmente ou ignore se os entregaveis forem inteiramente novos.>
 
 Regras:
 - Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo.
