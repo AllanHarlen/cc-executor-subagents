@@ -2,7 +2,7 @@
 name: executor-subagents
 description: Fast multi-agent executor for Claude Code. Use through /executor when the user wants a quick bug fix, refactor, feature slice, test repair, UI/front-end work, image asset generation, integration fix, or repo task that benefits from several independent subagents working in parallel. This skill intentionally avoids OpenSpec and heavyweight architecture rituals; it plans only enough to split safe work, launches focused agents by file/module ownership, integrates results, verifies, and reports concisely.
 disable-model-invocation: true
-argument-hint: "<demanda de resolucao rapida>"
+argument-hint: "help | preflight | config | status | resume [slug] | [--model <id>] [--effort <nivel>] [--parallel] [--subagent-model <id>] <demanda>"
 ---
 
 # Executor Subagents

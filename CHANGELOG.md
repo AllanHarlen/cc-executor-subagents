@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0] — 2026-08-19
+
+### Superfície de comando unificada e legível
+
+Os três plugins do pipeline (`/pensador` → `/orquestrador` → `/executor`) passam a compartilhar a mesma gramática de subcomandos e o mesmo vocabulário de flags, em inglês. O `/executor` era o mais desigual dos três: expunha só `preflight` e nenhuma flag, apesar de já rotear por `--parallel`/`--subagent-model` internamente e de já depender da Project_Config compartilhada.
+
+- **Novos subcomandos:** `help`, `config`, `status` e `resume [slug]`.
+  - `config` expõe a stack de agentes que o Executor já lia mas não deixava configurar: é o mesmo `.orchestrator/project-config.md` e o mesmo módulo do `/orquestrador`, então configurar por qualquer um dos dois basta. Antes era preciso rodar `/orquestrador project-config` para configurar o Executor.
+  - `status` e `resume` expõem como comando a lógica de checkpoint (`.executor/checkpoint.json`) que só existia como pergunta dentro da Fase 0.
+- **Novas flags:** `--model`, `--effort`, `--parallel` e `--subagent-model`. Nenhuma cria comportamento novo — são override do roteamento que o Passo 7 já fazia por padrão. Os nomes `--agy-*` são aceitos em silêncio como alias.
+- `argument-hint` (comando e `SKILL.md`) passa a declarar a superfície completa, incluindo o `preflight` que já era suportado mas não aparecia.
+- `handoff-contract.md`: o `nextStage.entrypoint` passou de `/orchestrador` para `/orquestrador`, acompanhando a renomeação do alias em português no Orquestrador. As três cópias seguem byte-idênticas.
+
 ## [1.1.0] — 2026-08-19
 
 ### Correção crítica: implementação de front-end apontava para o subagente read-only do AGY

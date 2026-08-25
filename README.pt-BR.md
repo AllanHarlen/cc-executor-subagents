@@ -171,6 +171,12 @@ Validar:
 ## Uso
 
 ```text
+/executor [--model <id>] [--effort <nível>] [--parallel] [--subagent-model <id>] <demanda>
+```
+
+Subcomandos: `help`, `preflight`, `config`, `status`, `resume [slug]`. O `config` lê e grava o mesmo `.orchestrator/project-config.md` do `/orquestrador` — configurar por um dos dois basta.
+
+```text
 /executor corrija o bug que quebra o login quando o usuário não tem avatar
 ```
 

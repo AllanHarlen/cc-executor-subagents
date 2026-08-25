@@ -1,6 +1,6 @@
 {
   "name": "cc-executor-subagents",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Fast multi-agent executor for Claude Code. Splits quick repo tasks into independent slices, supports pre-defined plan execution with Codex high plan-vs-output review, uses AGY 3.6.0+ (antigravity-coder for implementation, antigravity-agent for read-only analysis/review) for front-end and large-context work, keeps Codex for backend, tests, and review, and reports without OpenSpec ceremony. Agent stack is configurable via a shared Project_Config (.orchestrator/project-config.md) instead of a fixed codex+agy pair.",
   "author": {
     "name": "allanharlen"
