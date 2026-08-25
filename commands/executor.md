@@ -1,16 +1,18 @@
 ---
-description: Executar uma resolucao rapida multiagente sem OpenSpec, dividindo a demanda em fatias independentes, roteando por ownership conforme a Project_Config, integrando e verificando.
-argument-hint: "help | preflight | config | status | resume [slug] | [--model <id>] [--effort <nivel>] [--parallel] [--subagent-model <id>] <demanda>"
+description: Executar uma resolucao rapida multiagente sem OpenSpec, dividindo a demanda em fatias independentes, roteando front-end e imagem para AGY e backend/testes/review para Codex, integrando e verificando.
+argument-hint: "help | preflight | project-config | status | resume [dir] | [--model <id>] [--effort <nivel>] [--parallel] [--subagent-model <id>] <demanda>"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Agent, TaskCreate, TaskUpdate, TaskList, Skill
 ---
 
 # /executor
 
-Resolve rapido uma demanda de repo — bug, refactor localizado, teste quebrado, fatia de feature, UI, asset visual — dividindo em fatias independentes e colocando varios subagentes para atacar partes diferentes ao mesmo tempo. Nao cria OpenSpec e nao trabalha por duplas fixas.
+Inicia o **Executor Subagents** para resolver a demanda descrita em `$ARGUMENTS`.
 
-Para produzir uma especificacao antes de implementar, use `/pensador`; para uma orquestracao pesada a partir de um PRD pronto, use `/orquestrador`.
+Este comando substitui o antigo fluxo de orquestrador pesado. Ele nao cria OpenSpec e nao trabalha por duplas fixas. Quando a demanda ja trouxer um plano pre-definido, preserve esse plano como baseline e rode review Codex high comparando o plano inicial com a entrega gerada. Fora desse caso, o foco e resolver rapido com um mix pragmatico de execucao direta e subagentes independentes.
 
 Nota de permissao: este comando declara `Bash` amplo porque o executor precisa rodar verificacoes proporcionais ao risco do projeto (testes, lint, typecheck, build e preflight). Mesmo assim, use comandos destrutivos somente com autorizacao explicita do usuario.
+
+Para produzir uma especificacao antes de implementar, use `/pensador`; para orquestracao pesada a partir de um PRD pronto, use `/orquestrador`.
 
 ## Sinopse
 
@@ -18,13 +20,13 @@ Nota de permissao: este comando declara `Bash` amplo porque o executor precisa r
 /executor <demanda>                 resolve a demanda com subagentes
 /executor help                      esta ajuda
 /executor preflight                 valida dependencias e encerra
-/executor config                    mostra/altera a stack de agentes do projeto
-/executor status                    execucao atual e historico do checkpoint
-/executor resume [slug]             retoma a execucao interrompida
+/executor project-config            mostra/altera a stack de agentes do projeto
+/executor status [dir]              estado da execucao, read-only
+/executor resume [dir]              retoma a execucao interrompida
 
 flags (antes da demanda, em qualquer ordem):
-  --model <id>           sobrescreve o modelo do executor de front-end
-  --effort <nivel>       sobrescreve o esforco do executor de back-end/review
+  --model <id>           modelo do executor de front-end
+  --effort <nivel>       effort do executor de back-end/review
   --parallel             forca fan-out nativo nas delegacoes AGY
   --subagent-model <id>  modelo dos subagentes AGY (implica --parallel)
 ```
@@ -36,27 +38,107 @@ Interceptam o argumento: se `$ARGUMENTS` comeca com um destes, a demanda **nao**
 | Subcomando | O que faz | Executa |
 |---|---|---|
 | `help` | imprime a Sinopse acima e encerra | nada |
-| `preflight` | valida dependencias e mostra `status`, falhas obrigatorias, avisos e remediacao | `scripts/preflight.mjs` |
-| `config` | mostra e altera a stack de agentes do projeto, sem executar demanda | `skills/executor-subagents/scripts/project-config.mjs` (`show`/`write`) |
-| `status` | mostra `execucao_atual`, fase, risco e o `historico` do checkpoint | le `.executor/checkpoint.json` |
-| `resume [slug]` | retoma a execucao `RUNNING` da fase gravada, sem perguntar | le `.executor/checkpoint.json` e salta para `fase_atual` |
+| `preflight` | valida dependencias e mostra status, falhas, avisos e remediacao | `scripts/preflight.mjs` |
+| `project-config` (alias `config`) | mostra e altera a stack de agentes do projeto | `scripts/project-config.mjs` |
+| `status [dir]` | estado da execucao, sem reparar nem reconciliar | `scripts/executor-state.mjs status` |
+| `resume [dir]` | repara, reconcilia e retoma da fase gravada | `scripts/executor-state.mjs resume` |
 
-> `config` le e grava o **mesmo** `.orchestrator/project-config.md` do `/orquestrador`: Executor e Orquestrador rodam no mesmo projeto e compartilham a configuracao, entao configurar por um dos dois basta. Veja `references/project-config.md`.
+> A Project_Config do Executor vive em `.executor/project-config.md` e e **propria do Executor** — o `/orquestrador` mantem a dele em `.orchestrator/project-config.md`. Configurar um nao configura o outro.
 
 ## Flags
 
 | Flag | Valores | Default | Alias legado |
 |---|---|---|---|
-| `--model <id>` | allowlist de modelos do executor de front-end | escolha por categoria da task | `--agy-model` |
-| `--effort <nivel>` | `medium`, `high` | `medium` na implementacao, `high` no review | — |
+| `--model <id>` | alias/slug aceito pelo executor de front-end | escolha por categoria da task | `--agy-model` |
+| `--effort <nivel>` | `low`, `medium`, `high` | `medium` na implementacao, `high` no review | `--agy-effort` |
 | `--parallel` | — | heuristica (2+ entregaveis AGY independentes) | `--agy-parallel` |
-| `--subagent-model <id>` | mesma allowlist; implica `--parallel` | `inherit` | `--agy-subagent-model` |
+| `--subagent-model <id>` | mesmos valores de `--model`; implica `--parallel` | `inherit` | `--agy-subagent-model` |
 
-As flags sobrescrevem o roteamento que o Passo 7 ja faz por padrao; nenhuma delas cria comportamento novo. Os aliases legados continuam aceitos em silencio.
+As flags sobrescrevem **apenas os parametros da delegacao** (modelo, effort, fan-out). Elas nao mudam **quem** executa: isso vem inteiro da Project_Config. Os aliases legados continuam aceitos em silencio.
 
----
+## Modo help
 
-## Fluxo
+Imprima a Sinopse, a tabela de Subcomandos reservados e a tabela de Flags. Nao rode script nenhum e encerre.
+
+## Modo status
+
+Se o primeiro argumento for `status`, mostre o estado da execucao sem muta-lo:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/executor-state.mjs" status [--dir <artefatos_dir>]
+```
+
+Sem `--dir`, resolve a execucao ativa por `execucao_atual` do indice (`.executor/checkpoint.json`). Apresente fase atual, status por task, risco e pendencias. Este modo e **read-only**: nao repara tail de evento, nao reconcilia e nao muda estado — para isso existe `resume`. Se nao houver execucao (`RUN_NOT_FOUND`), informe e encerre.
+
+## Modo preflight
+
+Se `$ARGUMENTS` for exatamente `preflight`, rode apenas:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
+```
+
+Mostre:
+
+- `status`;
+- falhas obrigatorias;
+- avisos opcionais;
+- remediacao se houver.
+
+Depois encerre.
+
+## Modo project-config
+
+Se o primeiro argumento for `project-config`, este ramo substitui a execucao da demanda. Nao inicialize `artefatos_dir`, nao crie checkpoint nem delegue agentes.
+
+1. Mostre a configuracao vigente e a origem (`file` = `.executor/project-config.md`; `default` = `codex`/`agy`/`codex`/`agy`):
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" show --root "."
+   ```
+
+2. Se `show` retornar `ok: false` com erro do parser, apresente o erro nomeando campo, valor recebido, conjunto aceito e caminho, e ofereca por `AskUserQuestion` a regravacao do arquivo a partir de novas respostas. Nao sobrescreva o arquivo sem confirmacao explicita.
+
+3. Apresente as quatro perguntas de `AskUserQuestion` (`backendExecutor`, `frontendExecutor`, `frontendReviewer`, `backendReviewer`) com o texto, as descricoes de papel e a CLI exigida por opcao de `references/project-config.md`, marcando o **valor vigente** de cada papel como default.
+
+4. Grave as respostas. Papel sem resposta entra em `--default-applied`:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write --root "." \
+     --backend-executor "<codex|agy|claude-code>" \
+     --frontend-executor "<codex|agy|claude-code>" \
+     --backend-reviewer "<codex|agy|claude-code>" \
+     --frontend-reviewer "<codex|agy|claude-code>" \
+     --default-applied "<papel,papel>"
+   ```
+
+5. Rode o preflight uma vez, sempre, inclusive quando `changed` vier vazio:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
+   ```
+
+6. Se o preflight ainda reprovar uma CLI obrigatoria ou o plugin que a conecta, mostre a `remediation` e pergunte se o usuario quer corrigir a dependencia ou trocar o papel de novo. Depois disso encerre o comando; nenhuma execucao e iniciada.
+
+## Modo resume
+
+Se o primeiro argumento for `resume`, este ramo substitui o inicio de uma execucao nova. Trate o segundo argumento, quando presente, como o `artefatos_dir` explicito a retomar; sem ele, o comando resolve a execucao ativa sozinho.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/executor-state.mjs" resume [--dir <artefatos_dir>]
+```
+
+Sem `--dir`, `resume` le `execucao_atual` do indice (`.executor/checkpoint.json`) para achar a execucao ativa. Se nao houver nenhuma (`RUN_NOT_FOUND`), informe o erro e encerre sem iniciar uma execucao nova implicitamente.
+
+O comando faz: reparo de tail de evento incompleto -> replay -> qualquer task `RUNNING` interrompida vira `UNKNOWN` (nunca `FAILED`/`DONE` presumido) -> reconciliacao contra Git/arquivos/validacoes -> devolve `resumeFromPhase`, `unknownTasks`, `pendingExternalProbes`, `recommendations` e `projectConfigDrift`.
+
+Para cada task em `pendingExternalProbes`, correlacione pelo `sessionId` (Codex) ou `conversationId` (AGY) com a capacidade de status/retomada do subagente instalado. Se a integracao nao expuser status autoritativo, mantenha `UNKNOWN` e trate Git/arquivos/validacoes como corroboracao, nunca como prova isolada de sucesso — grave um probe file (formato em `references/persistent-state.md`) e rode `executor-state.mjs reconcile --dir <artefatos_dir> --probe-file <path>` antes de decidir reexecutar.
+
+Nao redelegue uma task `UNKNOWN` sem antes confirmar que a sessao/conversa anterior nao segue ativa. Se `projectConfigDrift.changed` for `true`, informe a diferenca papel a papel ao usuario antes de continuar — a Fase 1.2 do port so reporta o drift, nao o aplica automaticamente.
+
+Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhase`, pulando as fases ja concluidas. Nao trate `resume` como uma demanda nova: nao rode a Fase 1 (triagem) nem redefina `artefatos_dir`.
+
+## Execucao normal
 
 1. Rode o preflight:
 
@@ -64,13 +146,15 @@ As flags sobrescrevem o roteamento que o Passo 7 ja faz por padrao; nenhuma dela
    node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
    ```
 
-2. Se `status: "failed"` e a falha envolver Codex, verifique o `$ARGUMENTS` antes de cancelar: se a demanda for claramente front-end puro (UI, componente, layout, imagem, asset visual) **e nao houver plano pre-definido**, prossiga sem Codex — Codex nao e necessario para implementar tasks `UI_FRONTEND` ou `IMAGE_ASSET`. Se houver plano pre-definido, Codex high e necessario para o review read-only plano-vs-entrega; mostre `remediation` e pergunte se o usuario quer corrigir Codex, continuar assumindo o risco sem esse review, ou cancelar. Para qualquer outra natureza de task, cancele e mostre `remediation`.
+   O preflight deriva a obrigatoriedade de `codex`/`agy` e seus plugins da Project_Config (`.executor/project-config.md`). Sem arquivo, usa o default `codex`/`agy`/`codex`/`agy`. Nao ha mais excecao ad-hoc por tipo de demanda: a obrigatoriedade vem inteira da configuracao.
 
-3. Se `status: "failed"` e somente AGY ou o `cc-antigravity-plugin` falharem, mostre `remediation` e pergunte ao usuario se quer:
+2. Se `status: "failed"`, mostre `remediation` e pergunte ao usuario se quer:
 
-   - corrigir AGY e tentar de novo;
-   - continuar so com Codex;
+   - corrigir a CLI/plugin ausente e tentar de novo;
+   - trocar o papel afetado para `claude-code` (`node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write --backend-executor claude-code ...` ou o papel equivalente), rodar o preflight de novo e deixar o Executor (Claude) assumir essas tasks diretamente;
    - cancelar.
+
+3. Verifique `checks.optional.mcp.context7.ok` e `checks.optional.mcp["codebase-memory"].ok`. Para cada um `false`, acione o Dependency_Installer (`references/project-config.md`, `references/workflow.md` Fase 0): uma `AskUserQuestion` por dependencia ausente ("instalar" / "seguir sem instalar"), nomeando beneficio, impacto de seguir sem e o comando de `buildMissingDependencies(report, { platform })` (`scripts/lib/dependency-plan.mjs`). So execute o comando apos "instalar"; depois de qualquer instalacao confirmada, rode o preflight de novo antes de seguir. MCP ausente nunca bloqueia — "seguir sem instalar" registra a limitacao e segue.
 
 4. Carregue a skill:
 
@@ -80,7 +164,7 @@ As flags sobrescrevem o roteamento que o Passo 7 ja faz por padrao; nenhuma dela
 
    Se a tool de Skill recusar por `disable-model-invocation: true`, leia `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/SKILL.md` e siga diretamente.
 
-5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orquestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/report/handoff.json` (com fallback para `.orchestration/<slug>/handoff.json`, layout antigo), siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
+5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/report/handoff.json` (raiz `.orchestration/<slug>/handoff.json` apenas em runs anteriores ao layout v2 do Orchestrador), siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
 
 6. Decida:
 
@@ -88,15 +172,15 @@ As flags sobrescrevem o roteamento que o Passo 7 ja faz por padrao; nenhuma dela
    - usar 1 agente;
    - usar multiplos agentes independentes.
 
-7. Roteie por padrao (respeitando a Project_Config e as flags de override):
+7. Roteie pelo papel efetivo na Project_Config (`frontendExecutor`/`backendExecutor`, default `agy`/`codex`), nao por uma regra fixa:
 
-   - front-end/UI: `cc-antigravity-plugin:antigravity-coder`;
-   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex): `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo); adicione `--subagent-model gemini-3.5-flash-medium` para subagentes mais baratos;
-   - imagem explicita: `cc-antigravity-plugin:antigravity-coder --generate-imagem`;
-   - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only` (somente leitura);
-   - backend/testes/review: Codex.
+   - front-end/UI: `frontendExecutor` (default `cc-antigravity-plugin:antigravity-coder`; `claude-code` delega a um subagente Task do proprio Claude);
+   - varios entregaveis AGY independentes (relatorios, componentes, arquivos sem Codex), quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo); adicione `--subagent-model flash` para subagentes mais baratos;
+   - imagem explicita, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-coder --generate-image`;
+   - analise pura, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --read-only` (somente leitura, nunca implementa);
+   - backend/testes/review: `backendExecutor`/`backendReviewer` (default Codex; `claude-code` delega a um subagente Task do proprio Claude).
 
-8. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
+7. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
 
    ```text
    {artefatos_dir}/initial-plan-baseline.md (somente se houver plano pre-definido)
@@ -107,13 +191,13 @@ As flags sobrescrevem o roteamento que o Passo 7 ja faz por padrao; nenhuma dela
 
    Mantenha `{artefatos_dir}/monitoring.md` atualizado durante as Fases 4-8: status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase. **Nunca crie artefatos .md na raiz do projeto.**
 
-9. Delegue em paralelo por ownership, nao por dupla fixa.
+8. Delegue em paralelo por ownership, nao por dupla fixa.
 
-10. Integre e rode verificacoes.
+9. Integre e rode verificacoes.
 
-11. Se `plano_predefinido: true`, execute a **Fase 6.5 - Review plano vs entrega**: use Codex high read-only para comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e os arquivos gerados. Salve o parecer em `{artefatos_dir}/plan-vs-output-review.md`; se houver desalinhamento, corrija ou registre o bloqueio antes de fechar.
+10. Se `plano_predefinido: true`, execute a **Fase 6.5 - Review plano vs entrega**: use Codex high read-only para comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e os arquivos gerados. Salve o parecer em `{artefatos_dir}/plan-vs-output-review.md`; se houver desalinhamento, corrija ou registre o bloqueio antes de fechar.
 
-12. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH, plano pre-definido ou rastreabilidade solicitada, gere em `{artefatos_dir}/`:
+11. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH, plano pre-definido ou rastreabilidade solicitada, gere em `{artefatos_dir}/`:
 
    ```text
    {artefatos_dir}/workflow-log.md
@@ -124,54 +208,6 @@ As flags sobrescrevem o roteamento que o Passo 7 ja faz por padrao; nenhuma dela
    ```
 
    Use os templates em `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/assets/`. O `implementation-report.md` deve incluir o resultado do review plano-vs-entrega quando houver plano pre-definido e a secao 14 com instrucoes de negocio quando houver contexto de negocio real (o que mudou, como homologar, regras, impactos operacionais e proximo passo recomendado).
-
----
-
-## Modos
-
-### Modo help
-
-Imprima a Sinopse, a tabela de Subcomandos reservados e a tabela de Flags. Nao rode script nenhum e encerre.
-
-### Modo preflight
-
-Rode apenas:
-
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs"
-```
-
-Mostre `status`, falhas obrigatorias, avisos opcionais e a remediacao se houver. Depois encerre.
-
-### Modo config
-
-Mostre a configuracao vigente e a origem:
-
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/scripts/project-config.mjs" show --root "."
-```
-
-Se o usuario quiser alterar, apresente as quatro perguntas de `AskUserQuestion` (`backendExecutor`, `frontendExecutor`, `backendReviewer`, `frontendReviewer`) com as descricoes de `references/project-config.md`, marcando o valor vigente como default, e grave:
-
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/scripts/project-config.mjs" write --root "." \
-  --backend-executor "<codex|agy|claude-code>" \
-  --frontend-executor "<codex|agy|claude-code>" \
-  --backend-reviewer "<codex|agy|claude-code>" \
-  --frontend-reviewer "<codex|agy|claude-code>"
-```
-
-Nunca edite `.orchestrator/project-config.md` a mao: o renderer e a unica rota de gravacao. Rode o preflight ao final e encerre; nenhuma demanda e executada.
-
-### Modo status
-
-Leia `.executor/checkpoint.json` e mostre, read-only: a `execucao_atual` (demanda, `artefatos_dir`, `fase_atual`, `status`, risco, agentes lancados) e o `historico` de execucoes arquivadas. Nao retome, nao arquive e nao crie execucao. Sem checkpoint, diga que nao ha execucao registrada.
-
-### Modo resume
-
-Com `slug`, retome aquela execucao; sem `slug`, a `execucao_atual` quando estiver `RUNNING`. Diferente da Fase 0 normal, **nao** pergunte "retomar ou iniciar nova execucao" — a escolha ja foi feita ao digitar `resume`. Restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint e continue da `fase_atual`. Se a execucao estiver `DONE`, `FAILED` ou `CANCELLED`, informe que nao ha o que retomar e ofereca iniciar uma nova.
-
----
 
 ## /goal autonomo
 
@@ -189,7 +225,7 @@ Se a demanda for uma edicao trivial que voce consegue fazer em menos tempo do qu
 
 Use updates curtos:
 
-- "preflight OK; AGY 3.6.0+ validado para front-end, fan-out nativo e analise";
+- "preflight OK; cc-antigravity-plugin 4.0.0+ e AGY 1.1.8+ validados para front-end, fan-out nativo e analise";
 - "vou dividir em 3 slices independentes";
 - "lancei 3 agentes em paralelo; ownership: testes, service, front-end";
 - "verificacao passou/falhou; estou integrando o ajuste final".

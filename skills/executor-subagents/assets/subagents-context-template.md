@@ -32,7 +32,7 @@
 | Campo | Valor |
 |---|---|
 | Task | <descricao da slice> |
-| Modelo | <codex gpt-5.4 medium \| codex gpt-5.5 high \| agy gemini-3.5-flash-medium \| agy gemini-3.1-pro-high \| agy --generate-imagem> |
+| Modelo | <codex gpt-5.4 medium \| codex gpt-5.5 high \| agy --model flash --effort medium \| agy --model pro --effort high \| agy --generate-image> |
 | Status | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING \| PENDENTE |
 | Tokens (in/out/cache/total) | N/A |
 | Arquivos alterados | <lista> |

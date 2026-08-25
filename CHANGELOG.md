@@ -1,78 +1,222 @@
 # Changelog
 
-## [1.2.0] — 2026-08-19
+Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
-### Superfície de comando unificada e legível
+## [2.4.0] - 2026-08-25 - Superficie de comando unificada e legivel
 
-Os três plugins do pipeline (`/pensador` → `/orquestrador` → `/executor`) passam a compartilhar a mesma gramática de subcomandos e o mesmo vocabulário de flags, em inglês. O `/executor` era o mais desigual dos três: expunha só `preflight` e nenhuma flag, apesar de já rotear por `--parallel`/`--subagent-model` internamente e de já depender da Project_Config compartilhada.
+Os tres plugins do pipeline (`/pensador` -> `/orquestrador` -> `/executor`) passam a compartilhar a mesma gramatica de subcomandos e o mesmo vocabulario de flags, em ingles. O `/executor` era o mais desigual dos tres: o `argument-hint` declarava apenas `<demanda de resolucao rapida>`, escondendo `preflight`, `project-config` e `resume`, que ja existiam.
 
-- **Novos subcomandos:** `help`, `config`, `status` e `resume [slug]`.
-  - `config` expõe a stack de agentes que o Executor já lia mas não deixava configurar: é o mesmo `.orchestrator/project-config.md` e o mesmo módulo do `/orquestrador`, então configurar por qualquer um dos dois basta. Antes era preciso rodar `/orquestrador project-config` para configurar o Executor.
-  - `status` e `resume` expõem como comando a lógica de checkpoint (`.executor/checkpoint.json`) que só existia como pergunta dentro da Fase 0.
-- **Novas flags:** `--model`, `--effort`, `--parallel` e `--subagent-model`. Nenhuma cria comportamento novo — são override do roteamento que o Passo 7 já fazia por padrão. Os nomes `--agy-*` são aceitos em silêncio como alias.
-- `argument-hint` (comando e `SKILL.md`) passa a declarar a superfície completa, incluindo o `preflight` que já era suportado mas não aparecia.
-- `handoff-contract.md`: o `nextStage.entrypoint` passou de `/orchestrador` para `/orquestrador`, acompanhando a renomeação do alias em português no Orquestrador. As três cópias seguem byte-idênticas.
+- **`argument-hint` completo**, declarando toda a superficie em vez de so a demanda.
+- **Novos subcomandos:** `help` (imprime Sinopse, Subcomandos e Flags) e `status [dir]` (estado read-only via `executor-state.mjs status`, sem reparar tail nem reconciliar — para isso continua existindo `resume`). `config` passa a valer como alias de `project-config`.
+- **Novas secoes no comando:** Sinopse, Subcomandos reservados e Flags no topo do arquivo, antes dos modos.
+- **Flags de override documentadas:** `--model`, `--effort`, `--parallel` e `--subagent-model`, com os nomes `--agy-*` aceitos em silencio como alias legado. Elas sobrescrevem apenas os parametros da delegacao; **quem** executa continua vindo inteiro da Project_Config.
+- `handoff-contract.md`: o `nextStage.entrypoint` passou de `/orchestrador` para `/orquestrador`, acompanhando a renomeacao do alias em portugues no Orquestrador. As tres copias seguem byte-identicas.
 
-## [1.1.0] — 2026-08-19
+## [2.3.0] - 2026-08-24 - Deteccao de MCP por agente (`--check-agent-mcp`) e oferta de instalacao
 
-### Correção crítica: implementação de front-end apontava para o subagente read-only do AGY
+O check agregado `checks.optional.mcp.<servidor>.ok` prova apenas que o Codebase Memory MCP ou o
+Context7 estao registrados *em algum lugar* da maquina — nao que o Codex ou o AGY especificamente
+os tem. Isso fazia o placeholder de grafo/Context7 ir para o prompt de uma task Codex/AGY mesmo
+quando aquela CLI especifica nao tinha a ferramenta.
 
-O Orquestrador (`cc-orchestrador-subagents`) corrigiu este mesmo bug na sua versão 3.5.0: todo o roteamento de implementação/imagem/fan-out do Executor apontava para `cc-antigravity-plugin:antigravity-agent`, que é **somente leitura** (análise, planejamento, review) — quem escreve arquivo é `cc-antigravity-plugin:antigravity-coder`. O Executor nunca recebeu essa correção porque ficou 4 releases atrás do Orquestrador.
+- `scripts/lib/mcp-agent-cli.mjs` (novo): introspeccao real via `codex mcp list --json`/`agy mcp
+  list`, em vez de adivinhar por convencao de arquivo. Redacao estrita — nunca extrai
+  `transport.http_headers`/`transport.env`/URL/comando (podem carregar uma chave de API real), so
+  `name`/`enabled`/`type`. Corrige um bug de plataforma: `execFileSync` sem shell falhava
+  silenciosamente contra o `codex.cmd`/`.ps1` do npm no Windows; trocado por `execSync`.
+- `scripts/lib/mcp-agent-install.mjs` (novo): registra (`installAgentMcp`) e remove
+  (`removeAgentMcp`) um servidor no CLI do agente, com os comandos reais confirmados ao vivo.
+  Nunca roda sozinho — so depois de aprovacao explicita via `AskUserQuestion`, mesmo padrao do
+  instalador do Open Design (`cc-pensador`).
+- `scripts/preflight.mjs`: nova flag opt-in `--check-agent-mcp` publica
+  `checks.optional.mcpPerAgent.<agent>.<servidor>`, com `install` preenchido so quando
+  `checked: true, ok: false`.
+- `references/mcp-context.md`, `references/subagent-prompts.md`, `references/preflight-check.md`:
+  documentam a ordem de preferencia (`mcpPerAgent` por agente > `mcp` agregado como fallback) e a
+  secao "Oferta de instalacao por agente". Placeholder `Codebase Memory:` adicionado ao lado de
+  cada `Context7:` no template real de prompts (antes so existia documentado, nao no template).
+- `tests/mcp-agent-cli.test.mjs`, `tests/mcp-agent-install.test.mjs`, `tests/mcp-prompt-wiring.test.mjs`
+  (novos): 26 testes, incluindo fixtures reais capturados ao vivo e um caso que garante que nenhum
+  comando de instalacao carrega uma chave de API.
 
-- **`antigravity-coder` agora é o subagente de implementação** em `references/agent-stack.md`, `references/subagent-prompts.md` (§3 UI/front-end, §7 imagem/asset, §8 fan-out paralelo), `references/parallelization.md`, `SKILL.md` e `commands/executor.md`. `antigravity-agent` permanece exclusivo para análise cross-file/review (§6, `--read-only`).
-- **`scripts/preflight.mjs` agora valida a presença dos dois arquivos de agente** (`agents/antigravity-coder.md` e `agents/antigravity-agent.md`) na versão instalada do `cc-antigravity-plugin`, espelhando a validação já existente no Orquestrador — evita que um plugin desatualizado passe silenciosamente no preflight.
-- Regra explícita adicionada em "Regras de segurança operacional" do `SKILL.md`: nunca delegar implementação para `antigravity-agent`.
+## [2.2.0] - Correcao da postura sobre OpenSpec
 
-### Correção crítica: modo conjunto Orchestrador → Executor estava rompido pelo layout 2
+O SKILL mandava os subagentes ignorarem toda skill `openspec`/`opsx`, ao mesmo tempo em que o
+proprio plugin publicava a tabela de ingestao do artefato de handoff `openspec-change` — uma
+contradicao. Reformulado para: o Executor **nao aciona** OpenSpec (nao cria `openspec/`, nao chama
+`/opsx:*`/`openspec-*`, nao bloqueia por ausencia do CLI), mas **pode consumir** um handoff do
+Orchestrador com role `openspec-change` como baseline somente-leitura.
 
-O Orquestrador 4.1.0 reorganizou o diretório da run por estágio e moveu o manifesto de handoff de `.orchestration/<slug>/handoff.json` para `.orchestration/<slug>/report/handoff.json`. O Executor continuava procurando só o caminho antigo — sem erro, ele simplesmente não encontrava o manifesto e tratava toda entrega orquestrada recente como demanda avulsa, perdendo baseline, contrato e design.
+- `skills/executor-subagents/SKILL.md`, `README.md`, `README.pt-BR.md`: texto ajustado (ver acima).
+- `references/handoff-contract.md`: papel `openspec-change` atualizado (specs opcionais/aninhadas,
+  mudanca gerida por `/opsx:propose`). Sincronizado byte-a-byte com a copia canonica em
+  `cc-pensador`.
+- `.claude/settings.json`: removida a entrada `Bash(openspec publish:*)` (comando inexistente; este
+  plugin nao chama o CLI OpenSpec).
 
-- **Descoberta tolerante ao layout**, em `SKILL.md`, `references/workflow.md` e `commands/executor.md`: tenta `report/handoff.json` (layout 2) primeiro, cai para `handoff.json` (layout 1) quando ausente, e registra qual caminho respondeu em `plano_predefinido_fonte`.
-- O fallback sem manifesto também foi atualizado: `report/implementation-report.md` + `plan/tasks-classification.md` + `plan/waves.md` + `contracts/`, com fallback para os mesmos nomes na raiz quando o layout 2 não existe.
-- O `handoff.json` que o próprio Executor emite agora aponta `upstream` para o caminho que de fato respondeu na ingestão, não para um caminho fixo.
+### Teste de reconciliacao deixou de depender da arvore de trabalho do proprio repo
 
-### `handoff-contract.md` ressincronizado, byte-idêntico nos três plugins
+`tests/executor-state.test.mjs` — "reconcile without an authoritative probe keeps an UNKNOWN task
+UNKNOWN" chamava `initRun({ slug, artifactDir })` sem `projectRoot`. Com isso
+`resolveProjectRoot` caia no fallback `process.cwd()`, que e o **repositorio do plugin**, nao o
+fixture: `pathEvidence` procurava `src/output.txt` na raiz errada (`exists: false`) e `inspectGit`
+inspecionava o repo errado.
 
-O documento se declara "idêntico nos três plugins" desde sempre, mas a cópia do Executor estava 52 linhas atrás da versão real (faltavam a seção "Modos de operação" do 3.3.0 e "Open Design: contrato visual e materialização" do 3.2.x). Copiado verbatim da versão canônica (`cc-orchestrador-subagents`, agora também espelhada em `cc-pensador`). `test/handoff-contract-sync.test.js` do `cc-pensador` — que verifica essa promessa e ficava com 2 skips em checkout isolado — passa a cobrir de fato num workspace com os três repositórios lado a lado.
+O teste so passava quando a arvore de trabalho do plugin estava suja — ai `changedFiles` vinha
+nao-vazio e satisfazia o mesmo ramo `VERIFY_BEFORE_REEXECUTE` **pelo motivo errado**. Com o repo
+limpo, falhava. Agora passa `projectRoot: root`, alinhado com a convencao que
+`tests/completion-gates.test.mjs` ja usava, e a assercao passa a se sustentar na evidencia do
+proprio fixture. O teste vizinho que faz `process.chdir(root)` de proposito (para exercitar a
+recuperacao por `artifactRoot` com `artifactDir` de 2 niveis) foi preservado como esta.
 
-### Stack de agentes configurável (Project_Config compartilhada)
+## [2.1.0] - Alinhamento com o cc-antigravity-plugin 4.0
 
-O preflight exigia `codex` **e** `agy` sempre, contornado por perguntas ad-hoc de fallback na Fase 0 quando uma CLI faltava. Agora o Executor lê a mesma **Project_Config** do Orquestrador — `.orchestrator/project-config.md`, quatro papéis (`backendExecutor`, `frontendExecutor`, `backendReviewer`, `frontendReviewer`), cada um `codex`, `agy` ou `claude-code` — via os módulos compartilhados `scripts/lib/project-config.mjs` e `scripts/lib/dependency-plan.mjs` (copiados verbatim do Orquestrador). Executor e Orquestrador rodando no mesmo projeto compartilham a mesma configuração; uma run do `/orquestrador` que já resolveu a Project_Config é herdada pelo `/executor` sem repetir as quatro perguntas.
+Atualiza o Executor para o contrato do `cc-antigravity-plugin` 4.0.0 (AGY 1.1.8+, `1.1.16`
+recomendado). O `cc-orchestrador-subagents` ja tinha passado por essa migracao — incluindo um hotfix
+critico de roteamento — e este release porta o mesmo conserto para o Executor.
 
-- Novos papéis mapeados ao vocabulário do Executor em `references/project-config.md`: `backendExecutor` decide `BUG`/`REFACTOR`/`TEST_FIX`/`DOCS`/fatia back-end; `frontendExecutor` decide `UI_FRONTEND`/`IMAGE_ASSET`/fatia front-end; `backendReviewer` decide o review Codex high da Fase 6.5/risco `HIGH`; `frontendReviewer` decide o review de fatia UI.
-- Nova CLI `scripts/project-config.mjs` (`show`, `write`, `validate`, `required-clis`), cópia fina do CLI do Orquestrador.
-- `scripts/preflight.mjs` reescrito: `checks` agora expõe `config["project-config"]`, `cli`, `plugins`, `permissions`, `capabilities` e `optional.mcp`/`optional.permissions`; `failed`/`warnings` são derivados do Required_CLI_Set da Project_Config (`codex` obrigatória sse algum papel usa `codex`; `agy` idem) em vez de uma lista fixa. Com os quatro papéis em `claude-code`, `/executor` roda com `status: "ok"` e `failed: []` sem nenhuma CLI externa instalada.
-- Fase 0 do `SKILL.md` reestruturada em 0.1 (preflight) / 0.2 (resolução da Project_Config, quatro perguntas só quando o arquivo está ausente) / 0.3 (Dependency_Installer: uma pergunta `AskUserQuestion` por dependência ausente, com opção de trocar o papel afetado para `claude-code` quando o usuário recusa uma CLI obrigatória).
+**Requisito de ambiente novo (efeito de breaking na pratica):** o preflight agora exige
+`cc-antigravity-plugin >= 4.0.0`. Instalacoes com uma versao anterior do plugin (por exemplo `3.8.0`)
+passam a reprovar o preflight ate rodar `/plugin install cc-antigravity-plugin@cc-antigravity-plugin`
+— a remediacao sai impressa no proprio relatorio.
 
-### Protocolo de MCP: Context7 e Codebase Memory
+### Corrigido
 
-- **Context7:** `references/agent-stack.md` ganha a ordem obrigatória — resolver o identificador da biblioteca antes de pedir documentação, mesmo quando "já conhecido" de uma consulta anterior na mesma execução — e a regra de que a chave de API nunca entra em prompt, artefato ou checkpoint.
-- **Codebase Memory (novo, opcional):** `scripts/preflight.mjs` ganha `checks.optional.mcp.codebase-memory` (mesma heurística de detecção do Context7: CLI no PATH, skill instalada, ou menção em `.mcp.json` conhecido); `scripts/lib/dependency-plan.mjs` já sabe oferecer a instalação quando ausente. Uso documentado na Fase 1 (triagem): `search_graph`/`trace_path` para localizar owner e raio de impacto mais barato que `Grep`/`Glob` isolados — resultado de grafo é pista, confirmado por leitura do arquivo antes de fixar ownership.
+- **CRITICO — todo o roteamento de implementacao front-end/imagem/fan-out apontava para
+  `cc-antigravity-plugin:antigravity-agent`**, que no plugin 4.0 e **somente leitura**
+  (`tools: Bash(node *antigravity-bridge.js* --read-only*)`). A task de UI, imagem ou fan-out AGY nao
+  escrevia arquivo nenhum. Corrigido em `agent-stack.md`, `subagent-prompts.md`, `parallelization.md`,
+  `SKILL.md`, `commands/executor.md` e `workflow.md`: implementacao vai para `antigravity-coder`;
+  `antigravity-agent` fica reservado para analise/review read-only.
 
-### Endurecimento do review Codex plano-vs-entrega (Fase 6.5)
+### Alterado
 
-Regras que o Orquestrador já aplicava desde o 3.5.0, agora também no prompt `2.1 Codex review plano vs entrega high` e no review geral (`2. Codex review high`) de `references/subagent-prompts.md`:
+- Flags AGY atualizadas para a superficie 4.0: `--mode accept-edits`/`--mode plan`, `--format
+  json|stream-json`, `--effort low|medium|high`, `--json-schema`. `--agent <nome>` agora exige valor
+  e seleciona um agente customizado do AGY; sessao humana usa `--interactive` (o Executor, sendo
+  headless, nunca usa essa flag).
+- Modelos AGY passam a ser referenciados por alias de familia (`--model flash`, `--model pro`) em vez
+  de slugs pinados (`gemini-3.5-flash-medium`, `gemini-3.1-pro-high`) — o bridge resolve o alias
+  contra o catalogo dinamico de `agy models`, entao a prosa nao envelhece a cada release do AGY.
+- Escada de fallback AGY: `--model pro --effort high` → `--model flash --effort medium` →
+  Executor (Claude) direto.
+- Retomada apos `QUOTA_EXHAUSTED`: preferir `--conversation <id>` quando o envelope de erro trouxer
+  um `conversation_id` exato; usar `--continue` somente quando nao houver ID disponivel.
+- `preflight.mjs`: `MIN_ANTIGRAVITY_PLUGIN_VERSION` `3.6.0` → `4.0.0`; novos `MIN_AGY_VERSION`
+  (`1.1.8`) e `RECOMMENDED_AGY_VERSION` (`1.1.16`) checados via `agy --version`; `checkCli` ganhou
+  suporte a `minVersion`/`recommendedVersion`; `REQUIRED_AGY_FLAGS`/`REQUIRED_BRIDGE_FLAGS` ampliados
+  para as flags 4.0; `checkAntigravityBridge` passa a exigir tambem os arquivos do plugin instalado
+  (`agents/antigravity-coder.md`, `agents/antigravity-agent.md`, `commands/antigravity.md`,
+  `scripts/antigravity-bridge.js`).
+- Papel Imagem/asset (`agent-stack.md`) passa a usar `antigravity-coder` com a tool nativa
+  `generate_imagem` — o modelo removido `nano-banana` nao existe mais no bridge 4.0.
 
-- `// TODO`, `NotImplementedException`, placeholder ou stub no caminho de um requisito do plano/demanda é achado **BLOQUEANTE**, nunca "lacuna conhecida".
-- Em fatia de UI: elemento interativo sem `:hover`/`:focus` reais via CSS é achado bloqueante quando o plano exige esses estados — `style={{}}` inline não expressa pseudo-classe. Refletido também no prompt de implementação AGY (§3), nos "Estados obrigatórios".
+### Adicionado
 
-### Verificação em navegador real, proporcional à fatia (Fase 6)
+- Pipeline `IMAGE_SUGGESTIONS` (`references/subagent-prompts.md` secao 3a, espelhando o
+  `cc-orchestrador-subagents`): quando a task front-end devolve sugestoes de imagem, o Executor
+  apresenta as opcoes ao usuario via `AskUserQuestion` (`multiSelect`) antes de qualquer
+  `--generate-image`. Ganchado na Fase 5 (Integracao) de `SKILL.md` e `references/workflow.md`.
+- Dois guards de doc-sync em `tests/docs-consistency.test.mjs`: um routing guard (secoes de
+  implementacao AGY nunca declaram `antigravity-agent`) e um version guard (`MIN_ANTIGRAVITY_PLUGIN_VERSION`
+  precisa aparecer consistente entre `preflight.mjs` e a prosa) — a divergencia `3.6.0` (prosa) vs
+  `4.0.0` (codigo) que motivou este release nao teria passado despercebida com esses guards.
+- `executor-spec.mjs`: `RETIRED_IDENTIFIERS` ganhou `nano-banana`, `gemini-3.5-flash-medium` e
+  `gemini-3.1-pro-high`.
 
-`build`/`tsc`/`curl` não detectam CORS ausente, resolução de tenant/host feita a partir do browser, mismatch de casing na resposta, nem "200 mas silenciosamente quebrado" — a mesma classe de defeito que motivou a Fase 9.5 do Orquestrador (3.4.0). Regra proporcional adicionada à Fase 6 do `SKILL.md`: quando a fatia toca front-end que chama back-end em origem separada, dirigir o fluxo alterado (não a app inteira) num navegador real antes de reportar concluído; sem ferramenta de navegador, reportar `PARTIAL` com a limitação registrada.
+## [2.0.1] - Correcoes de review
 
-### Intelligence determinística: `validate-task-scope.mjs` e `inspect-diff.mjs`
+Quatro defeitos encontrados em review do proprio port, todos com teste de regressao. Nenhum estava coberto pela suite anterior — os testes exercitavam o caminho feliz de cada script, e o caso dos gates chegava a cristalizar o comportamento errado.
 
-Dois scripts novos e independentes do state engine do Orquestrador (o Executor não tem `state.json`; escopo é passado via `--allowed`, não lido de um modelo de tasks persistido):
+### Corrigido
 
-- `scripts/validate-task-scope.mjs` — compara arquivos alterados (`git diff`/`ls-files --others`) contra os padrões de ownership de uma fatia, mecanizando o passo 2 da Fase 5 ("verifique se houve toque fora do ownership").
-- `scripts/inspect-diff.mjs` — estatísticas de diff + sinalização mecânica de risco (migration, lockfile, auth/tenancy, arquivo sensível, possível segredo, TODO novo, artefato de debug).
+- **`validate-scope.mjs` dava falso negativo quando o agente commitava o trabalho** (o mais grave: e o gate que existe para pegar escrita fora do ownership). Um agente que commita deixa a working tree limpa, e o gate olhava so `git.changedFiles` — reportava `valid: true` com zero arquivos exatamente no caso que deveria acusar. Agora o baseline cai para o `commitBefore` da task quando `--since` nao e passado; o `commitBefore` ja e capturado sozinho no `task --status RUNNING`, entao nao ha flag nova a lembrar. O `summary.sinceCommit` passa a reportar qual baseline foi usado.
+- **`initRun` e `resolveProjectRoot` discordavam sobre a raiz do projeto**: o primeiro usava `process.cwd()`, o segundo adivinhava `join(artifactDir, "..", "..", "..")`. Com um `artifactDir` fora da convencao de 3 niveis, um arquivo existente era reportado como ausente e uma task legitimamente pronta era rejeitada com `TASK_EXPECTED_FILES_MISSING`. A raiz agora e recuperada do `state.artifactRoot` gravado no `init`, com `process.cwd()` como ultimo recurso — sem adivinhacao por profundidade.
+- **`executor-gates.mjs plan` falhava aberto**: `--risk` com typo ou sem valor caia para `LOW`, que e a resposta mais permissiva (zero gates), desligando silenciosamente toda a verificacao. Agora rejeita (`INVALID_RISK_LEVEL`), e `--risk` ausente vira `MISSING_ARGUMENT`.
+- **Flag sem valor vazava erro cru do Node em vez do contrato JSON da CLI**: `parseArgs` transforma `--payload` em `true`, e `required()` so rejeitava `undefined`/`""`. Afetava `check-agy-prompt --file`, `validate-wire-format --payload` e `collect-test-results --input`, que devolviam `ERR_INVALID_ARG_TYPE`/`Cannot read properties of undefined` com exit 1 em vez de `MISSING_ARGUMENT` com exit 2. Corrigido na raiz (`required()` e `numberArg()` de `lib/cli-utils.mjs`, mais a copia em `scripts/executor-state.mjs`), o que cobre a classe inteira.
 
-Wired na Fase 5 do `SKILL.md` e do `references/workflow.md`, para uso quando houver 3+ agentes ou ownership complexo.
+## [2.0.0] - Layout por estagio, gates de conclusao e documentacao
 
-### Regras de fechamento da contagem de tokens
+Fase 2.0 (final) do port Tier 1/Tier 2 de capacidades do `cc-orchestrador-subagents`. Fecha o ciclo: os artefatos passam a viver agrupados por estagio, e uma run so pode fechar `DONE` com os gates de conclusao fechados — nao so com as tasks terminais.
 
-`assets/workflow-log-template.md`, `assets/subagents-context-template.md` e `assets/implementation-report-template.md` ganham as regras explícitas do Orquestrador 4.1.0: dado não reportado é `N/A` e nunca `0`; agente que não executou fica `N/A` na linha inteira; com `--parallel` o total do AGY já é o agregado da sessão; rodada de review repetida soma na mesma linha com a contagem de rodadas; as tabelas de todos os relatórios precisam fechar no mesmo total.
+### Alterado (mudanca de contrato)
 
-## [1.0.0] — 2026-07-13
+- **`ARTIFACT_LAYOUT_VERSION` 1 → 2**: runs novas agrupam artefatos por estagio (`plan/`, `run/`, `review/`, `report/`, `evidence/`) em vez de tudo na raiz. `handoff.json`, `initial-plan-baseline.md`, `state.json`, `events.jsonl` e `.state.lock` continuam **sempre** na raiz — a infraestrutura de layout 2 (`scripts/lib/artifact-layout.mjs`) ja existia desde a Fase 1.2, essa versao so muda o default. Runs criadas nas Fases 1.1/1.2 (layout 1) continuam legiveis, sem migracao automatica: leitura sempre tenta layout 2 e cai para a raiz.
+- `SKILL.md` ganha uma tabela "Layout de artefatos" traduzindo `{artefatos_dir}/<nome>` para o subcaminho real — testada contra `LAYOUT_V2_FILE_DIRECTORIES` por um guard de doc-sync (`tests/artifact-layout.test.mjs`), para prosa e codigo nao divergirem.
 
-Primeira versão publicada: skill `executor-subagents`, comando `/executor`, contrato de handoff com Pensador/Orquestrador, e workflow rápido de 9 fases sem cerimônia OpenSpec.
+### Adicionado
+
+- **Gates de conclusao**: cinco gates (`verificacao`, `review`, `e2e`, `reports`, `handoff`) no `state.json`, geridos por `executor-state.mjs gate`. `run --status DONE` falha com `RUN_GATES_NOT_CLOSED` enquanto um gate `required` nao estiver `DONE` nem `N/A`. `verificacao`/`reports` sao sempre obrigatorios e nunca aceitam `N/A`; `review`/`e2e`/`handoff` sao condicionais — `N/A` por padrao, viram obrigatorios com `--required true` quando a condicao que os aciona se aplica a run (plano pre-definido, front-end separado, modo conjunto). Campo `completionGates` e opcional no snapshot: runs de fases anteriores nao tem e nao sao migradas.
+- `references/mcp-context.md`: protocolo do Context7 MCP (o Executor nao usa Codebase Memory MCP nesta fase — o custo de indexar um grafo nao se paga numa execucao curta).
+- README/README.pt-BR: secoes "Persistent state and resume" e "Gates proportional to risk".
+
+### Fora de escopo (decisao explicita, nao entra em versao futura deste port)
+
+SQLite/FTS5 e historico pesquisavel; Learning Recipes e Curator; telemetria OTLP; worktrees fisicas; routing adaptativo por historico; OpenSpec. Todos contrariam a premissa de velocidade do Executor ou exigem volume de historico que ele nao acumula — ver o plano original (Tier 1/Tier 2) para o raciocinio completo. `.executor/project-facts.md` (fatos de projeto validados, cortando redescoberta entre runs) tambem ficou fora desta entrega: o valor so aparece com o lado de leitura integrado, e construir so a escrita seria um recurso pela metade.
+
+## [1.3.0] - Validadores deterministicos e gates proporcionais ao risco
+
+Fase 1.3 do port de capacidades do `cc-orchestrador-subagents`: as promessas de prosa do `SKILL.md` ("verifique ownership", "valide wire format") ganham ferramenta. Tudo entra proporcional ao risco — `risco: LOW` sem plano pre-definido nem modo conjunto continua sem nenhum gate extra.
+
+### Adicionado
+
+- `scripts/lib/gates.mjs` + `scripts/executor-gates.mjs plan`: tabela pura risco → lista de gates. Uma unica chamada substitui a arvore de decisao "se risco X e plano pre-definido entao..." no `SKILL.md`.
+- `scripts/check-agy-prompt.mjs`: mede um prompt AGY contra o limite de 28.000 caracteres antes de delegar — essa regra so existia como prosa em todos os tres plugins do workflow; nada media de fato antes deste script.
+- `scripts/lib/intelligence.mjs`, `scripts/inspect-diff.mjs`, `scripts/validate-wire-format.mjs`, `scripts/collect-test-results.mjs`: portados do Orchestrador, adaptados para o `executor-state.mjs` local e para funcionar tambem em modo stateless (sem `--dir`, sem execucao ativa).
+- `scripts/validate-scope.mjs`: reescrito para o Executor — `--own`/`--deny` explicitos (uso avulso) ou `state.tasks[<task>].allowedPaths` de uma task registrada via `executor-state.mjs task register --allowed-path ...` (uso com execucao ativa). `--deny` sempre vence, mesmo quando `--own` tambem bate.
+- `scripts/lib/dependency-plan.mjs`: catalogo puro de dependencias ausentes (Context7, `codex`, `agy` e os plugins que os conectam), usado pelo Dependency_Installer do modo `/executor project-config`.
+- `references/subagent-prompts.md`: gate de design system (tokens via `var(--*)`, componentes batendo com `components.html`, `:hover`/`:focus` real — nunca `style={{}}` inline, accent ≤ 2x/pagina) — antes disso o Executor ingeria `design-system-files` do handoff do Orchestrador e ignorava.
+- `SKILL.md` Fase 6.6 (nova, condicional): verificacao E2E no navegador real quando front-end e back-end sao origens separadas — CORS, casing de resposta e resolucao de tenant so aparecem com um browser de verdade dirigindo a app.
+- `references/contracts.md`: regra de wire format, casing C#↔TypeScript (DTO `PascalCase` vs payload `camelCase`) e checklist de 11 itens de validacao cruzada — nenhum dos tres existia antes.
+- `references/programmatic-intelligence.md`, `assets/intelligence-result.schema.json`.
+
+### Alterado
+
+- `references/subagent-prompts.md` (prompt AGY front-end) referencia o gate de design quando houver Open Design.
+
+## [1.2.0] - Estado persistente e `/executor resume`
+
+Fase 1.2 do port de capacidades do `cc-orchestrador-subagents`: o Executor ganha um motor de estado seguro contra crash, portado do state engine do Orchestrador e reduzido ao que o fluxo rapido precisa. Ver `references/persistent-state.md` para o detalhamento.
+
+### Adicionado
+
+- **`{artefatos_dir}/state.json` + `events.jsonl` + `.state.lock`**: fonte da verdade por execucao, gerenciada por `scripts/lib/executor-state.mjs` e pela CLI `scripts/executor-state.mjs` (`init`, `task`, `heartbeat`, `sweep`, `phase`, `reconcile`, `resume`, `run`, `status`, `verify`). Evento gravado com `fsync` **antes** do snapshot atomico (arquivo temporario + `fsync` + `rename`); um crash entre os dois passos e reparado por replay.
+- **`/executor resume [--dir <artefatos_dir>]`**: reparo de tail de evento incompleto → replay → toda task `RUNNING` interrompida vira `UNKNOWN` (nunca `FAILED`/`DONE` presumido) → reconciliacao contra Git/arquivos/validacoes → continuacao a partir de `resumeFromPhase`. Ver o novo modo `resume` em `commands/executor.md`.
+- `scripts/lib/checkpoint-index.mjs`: `.executor/checkpoint.json` **schemaVersion 5** — o checkpoint deixa de guardar o estado detalhado da execucao (isso agora vive em `state.json`) e volta a ser so um indice (`execucao_atual`, `historico[]`), mais `plano_predefinido`/`plano_predefinido_fonte` (que continuam ali por exigencia literal de `references/handoff-contract.md` secao 7). Migracao de checkpoints v4 e automatica, em memoria, na leitura — nunca reescreve o arquivo v4 sozinha.
+- `scripts/lib/artifact-layout.mjs`, `scripts/lib/executor-adapters.mjs` (aceita `codex`, `agy` e `claude-code`), `scripts/executor-probe.mjs`: infraestrutura de layout de artefatos e normalizacao de retorno de subagente para `reconcile`/`resume`.
+- `skills/executor-subagents/assets/executor-state.schema.json`, `executor-event.schema.json`.
+
+### Alterado (mudanca de contrato)
+
+- `assets/checkpoint-template.json`: template v5, so com `version`, `execucao_atual`, `historico`, `plano_predefinido`, `plano_predefinido_fonte`. Os campos por-run antigos (`fase_atual`, `slices`, `agentes`, `arquivos_alterados`, ...) nao aparecem mais aqui — eles vivem em `state.json`.
+
+### Fora de escopo nesta fase
+
+Waves, completion gates, leases, worktrees, aplicacao automatica de drift de Project_Config numa execucao ja iniciada, e protocolo formal de cancelamento — ver `references/persistent-state.md` "Fora de escopo nesta fase". Ficam para a Fase 2.0 do port.
+
+## [1.1.0] - Fundacao, testes e Project_Config
+
+Primeira fase de um port de capacidades do `cc-orchestrador-subagents` para o `cc-executor-subagents`, mantendo a filosofia de execucao rapida do Executor. Ver `references/project-config.md`, `references/preflight-check.md` e `references/workflow.md` para o detalhamento.
+
+### Adicionado
+
+- **Project_Config** (`.executor/project-config.md`): quatro papeis configuraveis por projeto — `backendExecutor`, `frontendExecutor`, `backendReviewer`, `frontendReviewer` — cada um `codex`, `agy` ou `claude-code`. Com os quatro em `claude-code`, o plugin roda sem nenhuma CLI externa instalada.
+- `/executor project-config`: modo dedicado para consultar e regravar a Project_Config, com Dependency_Installer assistido.
+- `scripts/lib/project-config.mjs`, `scripts/project-config.mjs` (+ wrapper): leitura/escrita atomica do arquivo, catalogo de perguntas, derivacao do Required_CLI_Set e roteamento por tipo de trabalho.
+- `scripts/lib/cli-utils.mjs`: infraestrutura de CLI compartilhada (`parseArgs`, `executeJsonCli`, etc.).
+- `scripts/executor-spec.mjs`: modulo de especificacao pura (ordem de fases, tipos de trabalho, niveis de risco, identificadores retirados) usado pelos testes de doc-sync.
+- Auto-remediacao da permissao `codex-companion-bash` no preflight: cria/atualiza `.claude/settings.json` automaticamente quando possivel, sem nunca sobrescrever um arquivo invalido.
+- Suite de testes (`node --test`, `fast-check`) e `package.json` — o plugin nao tinha nenhum teste antes desta versao.
+
+### Alterado (mudanca de contrato)
+
+- **`preflight.mjs` schemaVersion 1 → 2**: o relatorio deixou de aninhar `checks.required.*`/`checks.optional.*` (obrigatoriedade fixa por posicao) e passou a ser plano — `checks.{config,cli,plugins,permissions,capabilities,optional}` — com obrigatoriedade derivada da Project_Config e carimbada em cada check (`required: true|false`). Rotulos de categoria em `failed`/`warnings` agora sao singulares (`plugin`, `permission`) em vez de plurais. Nao ha compatibilidade retroativa no formato do JSON.
+- `references/workflow.md`: renumeracao das fases para bater exatamente com `SKILL.md` (0, 1, 2, 3, 4, 5, 6, 6.5, 7, 8, 9). Antes desta versao os dois documentos usavam numeracoes diferentes para as mesmas fases.
+
+### Retirado
+
+- **`codex_excluido`**: a excecao ad-hoc "front-end puro pode seguir sem Codex" saiu da prosa (`SKILL.md`, `references/preflight-check.md`, `commands/executor.md`) e do template de checkpoint. A forma declarativa equivalente e `backendExecutor: claude-code` na Project_Config.
+
+## [1.0.0] e anteriores
+
+Ver historico do Git para o fluxo original (executor sem Project_Config, sem testes, sem `scripts/lib/`).

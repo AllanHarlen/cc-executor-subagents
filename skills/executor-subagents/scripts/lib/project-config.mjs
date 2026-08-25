@@ -19,9 +19,9 @@ import { dirname, join, resolve } from "node:path";
  * canonico: `renderProjectConfig` recebe `now` injetavel, o que torna o
  * round-trip e a idempotencia testaveis.
  *
- * Gramatica canonica do arquivo `.orchestrator/project-config.md`:
+ * Gramatica canonica do arquivo `.executor/project-config.md`:
  *
- *   # ORCHESTRATOR PROJECT CONFIG
+ *   # EXECUTOR PROJECT CONFIG
  *
  *   > <linha de contexto>
  *
@@ -53,7 +53,7 @@ import { dirname, join, resolve } from "node:path";
  *   `ProjectConfigError` se ele for invalido) e devolve a configuracao padrao
  *   com `source: "default"` quando ele esta ausente. Nunca inventa
  *   configuracao a partir de arquivo defeituoso.
- * - `writeProjectConfig(projectRoot, config, { now })`: cria `.orchestrator/`
+ * - `writeProjectConfig(projectRoot, config, { now })`: cria `.executor/`
  *   e grava por arquivo temporario mais rename, de modo que uma falha de I/O
  *   vira `PROJECT_CONFIG_WRITE_FAILED` sem destruir o arquivo anterior.
  * - `applyProjectConfigDefaults(answers)`: aplica o valor padrao de cada papel
@@ -65,8 +65,9 @@ import { dirname, join, resolve } from "node:path";
  * - `deriveRequiredCliSet(config)`: unica regra que decide se `codex` e `agy`
  *   sao CLIs obrigatorias, derivada de `EXECUTOR_REQUIRED_CLI` — a mesma tabela
  *   que o catalogo de perguntas usa.
- * - `resolveExecutorForCategory(category, config)`: Executor por categoria de
- *   task, com o par `{ backend, frontend }` para `FULLSTACK`.
+ * - `resolveExecutorForWorkType(tipo, config)`: Executor por tipo de trabalho do
+ *   Executor (`BUG`, `REFACTOR`, `FEATURE_SLICE`, ...), com o par
+ *   `{ backend, frontend }` para `FEATURE_SLICE`.
  * - `diffProjectConfig(left, right)`: papeis divergentes entre duas
  *   configuracoes, vazio quando nenhum papel mudou.
  */
@@ -92,14 +93,14 @@ export const DEFAULT_PROJECT_CONFIG = Object.freeze({
 /** Ordem canonica das linhas de campo do Project_Config_File. */
 export const PROJECT_CONFIG_FIELDS = Object.freeze(["schemaVersion", "updatedAt", ...ROLES]);
 
-export const PROJECT_CONFIG_DIRECTORY = ".orchestrator";
+export const PROJECT_CONFIG_DIRECTORY = ".executor";
 export const PROJECT_CONFIG_FILENAME = "project-config.md";
 export const PROJECT_CONFIG_RELATIVE_PATH = `${PROJECT_CONFIG_DIRECTORY}/${PROJECT_CONFIG_FILENAME}`;
 export const PROJECT_CONFIG_DEFAULT_APPLIED_MARK = "default-aplicado";
 
-const PROJECT_CONFIG_TITLE = "# ORCHESTRATOR PROJECT CONFIG";
+const PROJECT_CONFIG_TITLE = "# EXECUTOR PROJECT CONFIG";
 const PROJECT_CONFIG_LEAD =
-  "> Configuracao de stack de agentes deste projeto. Gerada e lida por /orchestrator project-config.";
+  "> Configuracao de stack de agentes deste projeto. Gerada e lida por /executor project-config.";
 const PROJECT_CONFIG_NOTES_HEADING = "## Notas";
 
 const UPDATED_AT_FORMAT = "YYYY-MM-DDTHH:MM:SSZ";
@@ -399,9 +400,9 @@ export function readProjectConfig(projectRoot = process.cwd()) {
 }
 
 /**
- * Grava o Project_Config_File em `<projectRoot>/.orchestrator/project-config.md`.
+ * Grava o Project_Config_File em `<projectRoot>/.executor/project-config.md`.
  *
- * Cria `.orchestrator/` quando necessario e grava por arquivo temporario no
+ * Cria `.executor/` quando necessario e grava por arquivo temporario no
  * mesmo diretorio mais `rename`, entao uma falha de I/O nunca deixa o arquivo
  * anterior truncado ou meio gravado: o erro vira `PROJECT_CONFIG_WRITE_FAILED`
  * e o conteudo previo permanece byte a byte intacto.
@@ -419,7 +420,7 @@ export function writeProjectConfig(projectRoot, config, options = {}) {
   const path = projectConfigPath(projectRoot);
   const content = renderProjectConfig(config, { now: options.now, path });
   // Reparse do conteudo canonico: garante que a Project_Config devolvida e
-  // exatamente a que sera relida do arquivo (Req 3.5).
+  // exatamente a que sera relida do arquivo.
   const persisted = parseProjectConfig(content, { path });
 
   const directory = dirname(path);
@@ -457,7 +458,7 @@ export function writeProjectConfig(projectRoot, config, options = {}) {
  * Papel sem resposta — chave ausente, `null`, `undefined` ou string vazia —
  * recebe o valor padrao de `DEFAULT_PROJECT_CONFIG` e entra em
  * `defaultsApplied`, que o renderer grava como `default-aplicado` e o parser
- * rele (Req 2.8). Papel respondido e validado contra `EXECUTORS`.
+ * rele. Papel respondido e validado contra `EXECUTORS`.
  *
  * `answers.defaultsApplied` declarado explicitamente e unido ao conjunto
  * derivado, para o caso de o chamador ja saber que uma resposta veio de default.
@@ -516,15 +517,15 @@ const QUESTION_SPECS = Object.freeze([
     role: "backendExecutor",
     title: "Qual agente implementa as tasks de back-end?",
     roleDescription:
-      "Executor das tasks BACKEND_ONLY e DATABASE_ONLY e da fatia back-end das tasks FULLSTACK.",
-    duty: "implementa as tasks de back-end e de banco de dados",
+      "Executor das tasks de backend, testes, refactor localizado e da fatia back-end das tasks FEATURE_SLICE full-stack.",
+    duty: "implementa as tasks de back-end, testes e integracao",
     options: ["codex", "claude-code"],
   },
   {
     role: "frontendExecutor",
     title: "Qual agente implementa as tasks de front-end?",
-    roleDescription: "Executor das tasks FRONTEND_ONLY e da fatia front-end das tasks FULLSTACK.",
-    duty: "implementa as tasks de front-end",
+    roleDescription: "Executor das tasks UI_FRONTEND, IMAGE_ASSET e da fatia front-end das tasks FEATURE_SLICE.",
+    duty: "implementa as tasks de front-end e assets visuais",
     options: ["agy", "claude-code"],
   },
   {
@@ -541,9 +542,10 @@ const QUESTION_SPECS = Object.freeze([
   },
   {
     role: "backendReviewer",
-    title: "Qual agente faz o review de back-end?",
-    roleDescription: "Revisor do resultado back-end, registrado em review/review-final.md.",
-    duty: "revisa o resultado back-end",
+    title: "Qual agente faz o review de back-end e o review plano-vs-entrega?",
+    roleDescription:
+      "Revisor do resultado back-end e do review plano-vs-entrega (Fase 6.5), registrado em review/review-final.md e review/plan-vs-output-review.md.",
+    duty: "revisa o resultado back-end e compara plano-vs-entrega",
     options: ["codex", "agy", "claude-code"],
   },
 ]);
@@ -568,7 +570,7 @@ function buildQuestionOption(spec, value) {
 }
 
 /**
- * Catalogo das quatro perguntas da coleta da Project_Config (Req 2.2 a 2.6).
+ * Catalogo das quatro perguntas da coleta da Project_Config.
  *
  * Objeto indexado por papel, com as chaves na ordem de apresentacao. Cada
  * entrada traz:
@@ -578,7 +580,7 @@ function buildQuestionOption(spec, value) {
  * - `options`: as opcoes permitidas, cada uma com `value`, `isDefault`,
  *   `requiresCli` (a CLI que aquela escolha torna obrigatoria, `null` para
  *   `claude-code`) e `description` — que anuncia o papel do agente e a CLI
- *   exigida, como pede o Req 2.6.
+ *   exigida.
  *
  * `requiresCli` e a mesma informacao que a derivacao de CLIs obrigatorias usa:
  * escolher `codex` num papel exige a CLI `codex`, escolher `agy` exige `agy`, e
@@ -617,46 +619,50 @@ export const REQUIRED_CLI_ORDER = Object.freeze(
   EXECUTORS.map((executor) => EXECUTOR_REQUIRED_CLI[executor]).filter((cli) => cli !== null),
 );
 
-/** Categorias de task reconhecidas pelo roteamento (mesma lista do validador). */
-export const TASK_CATEGORIES = Object.freeze([
-  "BACKEND_ONLY",
-  "FRONTEND_ONLY",
-  "FULLSTACK",
-  "DATABASE_ONLY",
-  "REVIEW_ONLY",
-  "DOCS_ONLY",
+/** Tipos de trabalho reconhecidos pela triagem do executor (Fase 1 do SKILL.md). */
+export const WORK_TYPES = Object.freeze([
+  "BUG",
+  "REFACTOR",
+  "FEATURE_SLICE",
+  "TEST_FIX",
+  "UI_FRONTEND",
+  "IMAGE_ASSET",
+  "DOCS",
+  "REVIEW",
 ]);
 
 /**
- * Papel da Project_Config que decide o Executor de cada categoria.
+ * Papel da Project_Config que decide o Executor de cada tipo de trabalho.
  *
- * `FULLSTACK` e o unico caso com dois papeis (uma fatia back-end e uma fatia
- * front-end), por isso mapeia para `null` aqui e e tratado a parte.
+ * `FEATURE_SLICE` e o unico caso com dois papeis (uma fatia back-end e uma
+ * fatia front-end quando a feature e full-stack), por isso mapeia para `null`
+ * aqui e e tratado a parte.
  *
- * `REVIEW_ONLY` usa `backendReviewer`: e a categoria do review final de
- * back-end, gravado em `review/review-final.md`. `DOCS_ONLY` acompanha o
- * `backendExecutor`, que e quem hoje recebe documentacao e task sem fatia de
- * interface.
+ * `REVIEW` usa `backendReviewer`: e o tipo de trabalho de review dedicado,
+ * gravado em `review/review-final.md`. `DOCS` acompanha o `backendExecutor`,
+ * que e quem hoje recebe documentacao tecnica sem fatia de interface.
  */
-export const CATEGORY_ROLE = Object.freeze({
-  BACKEND_ONLY: "backendExecutor",
-  DATABASE_ONLY: "backendExecutor",
-  FRONTEND_ONLY: "frontendExecutor",
-  REVIEW_ONLY: "backendReviewer",
-  DOCS_ONLY: "backendExecutor",
-  FULLSTACK: null,
+export const WORK_TYPE_ROLE = Object.freeze({
+  BUG: "backendExecutor",
+  REFACTOR: "backendExecutor",
+  TEST_FIX: "backendExecutor",
+  DOCS: "backendExecutor",
+  UI_FRONTEND: "frontendExecutor",
+  IMAGE_ASSET: "frontendExecutor",
+  REVIEW: "backendReviewer",
+  FEATURE_SLICE: null,
 });
 
 /** Origem da decisao de roteamento gravada nos artefatos e na telemetria. */
 export const EXECUTOR_SOURCE_PROJECT_CONFIG = "project-config";
 
-const CATEGORY_BY_UPPERCASE = new Map(TASK_CATEGORIES.map((category) => [category, category]));
+const WORK_TYPE_BY_UPPERCASE = new Map(WORK_TYPES.map((tipo) => [tipo, tipo]));
 
-function unknownCategory(received) {
+function unknownWorkType(received) {
   return new ProjectConfigError(
-    "PROJECT_CONFIG_UNKNOWN_CATEGORY",
-    `Unknown task category ${JSON.stringify(String(received))}; accepted: ${TASK_CATEGORIES.join(", ")}`,
-    { field: "category", received, accepted: [...TASK_CATEGORIES] },
+    "PROJECT_CONFIG_UNKNOWN_WORK_TYPE",
+    `Unknown work type ${JSON.stringify(String(received))}; accepted: ${WORK_TYPES.join(", ")}`,
+    { field: "tipo", received, accepted: [...WORK_TYPES] },
   );
 }
 
@@ -675,14 +681,14 @@ function requireRoles(config, { path } = {}) {
  * Deriva o Required_CLI_Set a partir dos quatro papeis da Project_Config.
  *
  * Esta e a **unica** regra que decide se `codex` e `agy` sao obrigatorios: o
- * Preflight, o Config_Command, o Dependency_Installer e o validador de
- * roteamento consomem este resultado em vez de reimplementar a condicao
- * (Req 5.1 a 5.5). Uma CLI e obrigatoria se e somente se ao menos um dos quatro
- * papeis usa o executor que a exige, conforme `EXECUTOR_REQUIRED_CLI` — a mesma
- * tabela que o catalogo de perguntas usa para anunciar a CLI de cada opcao.
+ * Preflight, o Config_Command e o Dependency_Installer consomem este resultado
+ * em vez de reimplementar a condicao. Uma CLI e obrigatoria se e somente se ao
+ * menos um dos quatro papeis usa o executor que a exige, conforme
+ * `EXECUTOR_REQUIRED_CLI` — a mesma tabela que o catalogo de perguntas usa para
+ * anunciar a CLI de cada opcao.
  *
  * `claude-code` nao exige CLI externa, entao a configuracao com os quatro
- * papeis em `claude-code` produz `clis: []` (Req 5.7).
+ * papeis em `claude-code` produz `clis: []`.
  *
  * @param {object} config Project_Config com os quatro papeis preenchidos.
  * @returns {{
@@ -719,41 +725,40 @@ export function deriveRequiredCliSet(config, options = {}) {
 }
 
 /**
- * Deriva o Executor de uma categoria de task a partir da Project_Config
- * (Req 7.1 a 7.4).
+ * Deriva o Executor de um tipo de trabalho a partir da Project_Config.
  *
- * - `BACKEND_ONLY`, `DATABASE_ONLY` e `DOCS_ONLY` -> `backendExecutor`.
- * - `FRONTEND_ONLY` -> `frontendExecutor`.
- * - `REVIEW_ONLY` -> `backendReviewer`.
- * - `FULLSTACK` -> par `{ backend, frontend }`, com `backendExecutor` na fatia
- *   back-end e `frontendExecutor` na fatia front-end.
+ * - `BUG`, `REFACTOR`, `TEST_FIX` e `DOCS` -> `backendExecutor`.
+ * - `UI_FRONTEND` e `IMAGE_ASSET` -> `frontendExecutor`.
+ * - `REVIEW` -> `backendReviewer`.
+ * - `FEATURE_SLICE` -> par `{ backend, frontend }`, com `backendExecutor` na
+ *   fatia back-end e `frontendExecutor` na fatia front-end.
  *
- * A categoria e normalizada (trim e maiusculas); categoria fora da lista vira
- * `PROJECT_CONFIG_UNKNOWN_CATEGORY`. O executor devolvido pertence sempre ao
+ * O tipo e normalizado (trim e maiusculas); tipo fora da lista vira
+ * `PROJECT_CONFIG_UNKNOWN_WORK_TYPE`. O executor devolvido pertence sempre ao
  * conjunto `codex`/`agy`/`claude-code`, porque vem de papel ja validado.
  *
- * @param {string} category Categoria da task.
+ * @param {string} tipo Tipo de trabalho (`tipo_trabalho`).
  * @param {object} config Project_Config com os quatro papeis preenchidos.
- * @returns {{ category: string, role: string, executor: string, executorSource: string }
- *   | { category: string, backend: string, frontend: string, executorSource: string }}
+ * @returns {{ tipo: string, role: string, executor: string, executorSource: string }
+ *   | { tipo: string, backend: string, frontend: string, executorSource: string }}
  */
-export function resolveExecutorForCategory(category, config, options = {}) {
-  const normalized = CATEGORY_BY_UPPERCASE.get(String(category ?? "").trim().toUpperCase());
-  if (!normalized) throw unknownCategory(category);
+export function resolveExecutorForWorkType(tipo, config, options = {}) {
+  const normalized = WORK_TYPE_BY_UPPERCASE.get(String(tipo ?? "").trim().toUpperCase());
+  if (!normalized) throw unknownWorkType(tipo);
   const roles = requireRoles(config, { path: options.path });
 
-  if (normalized === "FULLSTACK") {
+  if (normalized === "FEATURE_SLICE") {
     return Object.freeze({
-      category: normalized,
+      tipo: normalized,
       backend: roles.backendExecutor,
       frontend: roles.frontendExecutor,
       executorSource: EXECUTOR_SOURCE_PROJECT_CONFIG,
     });
   }
 
-  const role = CATEGORY_ROLE[normalized];
+  const role = WORK_TYPE_ROLE[normalized];
   return Object.freeze({
-    category: normalized,
+    tipo: normalized,
     role,
     executor: roles[role],
     executorSource: EXECUTOR_SOURCE_PROJECT_CONFIG,
@@ -773,8 +778,7 @@ function diffRoleValue(config, role, side, path) {
 }
 
 /**
- * Compara duas Project_Config e devolve os papeis que mudaram (Req 6.7, 10.2,
- * 10.3).
+ * Compara duas Project_Config e devolve os papeis que mudaram.
  *
  * O resultado sai na ordem canonica de `ROLES` e contem apenas os papeis
  * divergentes: lista vazia significa que nenhum papel mudou, que e como o
@@ -783,9 +787,8 @@ function diffRoleValue(config, role, side, path) {
  * `defaultsApplied` nao entram na comparacao: eles nao alteram roteamento nem
  * Required_CLI_Set.
  *
- * `null` ou `undefined` de um lado representa ausencia de configuracao (Run
- * antiga sem snapshot, projeto sem arquivo): cada papel aparece com `from` ou
- * `to` igual a `null`.
+ * `null` ou `undefined` de um lado representa ausencia de configuracao
+ * (projeto sem arquivo): cada papel aparece com `from` ou `to` igual a `null`.
  *
  * @param {object|null|undefined} left Configuracao anterior.
  * @param {object|null|undefined} right Configuracao nova.

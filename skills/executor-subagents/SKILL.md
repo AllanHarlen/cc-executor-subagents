@@ -2,7 +2,7 @@
 name: executor-subagents
 description: Fast multi-agent executor for Claude Code. Use through /executor when the user wants a quick bug fix, refactor, feature slice, test repair, UI/front-end work, image asset generation, integration fix, or repo task that benefits from several independent subagents working in parallel. This skill intentionally avoids OpenSpec and heavyweight architecture rituals; it plans only enough to split safe work, launches focused agents by file/module ownership, integrates results, verifies, and reports concisely.
 disable-model-invocation: true
-argument-hint: "help | preflight | config | status | resume [slug] | [--model <id>] [--effort <nivel>] [--parallel] [--subagent-model <id>] <demanda>"
+argument-hint: "help | preflight | config | status | resume [dir] | [--model <id>] [--effort <nivel>] [--parallel] [--subagent-model <id>] <demanda>"
 ---
 
 # Executor Subagents
@@ -20,9 +20,10 @@ Nao use esta skill quando a tarefa for uma edicao trivial de 1-2 linhas que voce
 - **Paralelismo pragmastico.** Rode em paralelo apenas tarefas independentes; serialize arquivos centrais compartilhados.
 - **Plano pre-definido vira baseline.** Quando o usuario trouxer um plano pronto, trabalhe sobre ele, preserve-o como fonte de verdade e revise a entrega contra esse baseline.
 - **Executor pode integrar.** O executor principal pode fazer pequenos ajustes de integracao, documentacao e glue code quando for mais rapido e seguro do que redelegar.
-- **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 3.6.0+. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
+- **Front-end com AGY.** UI/front-end e assets visuais seguem pelo `cc-antigravity-plugin` 4.0.0+ via `antigravity-coder` (implementacao). `antigravity-agent` e somente leitura e nunca implementa. Varios entregaveis AGY independentes usam fan-out nativo (`--parallel`).
 - **Context7 quando houver docs de libs.** Se a task envolver biblioteca, framework, SDK, API, CLI ou cloud service, use Context7 quando disponivel.
-- **Sem OpenSpec.** Nao crie `openspec/`, nao chame `/openspec-*`, nao bloqueie por ausencia de OpenSpec.
+- **Codebase Memory quando disponivel.** Na Fase 1 (Triagem), prefira `search_graph`/`trace_path`/`get_code_snippet` a varrer arquivos; na Fase 5 (Integracao), use `detect_changes` sobre o diff antes de decidir o alcance da verificacao. Ver `references/mcp-context.md`, Parte 1.
+- **Nao aciona OpenSpec.** O Executor nao cria `openspec/`, nao chama `/opsx:*`/`openspec-*` e nao bloqueia por ausencia do CLI OpenSpec. Ele pode, no entanto, **consumir** um handoff do Orchestrador que traga um artefato de role `openspec-change` (`openspec/changes/<nome>/`, ver `references/handoff-contract.md`) como baseline somente-leitura — nunca escreve nem move nada dentro de `openspec/`.
 - **Sem teatralidade.** Updates curtos, decisao rapida, evidencia final.
 
 ## Modo /goal autonomo
@@ -41,40 +42,45 @@ Sob `/goal`, nao devolva controle so porque uma etapa acabou. Continue ate haver
 
 **Verificar checkpoint antes de tudo:**
 
-Se `.executor/checkpoint.json` existir, leia-o. Avalie o campo `status` da execucao atual:
+`.executor/checkpoint.json` e um **indice**, nao o estado detalhado da execucao — esse vive em `{artefatos_dir}/state.json`, gerenciado por `executor-state.mjs` (escrita atomica, log de eventos, replay; ver `references/persistent-state.md`). Leia o indice:
 
-- `status: RUNNING` e `fase_atual >= 1`: pergunte ao usuario se quer **retomar** da fase `fase_atual` ou **iniciar nova execucao**. Em retomada, pule as fases ja concluidas e restaure `agy_disponivel`, `slices`, `waves`, `agentes`, `arquivos_alterados` e `artefatos_dir` do checkpoint. Em nova execucao, arquive a execucao atual em `historico` com `status: ABANDONED` e `timestamp_fim` preenchido, limpe os campos da execucao corrente e siga normalmente.
-- `status: DONE`, `FAILED` ou `CANCELLED`: arquive automaticamente em `historico` (sem perguntar) e inicie nova execucao. O `artefatos_dir` anterior permanece intacto em disco.
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" status
+```
 
-Se o checkpoint nao existir, crie-o com `historico: []` e `execucao_atual: ""`.
+Sem `--dir`, o comando resolve a execucao ativa via `execucao_atual` do indice. Avalie o resultado:
 
-Ao arquivar uma execucao em `historico`, registre: `demanda`, `demanda_slug`, `artefatos_dir`, `tipo_trabalho`, `risco`, `status` (DONE | FAILED | CANCELLED | ABANDONED), `fase_final` (valor de `fase_atual` no momento do arquivamento), `timestamp_inicio`, `timestamp_fim` (timestamp atual se ainda vazio), `agentes_count` (comprimento de `agentes[]`), `fallbacks_acionados` e `plano_predefinido`.
+- **execucao ativa encontrada** (`summary.status: RUNNING`, `BLOCKED`, `FAILED`, `STALLED` ou `UNKNOWN`): pergunte ao usuario se quer **retomar** (`/executor resume`, que roda `executor-state.mjs resume` — converte task `RUNNING` interrompida em `UNKNOWN` e reconcilia) ou **iniciar nova execucao**. Em nova execucao, registre a execucao atual em `historico` do checkpoint com `status: ABANDONED` (sem tocar `state.json` dela) e siga normalmente.
+- **execucao ativa terminal** (`DONE`/`CANCELLED`) **ou nenhuma execucao ativa**: siga direto para a nova execucao.
+- **nenhum `.executor/checkpoint.json`**: nada a fazer aqui — sera criado quando `artefatos_dir` for definido e `executor-state.mjs init` rodar.
+- **checkpoint em formato antigo (v4, sem `state.json`)**: `executor-state.mjs status`/`readCheckpointIndex` migra o indice em memoria automaticamente e reporta `migrationNotes`; se houver uma execucao ativa v4, a nota indica rodar `executor-state.mjs init --dir <artefatos_dir>` para lhe dar um `state.json` antes de retomar.
 
-Mantenha `execucao_atual` sempre apontando para o `artefatos_dir` da execucao em andamento. Atualize-o logo apos calcular o novo `artefatos_dir` na Fase 0.
+Ao arquivar uma execucao em `historico`, registre: `demanda`, `demanda_slug`, `artefatos_dir`, `tipo_trabalho`, `risco`, `status` (DONE | FAILED | CANCELLED | ABANDONED), `fase_final`, `timestamp_inicio`, `timestamp_fim` (timestamp atual se ainda vazio), `agentes_count`, `fallbacks_acionados` e `plano_predefinido` (mais `plano_predefinido_fonte` quando houver — exigido por `references/handoff-contract.md` secao 7).
 
-**0.1 - Preflight:**
+Mantenha `execucao_atual` sempre apontando para o `artefatos_dir` da execucao em andamento.
+
+Execute:
 
 ```bash
 node "${CLAUDE_SKILL_DIR}/scripts/preflight.mjs"
 ```
 
-O `status`/`failed` do preflight sao decididos pelo Required_CLI_Set da **Project_Config** (`.orchestrator/project-config.md` — mesmo arquivo do `cc-orchestrador-subagents`, ver `references/project-config.md`), nao por uma lista fixa de `codex`+`agy`. O relatorio traz o bloco `projectConfig` (os quatro papeis efetivos, `path`, `updatedAt`, `requiredCliSet`, `source: "file" | "default"`) e `warnings` para reprovado opcional/MCP ausente — `failed` so contem reprovado obrigatorio segundo o Required_CLI_Set vigente.
+O preflight deriva quais itens sao obrigatorios da **Project_Config** (`.executor/project-config.md`, papeis `backendExecutor`, `frontendExecutor`, `backendReviewer`, `frontendReviewer` — cada um `codex`, `agy` ou `claude-code`). Sem arquivo, usa o default `codex`/`agy`/`codex`/`agy`. Isso substitui a antiga excecao ad-hoc de "front-end puro pode seguir sem Codex": a obrigatoriedade agora vem inteira da configuracao, nao de uma pre-triagem do enunciado da tarefa.
 
-**0.2 - Resolucao da Project_Config:**
+| Item | Obrigatorio quando | Uso |
+|---|---|---|
+| `codex` CLI + plugin `openai-codex` | `backendExecutor` ou `backendReviewer` = `codex` | subagente `codex:codex-rescue` para backend, testes, review e recuperacao |
+| `agy` CLI (`>= 1.1.8`, `1.1.16` recomendado) + plugin `cc-antigravity-plugin` `>= 4.0.0` | `frontendExecutor` ou `frontendReviewer` = `agy` | subagente `cc-antigravity-plugin:antigravity-coder` para implementacao (inclui `--parallel` e `--subagent-model` para fan-out nativo); `antigravity-agent` para analise/review read-only |
+| permissao Bash do Codex companion | sempre | evita bloqueio de aprovacao em background — auto-remediado quando possivel |
+| `/goal` hooks | opcional | autonomia entre turnos |
+| Context7 MCP | opcional | docs atuais para libs/frameworks/APIs |
+| Codebase Memory MCP | opcional | grafo de codigo para Fase 1 (localizar simbolos) e Fase 5 (impacto do diff) |
 
-- `source: "file"` -> a configuracao existe e e valida; carregue-a e **nao repita as quatro perguntas**.
-- `source: "default"` com arquivo ausente -> apresente as quatro perguntas de `AskUserQuestion` (`backendExecutor`, `frontendExecutor`, `frontendReviewer`, `backendReviewer`), com a descricao de papel e a CLI exigida por opcao de `references/project-config.md`; grave com `scripts/project-config.mjs write` (papel sem resposta entra em `default-aplicado`) e rode o preflight de novo.
-- `checks.config["project-config"].ok: false` -> o arquivo existe e e invalido; pare com o erro do parser e a remediacao de corrigir ou remover `.orchestrator/project-config.md`, sem sobrescreve-lo.
+Se um item **obrigatorio** falhar, mostre a remediacao e pergunte ao usuario se quer: (a) corrigir a CLI/plugin ausente, (b) trocar o papel afetado para `claude-code` via `node "${CLAUDE_SKILL_DIR}/scripts/project-config.mjs" write --backend-executor claude-code ...` (ou `--frontend-executor`/`--backend-reviewer`/`--frontend-reviewer`) para o Executor (Claude) assumir essas tasks diretamente, ou (c) cancelar. Depois de trocar o papel, rode o preflight de novo.
 
-Para uma tarefa trivial de 1-2 minutos sem CLI externa nenhuma envolvida (glue pequeno, doc), pule a Fase 0.2 e siga com o default — as quatro perguntas so valem a pena quando a tarefa de fato vai delegar a um subagente externo.
+Se um MCP **opcional** (Context7, Codebase Memory) faltar, acione o Dependency_Installer antes da Fase 1 — uma `AskUserQuestion` por dependencia ausente, nunca bloqueante. Ver `references/workflow.md` Fase 0 e `references/project-config.md`.
 
-**0.3 - Instalacao assistida (Dependency_Installer):**
-
-Com a Project_Config resolvida, monte a lista de dependencias ausentes (Context7 e CBM opcionais, cada CLI do Required_CLI_Set reprovada e o plugin do Claude Code que a conecta) usando `scripts/lib/dependency-plan.mjs`. Siga o protocolo completo em `references/project-config.md`: uma pergunta `AskUserQuestion` por dependencia, execucao so apos `instalar`, registro limitado a `name`/`decision`/`command`/`exitCode`/`durationMs`, e a oferta de trocar o papel afetado para `claude-code` quando o usuario recusa uma CLI obrigatoria. Ao final, rode o preflight uma vez mais.
-
-Verifique tambem o tipo da demanda antes de insistir numa CLI: faca uma pre-triagem rapida (leia o enunciado da tarefa) para checar se e puramente `UI_FRONTEND` ou `IMAGE_ASSET` e se ha plano pre-definido. Se for front-end puro sem plano pre-definido, a fatia nao precisa de `backendExecutor`/`backendReviewer` — prossiga sem essa CLI e registre `codex_excluido: true` no checkpoint quando o papel configurado for `codex`. Se houver plano pre-definido, o `backendReviewer` configurado continua necessario para o review read-only da Fase 6.5.
-
-Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0`, `agy_disponivel` e `timestamp_inicio`.
+Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/checkpoint-template.json` como base, preenchendo `fase_atual: 0` e `timestamp_inicio`.
 
 **Determinar `artefatos_dir` (obrigatorio antes da Fase 2):**
 
@@ -82,10 +88,27 @@ Salve o resultado do preflight em `.executor/checkpoint.json` usando `assets/che
 2. Exemplo: `/executor desenvolva uma pagina clientes` vira `desenvolva-pagina-clientes`.
 3. Se `.executor/{demanda_slug}` nao existir, defina `artefatos_dir = .executor/{demanda_slug}/artefatos`.
 4. Se ja existir, acrescente o primeiro sufixo livre: `.executor/{demanda_slug}-n2/artefatos`, depois `-n3`, e assim por diante.
-5. Salve `artefatos_dir` no `.executor/checkpoint.json`.
-6. Nao crie a pasta ainda - crie somente ao escrever o primeiro artefato.
+5. Inicialize o estado da execucao (isso ja cria `artefatos_dir` e grava `execucao_atual` no indice atomicamente):
+
+   ```bash
+   node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" init --slug {demanda_slug} --dir {artefatos_dir} --phase 0
+   ```
+
+   `init` e idempotente: rodar de novo no mesmo `artefatos_dir` devolve a execucao existente em vez de recriar.
 
 **Regra absoluta:** nenhum artefato `.md` deve ser criado na raiz do projeto ou em qualquer caminho fora de `artefatos_dir`. Qualquer arquivo gerado pelo executor (plano, monitoring, logs, relatorios, contratos) vai exclusivamente dentro de `artefatos_dir`.
+
+**Layout de artefatos.** Desde a Fase 2.0 do port, `artefatos_dir` agrupa por estagio (layout 2 — ver `scripts/lib/artifact-layout.mjs`). Toda mencao a `{artefatos_dir}/<nome>` neste documento resolve para o caminho abaixo; escreva diretamente no subcaminho correto:
+
+| `{artefatos_dir}/<nome>` | Caminho real |
+|---|---|
+| `execution-brief.md`, `interface-contract.md` | `plan/<nome>` |
+| `monitoring.md`, `reconciliation-probe.json` | `run/<nome>` |
+| `plan-vs-output-review.md`, `review-final.md`, `e2e-verification.md` | `review/<nome>` |
+| `implementation-report.md`, `workflow-log.md`, `subagents-context.md` | `report/<nome>` |
+| `handoff.json`, `initial-plan-baseline.md`, `state.json`, `events.jsonl` | raiz de `artefatos_dir` (nunca movem — ver `references/handoff-contract.md`) |
+
+Runs criadas antes da Fase 2.0 (layout 1, tudo na raiz) continuam legiveis e nao sao migradas automaticamente — leitura sempre tenta o layout 2 e cai para a raiz.
 
 ### Fase 1 - Triagem de 2 minutos
 
@@ -94,18 +117,18 @@ Antes de delegar, levante somente o que muda a execucao:
 - objetivo final em uma frase;
 - arquivos/modulos provaveis;
 - tipo de trabalho: `BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`;
-- se `tipo_trabalho` for `UI_FRONTEND` ou `IMAGE_ASSET`, marque `codex_excluido: true` — Codex nao participa do fluxo para tasks puramente front-end;
 - se a demanda trouxer plano pre-definido (texto estruturado, arquivo citado, artefato existente, checkpoint, ou termos como "siga este plano", "plano aprovado", "plano ja definido"), marque `plano_predefinido: true`;
-- se `plano_predefinido: true`, Codex fica excluido da implementacao de UI/asset, mas nao do review read-only de plano-vs-entrega;
 - risco: `LOW`, `MEDIUM`, `HIGH`;
 - comandos de verificacao obvios;
 - perguntas bloqueantes, se existirem.
 
 Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte uma vez, com opcoes concretas.
 
+**Gates por risco.** Depois de fixar `risco`, rode `node "${CLAUDE_SKILL_DIR}/scripts/executor-gates.mjs" plan --risk <risco> --agent-count <N> --predefined-plan <bool> --joint-mode <bool> --interface-contract <bool> --frontend-separate-origin <bool>`. Ele devolve a lista exata de gates das Fases 6/6.5/6.6 — comandos prontos quando `kind: "script"`, acao a tomar quando `kind: "action"`. Em `risco: LOW` sem plano pre-definido nem modo conjunto, a lista vem vazia e nada muda em relacao ao fluxo direto de hoje.
+
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
-**Modo conjunto (Orchestrador → Executor):** antes de tratar a demanda como avulsa, procure `.orchestration/<slug>/report/handoff.json` (`stage: orchestrador`, layout 2, runs a partir do Orchestrador 4.1.0); se ausente, tente `.orchestration/<slug>/handoff.json` (layout 1, runs anteriores). Se existir em qualquer um dos dois caminhos, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff que de fato respondeu, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem manifesto em nenhum dos dois caminhos, leia `.orchestration/<slug>/report/implementation-report.md` + `plan/tasks-classification.md` + `plan/waves.md` + `contracts/`, com fallback para os mesmos nomes na raiz (`implementation-report.md`, `tasks-classification.md`, `waves.md`) quando o layout 2 nao existir. Detalhes em `references/handoff-contract.md` (secao 7).
+**Modo conjunto (Orchestrador → Executor):** antes de tratar a demanda como avulsa, procure `.orchestration/<slug>/report/handoff.json` (`stage: orchestrador`) — o Orchestrador agrupa `handoff.json` sob `report/` desde o layout v2; caia para `.orchestration/<slug>/handoff.json` (raiz) apenas se a run for anterior a esse layout. Se existir, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega do Orchestrador — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador (raiz de `.pensador/<slug>-vN/`) e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem `handoff.json`, leia `.orchestration/<slug>/report/implementation-report.md` + `.orchestration/<slug>/plan/tasks-classification.md` + `.orchestration/<slug>/plan/waves.md` + `.orchestration/<slug>/contracts/`. Detalhes em `references/handoff-contract.md` (secao 7).
 
 ### Fase 2 - Mapa de execucao curto
 
@@ -145,10 +168,10 @@ Use esta regra:
 |---|---|
 | 1 arquivo, mudanca obvia, baixo risco | Execute direto |
 | 1 area backend clara, patch medio | 1 agente Codex |
-| UI/front-end isolado | 1 agente AGY agentic — Codex nao participa |
-| UI/front-end complexa | 1 agente AGY com `--model gemini-3.1-pro-high` — Codex nao participa |
-| Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY com `--parallel`; adicione `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
-| Imagem ou asset explicito | 1 agente AGY com `--generate-imagem` — Codex nao participa |
+| UI/front-end isolado | 1 agente AGY (`antigravity-coder`) agentic — Codex nao participa |
+| UI/front-end complexa | 1 agente AGY (`antigravity-coder`) com `--model pro --effort high` — Codex nao participa |
+| Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY (`antigravity-coder`) com `--parallel`; adicione `--subagent-model flash` para subagentes baratos |
+| Imagem ou asset explicito | 1 agente AGY (`antigravity-coder`) com `--generate-image` — Codex nao participa |
 | Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
 | N areas independentes de dominios diferentes (AGY + Codex) | N agentes em paralelo (waves na camada Claude); sem limite fixo — o criterio e ownership disjunto |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
@@ -174,13 +197,17 @@ Cada prompt deve incluir:
 
 Roteamento padrao:
 
-- front-end/UI: `cc-antigravity-plugin:antigravity-coder` em modo agentic;
+- front-end/UI: `cc-antigravity-plugin:antigravity-coder --mode accept-edits`;
 - varios entregaveis AGY independentes sem Codex: `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo de subagentes Gemini; opcional `--subagent-model` para subagentes mais baratos);
-- imagem/asset explicito: `cc-antigravity-plugin:antigravity-coder --generate-imagem`;
-- analise pura: `cc-antigravity-plugin:antigravity-agent --read-only` (somente leitura — nunca usar para implementar);
+- imagem/asset explicito: `cc-antigravity-plugin:antigravity-coder --generate-image`;
+- analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
 - backend/testes/review: Codex.
 
-**Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-imagem`.
+`antigravity-agent` e somente leitura — nunca roteie implementacao para ele; a task nao escreveria nada.
+
+**Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-image`.
+
+**Limite de prompt AGY.** Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>` (ou `--stdin`). Acima de 28.000 caracteres o bridge pode falhar com `ENAMETOOLONG` no Windows — divida a task em subtasks por entregaveis independentes antes de delegar, nunca envie o prompt acima do limite.
 
 Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar listagem de skills, o subagente deve consultalas, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Se nao houver listagem disponivel, o subagente deve seguir com `skills nao acessiveis`.
 
@@ -191,14 +218,11 @@ Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar li
 Quando agentes retornarem:
 
 1. Leia os resumos e os arquivos alterados.
-2. Verifique se houve toque fora do ownership. Com 3+ agentes ou ownership complexo, mecanize em vez de conferir no olho:
-   ```bash
-   node "${CLAUDE_SKILL_DIR}/scripts/validate-task-scope.mjs" --root . --allowed "<padroes/do/slice/**>"
-   ```
-   `outOfScope` fora de `[]` e achado — trate como toque fora do ownership (item 3 abaixo). Para risco `MEDIUM`/`HIGH`, rode tambem `node "${CLAUDE_SKILL_DIR}/scripts/inspect-diff.mjs" --root .` e leve qualquer `riskCounts` (migration, lockfile, auth/tenancy, possivel segredo, TODO novo, artefato de debug) para a Fase 6/6.5.
+2. Verifique se houve toque fora do ownership.
 3. Resolva conflitos pequenos diretamente quando for seguro.
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
 5. Atualize `{artefatos_dir}/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
+6. Se um agente front-end devolveu `IMAGE_SUGGESTIONS` preenchido (nao `N/A`), trate antes de fechar a fase: apresente as opcoes ao usuario via `AskUserQuestion` (`multiSelect: true`) e delegue cada aprovacao de volta ao `antigravity-coder` com `--generate-image` (uma chamada por imagem). Ver `references/subagent-prompts.md` secao 3a.
 
 Se um agente falhar por cota, auth, timeout ou ausencia do AGY, normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`, registre a evidencia e aplique o fallback gradual (ver "Politica de falhas" abaixo) antes de pausar para o usuario.
 
@@ -212,9 +236,9 @@ Execute verificacoes proporcionais ao risco:
 - `MEDIUM`: testes da area + typecheck/build quando aplicavel.
 - `HIGH`: suite relevante, review Codex high e plano de rollback.
 
-Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario deve rodar depois.
+Execute os gates `kind: "script"` devolvidos por `executor-gates.mjs plan` (Fase 1) nesta fase — `inspect-diff` sempre que MEDIUM+, `validate-scope` quando 2+ agentes, `collect-test-results`/`validate-wire-format` quando escalado (HIGH, plano pre-definido ou modo conjunto). Anexe a evidencia (`evidenceId`) ao fechamento.
 
-**Verificacao em navegador real, quando a fatia toca front-end que chama back-end em origem separada.** `build`/`tsc`/`curl` nao detectam CORS ausente, resolucao de tenant/host feita a partir do browser, mismatch de casing no corpo da resposta, nem "200 mas a UI ficou silenciosamente quebrada" — sao cegos a essa classe de defeito de integracao por construcao. Antes de reportar a fatia como concluida, dirija **o fluxo alterado** (nao a app inteira) num navegador real e confirme: console/network sem erro de CORS, o dado retornado bate com o que a UI mostra, e o efeito final da acao de fato aconteceu. Sem ferramenta de navegador disponivel, registre a limitacao explicitamente e reporte a fatia como `PARTIAL` — nunca como verificada.
+Se nao conseguir rodar testes, diga exatamente por que e qual comando o usuario deve rodar depois.
 
 ### Fase 6.5 - Review plano vs entrega
 
@@ -228,6 +252,19 @@ Execute esta fase somente quando `plano_predefinido: true`.
 6. Atualize `.executor/checkpoint.json` em `review_plano_vs_entrega` com `status: REVIEWED | BLOCKED | FALLBACK_INTERNAL` e `path`.
 
 Se Codex high falhar por quota nessa fase, siga a politica de "Codex bate a cota em revisao": faca review interno read-only, salve no mesmo `{artefatos_dir}/plan-vs-output-review.md` e registre o fallback explicitamente.
+
+### Fase 6.6 - Verificacao E2E no navegador real
+
+Execute esta fase somente quando `executor-gates.mjs plan` devolver o gate `browser-e2e` — ou seja, quando ha front-end na entrega **e** front-end e back-end sao origens/deploys separados (SPA/Next.js chamando uma API em outra porta/host). Sem isso, pule direto para a Fase 7.
+
+**Por que esta fase existe.** Review de codigo, `dotnet build`, `npm run build`, `tsc` e `curl` sao cegos a uma classe inteira de defeitos de integracao runtime: CORS ausente que so quebra no browser, resolucao de tenant/host que o `curl` mascara ao passar `Host` manualmente, e casing de resposta divergente que falha silenciosamente com `200` e a UI vazia.
+
+1. Suba a app de verdade (ex.: `docker compose up --build`) e confirme os servicos saudaveis. Se subir a stack falhar, isso ja e achado bloqueante.
+2. Dirija os fluxos de usuario criticos num navegador real via Playwright MCP (ou equivalente): navegue, preencha formularios, clique, submeta — incluindo fluxos que exigem login, com credenciais de seed/demo documentadas.
+3. Em cada fluxo, verifique: console/network sem erros de CORS; cada chamada de API retorna 2xx **e** a UI reflete o dado real (desconfie de "200 mas tela vazia/inalterada" — sintoma classico de casing divergente); o efeito final da acao aconteceu de fato; resolucao multi-tenant/host funciona a partir do browser; estados de tela (vazio/carregando/erro/sucesso) se comportam como especificado.
+4. Capture evidencia (screenshot e/ou resumo de console+network) em `{artefatos_dir}/review/e2e-verification.md` e screenshots em `{artefatos_dir}/review/screenshots/`.
+
+Achados desta fase sao **bloqueantes**. Se a ferramenta de navegador nao estiver disponivel, nao invente aprovacao: registre a limitacao e marque o `handoff.json` (quando houver) como `PARTIAL`, nunca `DONE`.
 
 ### Fase 7 - Fechamento interno
 
@@ -274,9 +311,9 @@ Antes de pausar para o usuario, aplique automaticamente a escada de fallback aba
 **Escada AGY:**
 
 ```
-AGY gemini-3.1-pro-high
-  → AGY gemini-3.5-flash-medium  (retry automatico, sem perguntar)
-  → Executor (Claude) direto     (se flash-medium tambem falhar)
+AGY --model pro --effort high
+  → AGY --model flash --effort medium  (retry automatico, sem perguntar)
+  → Executor (Claude) direto           (se flash tambem falhar)
 ```
 
 **Escada Codex:**
@@ -301,8 +338,9 @@ O executor (Claude) assume a task diretamente quando todos os degraus acima falh
 
 1. Normalize para `QUOTA_EXHAUSTED` no contexto do executor.
 2. Registre a evidencia no `{artefatos_dir}/monitoring.md`.
-3. Aplique a escada AGY: tente `flash-medium`; se falhar, executor direto.
-4. Se a task for de imagem/asset e o executor nao puder substituir, pergunte ao usuario se quer remediar, pular o asset, ou cancelar.
+3. Prefira retomar com `--conversation <id>` quando o envelope de erro trouxer um `conversation_id` exato; use `--continue` somente quando nao houver ID disponivel.
+4. Aplique a escada AGY: tente `--model flash --effort medium`; se falhar, executor direto.
+5. Se a task for de imagem/asset e o executor nao puder substituir, pergunte ao usuario se quer remediar, pular o asset, ou cancelar.
 
 **AGY emite `AUTH_REQUIRED`, `TIMEOUT` ou `AGY_MISSING`:**
 
@@ -329,7 +367,7 @@ O executor (Claude) assume a task diretamente quando todos os degraus acima falh
 Todo subagente (Codex ou Antigravity) deve, como **primeiro passo antes de implementar qualquer coisa**:
 
 1. **Listar as skills disponiveis** no ambiente se essa capacidade existir (ex: `/skills` ou equivalente). Se o ambiente nao expuser um inventario de skills, registre `skills nao acessiveis`.
-2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` - essas sao exclusivas do orquestrador.
+2. **Filtrar as incompativeis:** ignorar todas as skills cujo nome comece com `openspec` ou `opsx` - essas pertencem ao fluxo do Pensador (modo Spec) e nao devem ser acionadas pelo subagente do Executor.
 3. **Identificar e usar as compativeis:** das skills restantes, usar as que se aplicam a task em execucao durante a implementacao.
 4. **Reportar no retorno:** no campo obrigatorio `Skills utilizadas`, listar quais foram usadas (ou "nenhuma").
 
@@ -352,7 +390,9 @@ Use os templates de `assets/` como base. Regras:
 - **subagents-context.md**: resumo geral (ondas, total de agentes, fallbacks), linha do tempo de eventos, detalhes por subagente (task, modelo, status, tokens, arquivos, decisoes, testes, riscos, skills), divergencias cruzadas detectadas, e contexto para retomada.
 - **implementation-report.md**: resumo executivo, preflight (incluindo se houve auto-remediacao), tasks com criterios de aceite, contratos implementados e validacao de wire format, decisoes tecnicas, validacoes (build/testes/typecheck/lint), fallbacks, status final (pronto para merge | pronto para homologacao | bloqueado), tabela de tokens (secao 12), e secao 14 com instrucoes de negocio quando houver contexto de negocio real.
 - Se houver plano pre-definido, os tres entregaveis devem referenciar `{artefatos_dir}/initial-plan-baseline.md` e `{artefatos_dir}/plan-vs-output-review.md`.
-- Grave `{artefatos_dir}/handoff.json` (`HANDOFF_VERSION = 1`, veja `references/handoff-contract.md`) com `stage: "executor"`, `upstream` apontando para o caminho do handoff do Orchestrador que de fato respondeu na ingestao (`.orchestration/<slug>/report/handoff.json` ou, em fallback, `.orchestration/<slug>/handoff.json`), `artifacts[]` com os roles do executor (`initial-plan-baseline`, `execution-brief`, `plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots`) e `status` final. Como o executor e o ultimo estagio da cadeia, `nextStage` pode ser `null`.
+- Grave `{artefatos_dir}/handoff.json` (`HANDOFF_VERSION = 1`, veja `references/handoff-contract.md`) com `stage: "executor"`, `upstream` apontando para o caminho onde o handoff do Orchestrador foi de fato encontrado — `.orchestration/<slug>/report/handoff.json` na maioria das runs, ou `.orchestration/<slug>/handoff.json` (raiz) apenas para runs em layout anterior ao v2 (quando houve ingestao upstream) —, `artifacts[]` com os roles do executor (`initial-plan-baseline`, `execution-brief`, `plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots`) e `status` final. Como o executor e o ultimo estagio da cadeia, `nextStage` pode ser `null`.
+
+**Gates de conclusao.** Quando a execucao usa `executor-state.mjs` (2+ agentes, plano pre-definido ou sessao longa), feche os gates antes de `run --status DONE`: `node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" gate --dir {artefatos_dir} --gate <verificacao|review|e2e|reports|handoff> --status DONE|N/A`. `verificacao` e `reports` sao sempre obrigatorios; `review`/`e2e`/`handoff` so bloqueiam quando `--required true` foi declarado (plano pre-definido, front-end separado, ou modo conjunto respectivamente) — caso contrario, feche-os como `N/A`. Ver `references/persistent-state.md`.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.
@@ -386,10 +426,9 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 - Nao instale dependencias novas sem justificativa e autorizacao quando houver impacto de lockfile.
 - Nao altere auth/autorizacao/segredos sem review dedicado.
 - Nao ignore erro de build/teste; se aceitar uma falha, registre como pendencia.
-- Para front-end/UI puro (`UI_FRONTEND`, `IMAGE_ASSET`): Codex nao participa do fluxo — nem como agente, nem como fallback. Aplique somente a escada AGY (pro-high → flash-medium → executor direto). Nunca lance Codex para estas tasks.
+- Para front-end/UI puro (`UI_FRONTEND`, `IMAGE_ASSET`): Codex nao participa do fluxo — nem como agente, nem como fallback. Aplique somente a escada AGY (`pro`/high → `flash`/medium → executor direto). Nunca lance Codex para estas tasks.
 - Excecao: se `plano_predefinido: true`, Codex high participa apenas como review read-only na Fase 6.5 para comparar o plano inicial com a entrega gerada; ele nao implementa nem faz fallback de UI/asset.
 - Para imagem/asset: sem AGY nao ha fallback automatico; registre como `BLOCKED` e pergunte ao usuario.
-- **Nunca delegue implementacao (UI, imagem/asset, fan-out) para `cc-antigravity-plugin:antigravity-agent`.** Esse subagente e somente leitura (analise, planejamento, review); quem escreve arquivo e `cc-antigravity-plugin:antigravity-coder`. Delegar escrita ao agente de leitura falha silenciosamente ou produz uma "implementacao" que nunca tocou o disco.
 
 ## Comunicacao
 
@@ -402,7 +441,6 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 
 | Arquivo | Quando ler |
 |---|---|
-| `references/handoff-contract.md` | ingerir artefatos do Orchestrador/Pensador e gravar `handoff.json` |
 | `references/workflow.md` | detalhes do fluxo rapido |
 | `references/agent-stack.md` | escolher Codex/Antigravity/effort |
 | `references/subagent-prompts.md` | sempre antes de delegar |
@@ -410,14 +448,22 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `references/contracts.md` | usar notas de interface em pequenos full-stacks |
 | `references/handoff-contract.md` | modo conjunto: ingerir o handoff do Orchestrador/Pensador e emitir o proprio |
 | `references/preflight-check.md` | entender/remediar preflight |
-| `references/project-config.md` | Fase 0.2/0.3: as quatro perguntas da Project_Config e o protocolo do Dependency_Installer |
+| `references/project-config.md` | as 4 perguntas de stack, protocolo do Dependency_Installer, roteamento derivado |
+| `references/persistent-state.md` | entender `state.json`/`events.jsonl`, os 5 invariantes e o protocolo de `/executor resume` |
+| `references/programmatic-intelligence.md` | scripts deterministicos (inspect-diff, validate-wire-format, validate-scope, collect-test-results) |
+| `references/mcp-context.md` | protocolo do Context7 MCP e do Codebase Memory MCP |
 | `assets/plan-template.md` | criar `{artefatos_dir}/execution-brief.md` quando util |
 | `assets/monitoring-template.md` | manter `{artefatos_dir}/monitoring.md` vivo na Fase 8 |
 | `assets/workflow-log-template.md` | gerar `{artefatos_dir}/workflow-log.md` (Fase 9) |
 | `assets/subagents-context-template.md` | gerar `{artefatos_dir}/subagents-context.md` (Fase 9) |
 | `assets/implementation-report-template.md` | gerar `{artefatos_dir}/implementation-report.md` (Fase 9) |
-| `scripts/preflight.mjs` | validar ambiente minimo, com Required_CLI_Set derivado da Project_Config |
-| `scripts/project-config.mjs` | Fase 0.2: `show`/`write`/`validate`/`required-clis` da Project_Config |
-| `scripts/lib/dependency-plan.mjs` | Fase 0.3: catalogo de dependencias ausentes do Dependency_Installer |
-| `scripts/validate-task-scope.mjs` | Fase 5: mecanizar a verificacao de arquivos alterados fora do ownership |
-| `scripts/inspect-diff.mjs` | Fase 5/6: sinalizar migration, lockfile, auth/tenancy, possivel segredo, TODO novo ou artefato de debug no diff |
+| `scripts/preflight.mjs` | validar ambiente minimo (obrigatoriedade derivada da Project_Config) |
+| `scripts/project-config.mjs` | ler/gravar `.executor/project-config.md` |
+| `scripts/executor-state.mjs` | init/task/heartbeat/sweep/phase/reconcile/resume/run/status/verify da execucao |
+| `scripts/executor-probe.mjs` | normalizar retorno bruto de subagente em probe estavel para `reconcile`/`resume` |
+| `scripts/executor-gates.mjs` | `plan`: lista exata de gates por risco/plano-predefinido/modo-conjunto (Fase 1) |
+| `scripts/check-agy-prompt.mjs` | medir prompt AGY contra o limite de 28.000 chars antes de delegar (Fase 4) |
+| `scripts/inspect-diff.mjs` | estatisticas e riscos mecanicos do diff (Fase 6) |
+| `scripts/validate-scope.mjs` | arquivos alterados x ownership declarado (Fase 6, 2+ agentes) |
+| `scripts/validate-wire-format.mjs` | payload x contrato/schema (Fase 6, `interface_contract: true`) |
+| `scripts/collect-test-results.mjs` | resultado de teste estruturado (JUnit/TRX/JSON) (Fase 6) |

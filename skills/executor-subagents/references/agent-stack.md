@@ -1,7 +1,5 @@
 # Stack de Agentes
 
-> **A stack e configuravel, nao fixa.** As tabelas abaixo descrevem o comportamento sob os defaults da Project_Config (`backendExecutor: codex`, `frontendExecutor: agy`, `backendReviewer: codex`, `frontendReviewer: agy`). Quem de fato implementa/revisa cada tipo de trabalho vem de `.orchestrator/project-config.md` — o mesmo arquivo do `cc-orchestrador-subagents` — resolvido na Fase 0.2 e derivado por `scripts/lib/project-config.mjs`; ver `references/project-config.md`. Quando um papel e `claude-code`, o Executor (voce mesmo) assume a task diretamente, sem CLI externa nem fallback ladder.
-
 ## Papeis
 
 | Papel | Modelo | Subagent type | Quando usar |
@@ -9,14 +7,16 @@
 | Executor principal | Claude | voce mesmo | triagem, split, integracao, verificacao, glue pequeno e alinhamento com o usuario |
 | Executor geral | Codex gpt-5.4 medium | `codex:codex-rescue` | backend, testes, refactor localizado, bugfix, integracao tecnica |
 | Review critico | Codex gpt-5.5 high | `codex:codex-rescue` | risco alto, auth, dados, concorrencia, review final |
-| UI/front-end | AGY gemini-3.5-flash-medium | `cc-antigravity-plugin:antigravity-coder` | tarefas front-end do dia a dia, componentes, layouts, estados e polish visual |
-| UI/front-end complexa | AGY gemini-3.1-pro-high | `cc-antigravity-plugin:antigravity-coder` | redesign mais complexo, fluxos visuais grandes, UX com mais ambiguidade |
+| UI/front-end | AGY `--model flash --effort medium` | `cc-antigravity-plugin:antigravity-coder` | tarefas front-end do dia a dia, componentes, layouts, estados e polish visual |
+| UI/front-end complexa | AGY `--model pro --effort high` | `cc-antigravity-plugin:antigravity-coder` | redesign mais complexo, fluxos visuais grandes, UX com mais ambiguidade |
 | Analise cross-file | AGY read-only | `cc-antigravity-plugin:antigravity-agent` | arquitetura, impacto de refactor, orientacao de codebase |
-| Imagem/asset | AGY nano-banana | `cc-antigravity-plugin:antigravity-coder` | mockups, assets, ilustracoes e pedidos explicitos de imagem |
+| Imagem/asset | AGY (tool nativa `generate_imagem`) | `cc-antigravity-plugin:antigravity-coder` | mockups, assets, ilustracoes e pedidos explicitos de imagem |
 
-`cc-antigravity-plugin:antigravity-coder` e o unico subagente AGY com permissao de escrita (cria, edita, move e formata arquivos via o bridge nativo) — usar para qualquer implementacao front-end/imagem. `cc-antigravity-plugin:antigravity-agent` e **somente leitura** (analise, planejamento, review); jamais delegar implementacao a ele.
+**`antigravity-agent` e somente leitura.** Delegar implementacao (front-end, imagem, fan-out) a ele
+e erro de roteamento — a task nao escreve nada. Toda implementacao AGY vai para `antigravity-coder`;
+`antigravity-agent` fica reservado para analise, mapeamento e review sem escrita.
 
-Codex e obrigatorio para tasks de backend, testes e review. Para tasks puramente front-end (`UI_FRONTEND`, `IMAGE_ASSET`), somente AGY e necessario — Codex nao participa dessas tasks. AGY 3.6.0+ e obrigatorio para front-end, imagem, contexto largo e fan-out nativo de subagentes Gemini (`--parallel`).
+Codex e obrigatorio para tasks de backend, testes e review. Para tasks puramente front-end (`UI_FRONTEND`, `IMAGE_ASSET`), somente AGY e necessario — Codex nao participa dessas tasks. `cc-antigravity-plugin` 4.0.0+ (AGY 1.1.8+, 1.1.16 recomendado) e obrigatorio para front-end, imagem, contexto largo e fan-out nativo de subagentes Gemini (`--parallel`).
 
 Excecao: quando a execucao partir de um plano pre-definido, Codex high entra como review read-only de plano-vs-entrega, inclusive para UI/front-end puro. Ele nao implementa UI/asset nem faz fallback dessas tasks; apenas compara o baseline inicial com o resultado gerado.
 
@@ -42,14 +42,18 @@ Use `gpt-5.5-codex --effort high` para:
 
 ## Heuristica Antigravity (AGY)
 
-Use `--model gemini-3.5-flash-medium` para:
+O bridge resolve `--model` dinamicamente contra o catalogo de `agy models` (cache de 24h, fallback
+de emergencia se a descoberta falhar). Use aliases de familia em vez de slugs fixos — o bridge
+resolve para o membro mais novo daquela familia, entao a prosa nao envelhece a cada release do AGY.
+
+Use `--model flash --effort medium` para:
 
 - UI/front-end do dia a dia;
 - componentes e estados comuns;
 - ajustes visuais e responsividade;
 - tarefas multi-arquivo que pedem contexto largo, mas sem profundidade maxima.
 
-Use `--model gemini-3.1-pro-high` para:
+Use `--model pro --effort high` para:
 
 - UI/front-end complexa;
 - fluxos visuais com muitas dependencias;
@@ -64,17 +68,22 @@ Use `--read-only` para:
 - review de seguranca cross-file;
 - sintetizar documentacao de muitos arquivos.
 
-Use `--generate-imagem` para:
+`--read-only` ja implica `--mode plan` e desliga `--dangerously-skip-permissions`/auto `--add-dir`.
+Nao combine com `--disable-slash-commands`.
+
+Use `--generate-image` para:
 
 - mockups ou assets pedidos explicitamente pelo usuario;
 - imagens guiadas por arquivos de referencia via `--files`;
-- saida em diretorio especifico via `--output-dir` quando houver destino claro.
+- saida em diretorio especifico via `--output-dir` quando houver destino claro;
+- a tool nativa `generate_imagem` do AGY gera a imagem sem trocar o modelo da sessao.
 
 Use `--parallel` para:
 
 - varios entregaveis AGY independentes (relatorios, componentes, arquivos) sem dependencia entre si e sem Codex na wave;
 - o AGY decide a contagem de subagentes Gemini nativos, executa em paralelo e agrega os resultados;
-- combine com `--subagent-model gemini-3.5-flash-medium` para usar subagentes mais baratos sob um planejador mais capaz;
+- combine com `--subagent-model flash` para usar subagentes mais baratos sob um planejador mais capaz (`--subagent-model` implica `--parallel`);
+- combine com `--format stream-json` para acompanhar progresso incremental em `stderr` sem misturar com a resposta final em `stdout`;
 - ao final o AGY reporta os Conversation IDs de cada subagente nativo.
 
 Nao use `--parallel` quando:
@@ -83,7 +92,10 @@ Nao use `--parallel` quando:
 - os entregaveis dependem uns dos outros ou compartilham estado;
 - o task precisar de monitoramento ou formato de retorno por fatia.
 
-Nao combine `--parallel` com `--generate-imagem` (o bridge ignora `--parallel` nesse caso).
+Nao combine `--parallel` com `--generate-image` (o bridge ignora `--parallel` nesse caso).
+
+`--agent <nome>` seleciona um agente customizado do AGY e exige valor; o Executor e headless e nunca
+usa `--interactive` (sessao humana em PTY).
 
 ## Fallback gradual de modelo
 
@@ -93,9 +105,9 @@ Antes de pausar para o usuario, percorra a escada automaticamente e registre cad
 
 | Degrau | Modelo/modo | Condicao de ativacao |
 |---|---|---|
-| 1 | `gemini-3.1-pro-high` | tentativa inicial |
-| 2 | `gemini-3.5-flash-medium` | pro-high falhou por cota/timeout |
-| 3 | Executor (Claude) direto | flash-medium tambem falhou |
+| 1 | `--model pro --effort high` | tentativa inicial |
+| 2 | `--model flash --effort medium` | pro falhou por cota/timeout |
+| 3 | Executor (Claude) direto | flash tambem falhou |
 | — | Pausa para usuario | task e de imagem/asset (sem fallback possivel) |
 
 **Codex:**
@@ -115,7 +127,10 @@ O bridge do `cc-antigravity-plugin` pode emitir sinais brutos `QUOTA_EXAUSTED`, 
 
 - normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`;
 - registre o sinal bruto como evidencia;
-- aplique a escada de fallback antes de pausar para o usuario.
+- aplique a escada de fallback antes de pausar para o usuario;
+- ao retomar apos `QUOTA_EXHAUSTED`, prefira `--conversation <id>` quando o envelope de erro trouxer
+  um `conversation_id` exato; use `--continue` somente quando nao houver ID disponivel — isso evita
+  perder a conversa original ao retomar depois da renovacao de quota.
 
 ## Context7
 
@@ -125,25 +140,17 @@ Se a task envolve biblioteca, framework, SDK, API, CLI ou cloud service:
 - instrua os agentes a consultar docs atuais;
 - se nao estiver disponivel, registre que seguiram pelos padroes locais.
 
-**Ordem obrigatoria, sem atalho:** resolver o identificador da biblioteca (nome livre -> identificador do Context7) **antes** de pedir a documentacao, mesmo quando o identificador "ja e conhecido" de uma consulta anterior na mesma execucao — nome de pacote e identificador do servidor nao sao a mesma coisa, e pedir documentacao de um identificador inventado devolve conteudo errado ou vazio. Quando a task fixa versao (`package.json`, `*.csproj`, lockfile), passe a versao na consulta: documentacao de major diferente e a causa mais comum de API inexistente em codigo gerado.
-
-**Fora de tudo:** chave de API do Context7 nunca entra em prompt de subagente, artefato (`{artefatos_dir}/`) ou checkpoint. Cite apenas nome do servidor e comando de setup.
-
-## Codebase Memory (opcional)
-
-Quando `codebase-memory-mcp` estiver disponivel (indicado pelo `codebase-memory-mcp` no PATH ou por `.mcp.json` conhecido — nao ha check dedicado no preflight leve do executor, mas o servidor pode ja estar registrado na sessao do Claude Code), use-o na Fase 1 (triagem) para localizar owner e raio de impacto de forma mais barata do que `Grep`/`Glob` isolados: `search_graph` para achar o simbolo citado na demanda, `trace_path` para quem chama/e chamado. Resultado de grafo e pista, nao prova — confirme por leitura do arquivo antes de fixar ownership ou afirmar que algo nao existe. Sem o servidor, siga com `Read`/`Glob`/`Grep` normalmente; a triagem de 2 minutos ja cobre esse caminho.
-
 ## Escolha rapida
 
 | Demanda | Melhor rota |
 |---|---|
 | bug simples em um modulo backend | 1 Codex medium |
 | bug + testes em arquivos separados | 2 Codex medium em paralelo |
-| UI/front-end isolado | 1 AGY flash-medium (sem Codex) |
-| UI/front-end complexa | 1 AGY pro-high (sem Codex) |
+| UI/front-end isolado | 1 AGY `--model flash --effort medium` (sem Codex) |
+| UI/front-end complexa | 1 AGY `--model pro --effort high` (sem Codex) |
 | Mapear impacto antes de refactor | 1 AGY read-only + execucao com Codex |
-| asset visual pedido explicitamente | 1 AGY `--generate-imagem` (sem Codex) |
-| varios relatorios/componentes AGY independentes | 1 AGY `--parallel` (fan-out nativo); `--subagent-model gemini-3.5-flash-medium` para subagentes baratos |
+| asset visual pedido explicitamente | 1 AGY `--generate-image` (sem Codex) |
+| varios relatorios/componentes AGY independentes | 1 AGY `--parallel` (fan-out nativo); `--subagent-model flash` para subagentes baratos |
 | feature slice pequena full-stack | AGY no front + Codex no backend se ownership for disjunto; criar `interface-contract.md` antes de delegar |
 | N modulos/dominios independentes | N agentes em paralelo; sem teto — cada slice disjunto vira um agente |
 | risco alto | Codex high review antes/depois |

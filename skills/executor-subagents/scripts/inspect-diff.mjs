@@ -1,20 +1,12 @@
 #!/usr/bin/env node
-/**
- * Deterministic diff stats + mechanical risk flags, so Fase 5/6 don't rely on
- * eyeballing `git diff` for signals a script can compute cheaply: migrations,
- * lockfile changes, auth/tenancy paths, new TODOs, leftover debug artifacts,
- * possible secrets. Read-only — never edits code.
- *
- * Usage:
- *   node inspect-diff.mjs --root . [--base <gitRef>] [--cached]
- */
 
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { executeJsonCli, parseArgs } from "./lib/cli-utils.mjs";
+import { boolArg, executeJsonCli, parseArgs } from "./lib/cli-utils.mjs";
+import { intelligenceResult, persistIntelligenceEvidence } from "./lib/intelligence.mjs";
 
-function git(root, args) {
+function git(root, args, allowFailure = false) {
   try {
     return execFileSync("git", args, {
       cwd: root,
@@ -23,8 +15,11 @@ function git(root, args) {
       timeout: 20_000,
       maxBuffer: 10 * 1024 * 1024,
     }).trim();
-  } catch {
-    return "";
+  } catch (error) {
+    if (allowFailure) return "";
+    const wrapped = new Error(error.stderr?.trim() || error.message);
+    wrapped.code = "GIT_DIFF_FAILED";
+    throw wrapped;
   }
 }
 
@@ -47,11 +42,10 @@ function main(argv) {
   const args = parseArgs(argv);
   const root = resolve(args.root ?? process.cwd());
   const baseArgs = ["diff"];
-  if (args.cached) baseArgs.push("--cached");
-  if (args.base) baseArgs.push(String(args.base));
-
-  const names = git(root, [...baseArgs, "--name-only"]).split(/\r?\n/).filter(Boolean);
-  const numstatText = git(root, [...baseArgs, "--numstat"]);
+  if (boolArg(args.cached, false)) baseArgs.push("--cached");
+  if (args.base) baseArgs.push(args.base);
+  const names = git(root, [...baseArgs, "--name-only"], true).split(/\r?\n/).filter(Boolean);
+  const numstatText = git(root, [...baseArgs, "--numstat"], true);
   const stats = new Map();
   for (const line of numstatText.split(/\r?\n/).filter(Boolean)) {
     const [added, deleted, ...pathParts] = line.split("\t");
@@ -61,12 +55,11 @@ function main(argv) {
     });
   }
   const files = names.map((path) => {
-    const patch = git(root, [...baseArgs, "--", path]);
+    const patch = git(root, [...baseArgs, "--", path], true);
     return { path, ...(stats.get(path) ?? { added: 0, deleted: 0 }), risks: riskFor(path, patch) };
   });
   const riskCounts = {};
   for (const risk of files.flatMap((file) => file.risks)) riskCounts[risk] = (riskCounts[risk] ?? 0) + 1;
-
   const summary = {
     filesChanged: files.length,
     insertions: files.reduce((sum, file) => sum + (file.added ?? 0), 0),
@@ -75,8 +68,15 @@ function main(argv) {
     riskyFiles: files.filter((file) => file.risks.length > 0).length,
     riskCounts,
   };
-
-  return { tool: "inspect-diff", summary, detail: { files } };
+  const result = intelligenceResult("inspect-diff", summary, { files });
+  return {
+    result,
+    persistence: persistIntelligenceEvidence(result, {
+      artifactDir: args.dir,
+      taskId: args.task,
+      projectRoot: root,
+    }),
+  };
 }
 
 executeJsonCli(main);

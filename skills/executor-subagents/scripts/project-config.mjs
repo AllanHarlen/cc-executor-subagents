@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * CLI da Project_Config, usada pela Fase 0 do `/executor`.
+ * CLI da Project_Config (`/executor project-config`).
  *
  * Camada fina sobre `lib/project-config.mjs`: nenhuma regra de configuracao
  * nasce aqui. O modulo continua sendo a unica fonte da verdade sobre papeis,
- * executores permitidos, formato do arquivo e derivacao do Required_CLI_Set —
- * o mesmo modulo e o mesmo `.orchestrator/project-config.md` que o
- * `cc-orchestrador-subagents` le/escreve, entao uma configuracao gravada por
- * um dos dois plugins vale para o outro no mesmo projeto.
+ * executores permitidos, formato do arquivo e derivacao do Required_CLI_Set.
  *
  * Subcomandos:
  *
@@ -22,17 +19,17 @@
  * Contrato de saida herdado de `executeJsonCli`: `{ ok: true, ... }` em stdout
  * ou `{ ok: false, error: { code, message, details } }` em stderr.
  *
- * Garantias de escopo (Req 6.8): o unico caminho que escreve no filesystem e
- * `write`, e ele grava exclusivamente `.orchestrator/project-config.md` via
- * `writeProjectConfig`. Nao existe aqui criacao de `.orchestration/`,
- * inicializacao de Run, leitura de PRD nem leitura de especificacao.
+ * Garantias de escopo: o unico caminho que escreve no filesystem e `write`, e
+ * ele grava exclusivamente `.executor/project-config.md` via
+ * `writeProjectConfig`. Nao existe aqui criacao de diretorio de run,
+ * inicializacao de checkpoint nem leitura de demanda.
  *
  * Arquivo invalido: `show`, `validate` e `required-clis` propagam o
  * `ProjectConfigError` do parser, nomeando campo, caminho, valor recebido e
- * conjunto aceito (Req 6.1 e insumo do Req 6.9). `write` e deliberadamente
- * tolerante ao arquivo anterior invalido — a regravacao a partir de novas
- * respostas e justamente a remediacao oferecida pelo Req 6.9 — e devolve o erro
- * do parser dentro de `previous.error`, sem perder a informacao.
+ * conjunto aceito. `write` e deliberadamente tolerante ao arquivo anterior
+ * invalido — a regravacao a partir de novas respostas e justamente a
+ * remediacao oferecida — e devolve o erro do parser dentro de
+ * `previous.error`, sem perder a informacao.
  */
 
 import {
@@ -59,8 +56,8 @@ function help() {
   return {
     name: "project-config",
     warning:
-      "write is the only mutating command and it only writes .orchestrator/project-config.md. "
-      + "No command creates .orchestration/, initializes a Run or reads a PRD.",
+      "write is the only mutating command and it only writes .executor/project-config.md. "
+      + "No command creates a run directory, initializes a checkpoint or reads a demand.",
     commands: {
       show: "show [--root .]",
       write:

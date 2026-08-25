@@ -15,6 +15,8 @@ Se encontrar o sinal bruto QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING
 
 Se ficar bloqueado, retorne Status: BLOCKED com a menor pergunta ou decisao necessaria.
 
+Antes de prometer Codebase Memory ou Context7 no prompt de uma task Codex/AGY, prefira `checks.optional.mcpPerAgent.<agent>.<servidor>.ok` (verdade ao vivo por agente, so existe quando o preflight rodou com `--check-agent-mcp`) em vez do agregado `checks.optional.mcp.<servidor>.ok`, que so prova registro em algum lugar da maquina, nao necessariamente na CLI que vai executar a task (ver `references/mcp-context.md`). Se o sinal aplicavel indicar disponibilidade do Codebase Memory e voce tiver acesso ao servidor, use search_graph/trace_path/get_code_snippet para localizar o simbolo, quem o chama e o que ele chama, antes de varrer arquivos com Read/Glob/Grep. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente.
+
 Nao amplie escopo. Nao instale dependencia nova sem justificar e sem autorizacao explicita no prompt.
 ```
 
@@ -48,6 +50,9 @@ Verificacao esperada:
 
 Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
+
+Codebase Memory:
+<SE DISPONIVEL: antes de varrer arquivos, use search_graph/trace_path/get_code_snippet para localizar o simbolo citado na demanda, quem o chama e o que ele chama. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente. SENAO: varra arquivos normalmente.>
 
 Regras:
 - Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo.
@@ -153,10 +158,10 @@ Retorne:
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
-Use `--model gemini-3.5-flash-medium` para UI do dia a dia e `--model gemini-3.1-pro-high` para UI complexa.
+Use `--model flash --effort medium` para UI do dia a dia e `--model pro --effort high` para UI complexa. O bridge resolve o alias de familia contra o catalogo dinamico de `agy models`.
 
 ```text
---model gemini-3.5-flash-medium --dirs <DIRS>
+--mode accept-edits --format stream-json --model flash --effort medium --dirs <DIRS>
 
 Voce e um agente AGY responsavel por implementar front-end/UI em uma execucao rapida multiagente.
 
@@ -173,6 +178,8 @@ Ownership:
 Design system/padroes:
 <TOKENS, COMPONENTES, CONVENCOES>
 
+Quando houver design system (Open Design — `tokens.css`/`components.html`/`preview/` do handoff do Orchestrador/Pensador, ver `references/handoff-contract.md` secao 6): consuma `tokens.css` verbatim via `var(--*)`, sem inventar hex/raio/espacamento fora dos tokens, e bata os componentes com os estados de `components.html`. Ver a secao "Gate de design system" no fim deste arquivo — o review da Fase 6/6.5 aplica esse gate e trata violacao de requisito explicito como bloqueante.
+
 Estados obrigatorios:
 - loading:
 - error:
@@ -183,11 +190,15 @@ Estados obrigatorios:
 Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
 
+Codebase Memory:
+<SE DISPONIVEL: antes de varrer arquivos, use search_graph/trace_path/get_code_snippet para localizar o simbolo citado na demanda, quem o chama e o que ele chama. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente. SENAO: varra arquivos normalmente.>
+
 Regras:
 - Modo agentic ativo: implemente a UI diretamente; nao use --read-only.
 - Preserve design system existente.
 - Mantenha responsividade e acessibilidade.
 - Nao altere payload/API sem avisar.
+- Se identificar oportunidades de imagery (hero, banner, ilustracao de empty/error state, icone), NAO gere sem aprovacao: liste as sugestoes no item IMAGE_SUGGESTIONS do retorno. O executor principal (nunca voce) apresenta as opcoes ao usuario antes de qualquer geracao.
 - Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
 
 Retorne:
@@ -200,7 +211,21 @@ Retorne:
 6. Pendencias
 7. Riscos
 8. Skills utilizadas
+9. IMAGE_SUGGESTIONS: <bloco de sugestoes de imagem | "N/A (nenhuma oportunidade de imagery identificada)">
 ```
+
+### 3a. Tratamento de `IMAGE_SUGGESTIONS` (pos-retorno da task front-end)
+
+Se o item 9 do retorno da Secao 3 vier preenchido (nao `N/A`), o executor principal segue este fluxo **antes de considerar a task concluida**:
+
+1. Apresente cada entrada do bloco ao usuario via `AskUserQuestion` (`multiSelect: true`), um `option` por imagem sugerida (label = nome curto, description = prompt resumido).
+2. Para cada opcao aprovada, delegue de volta ao `cc-antigravity-plugin:antigravity-coder` (uma chamada por imagem — o bridge nao mistura `--generate-image` com `--parallel`):
+   ```text
+   --generate-image --output-dir <DIR DO ENTREGAVEL> -- "<prompt da sugestao>"
+   ```
+3. Apos gerar, confirme que o arquivo foi referenciado em algum componente (import/`src`/`background-image`) — imagem gerada e nao referenciada e uma pendencia, nao uma entrega.
+4. Registre em `{artefatos_dir}/subagents-context.md`: quais imagens foram sugeridas, quais o usuario aprovou, e o caminho final de cada arquivo gerado.
+5. Se o usuario nao aprovar nenhuma, registre a recusa e siga sem bloquear a task — imagery e um enriquecimento, nao um requisito obrigatorio, exceto quando a demanda explicitamente exigir imagem de produto/servico.
 
 ## 4. Investigacao read-only
 
@@ -245,10 +270,10 @@ Nao implemente trabalho novo nesta resposta.
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-agent`
 
-Use `--read-only` sempre. Use `--model gemini-3.5-flash-medium` para analise geral e `--model gemini-3.1-pro-high` quando o raciocinio precisar ser mais profundo.
+Use `--read-only` sempre. Use `--model flash` para analise geral e `--model pro --effort high` quando o raciocinio precisar ser mais profundo.
 
 ```text
---read-only --model gemini-3.5-flash-medium --dirs <DIRS>
+--read-only --format json --model flash --dirs <DIRS>
 
 Voce e um agente de analise em uma execucao rapida multiagente.
 
@@ -310,7 +335,7 @@ Retorne:
 Use quando todos os entregaveis sao de dominio AGY, sao independentes entre si e nao envolvem Codex. O AGY decompoe e executa com subagentes Gemini nativos.
 
 ```text
---parallel --subagent-model gemini-3.5-flash-medium --dirs <DIRS>
+--parallel --subagent-model flash --format stream-json --dirs <DIRS>
 
 Voce e um agente AGY em modo fan-out paralelo numa execucao rapida multiagente.
 
@@ -330,6 +355,9 @@ Ownership:
 
 Context7:
 <SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de gerar. Use resolve-library-id -> query-docs. SENAO: siga padroes locais.>
+
+Codebase Memory:
+<SE DISPONIVEL E OS ENTREGAVEIS TOCAM CODIGO EXISTENTE: use search_graph/trace_path/get_code_snippet para localizar simbolos afetados antes de varrer arquivos. Grafo e pista, nao prova. SENAO: varra arquivos normalmente ou ignore se os entregaveis forem inteiramente novos.>
 
 Regras:
 - Voce nao esta sozinho no codebase. Outros agentes podem editar outras areas em paralelo.
@@ -354,10 +382,10 @@ Retorne:
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
-Use quando o usuario pedir explicitamente asset, mockup, ilustracao, banner, logo ou imagem.
+Use quando o usuario pedir explicitamente asset, mockup, ilustracao, banner, logo ou imagem, ou quando uma sugestao de `IMAGE_SUGGESTIONS` (secao 3a) for aprovada.
 
 ```text
---generate-imagem --files <ARQUIVOS_DE_REFERENCIA> --output-dir <DESTINO>
+--generate-image --files <ARQUIVOS_DE_REFERENCIA> --output-dir <DESTINO>
 
 Voce e um agente AGY responsavel por gerar um asset visual em uma execucao rapida multiagente.
 
@@ -374,7 +402,7 @@ Destino:
 <PASTA OU ARQUIVO ESPERADO>
 
 Regras:
-- Use `--generate-imagem` como flag canonica.
+- Use `--generate-image` como flag canonica (`--generate-imagem` e aceito como alias pelo bridge).
 - Use `--files` quando houver guias de estilo, paleta, texto ou referencias locais.
 - Nao edite codigo da aplicacao, exceto se o prompt disser para conectar o asset gerado.
 - Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
@@ -388,3 +416,17 @@ Retorne:
 5. Pendencias
 6. Skills utilizadas
 ```
+
+## 9. Gate de design system (review)
+
+Aplique este checklist na Fase 6 (verificacao) e na Fase 6.5 (review plano vs entrega) sempre que a task consumir um design system (Open Design). Sem design system, ignore esta secao.
+
+- o estilo consome `tokens.css` via custom properties (`var(--*)`); SEM hex/raio/espacamento inventado fora dos tokens;
+- componentes batem com seletores/estados de `components.html` (default/hover/focus/active/disabled/loading/empty/error);
+- **elementos interativos (botoes, links, cards clicaveis) tem estado `:hover`/`:focus` real, implementado como regra CSS/CSS-Modules/styled/Tailwind — NAO como `style={{}}` inline.** Inline style e estruturalmente incapaz de expressar `:hover`/`:focus`/`@keyframes`; se `components.html` especifica hover (ex.: `.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }`), o componente entregue precisa do equivalente real, nao so o estado default. Grep rapido de sanidade: proporcao alta de `style={{` sem nenhuma regra `:hover`/`:focus` no CSS do projeto e sinal de gate falho;
+- accent usado no maximo 2x por pagina (hero + CTA) alem de links; sem flood; sem emoji como icone; sem sombra se Depth & Elevation = minimal;
+- telas-chave conferidas contra o diretorio `preview/` (diferenca de layout/hierarquia/contraste; abrir `colors.html`, `spacing.html` ou `typography.html` conforme os arquivos disponiveis no system);
+- anti-padroes da secao 9 do `DESIGN.md` ausentes do codigo final.
+
+Trate violacao de design system como problema **BLOQUEANTE** quando contrariar requisito explicito (override sem justificativa, token inventado, accent flood, elemento interativo sem hover/focus real). Registre o achado em `{artefatos_dir}/plan-vs-output-review.md` (plano pre-definido) ou no fechamento da Fase 6 (execucao avulsa).
+

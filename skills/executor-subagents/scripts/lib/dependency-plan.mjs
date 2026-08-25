@@ -18,39 +18,43 @@ import {
  * Duas responsabilidades:
  *
  * - `buildMissingDependencies(report, { platform })`: derivacao exata do
- *   relatorio de preflight. CBM_MCP ausente e Context7_MCP ausente primeiro
- *   (contexto antes de execucao), depois cada CLI do Required_CLI_Set com check
- *   reprovado, em ordem canonica (`codex` antes de `agy`), cada uma seguida
- *   imediatamente pelo plugin do Claude Code que a conecta (`openai-codex` para
- *   `codex`, `cc-antigravity-plugin` para `agy`) quando `checks.plugins` reprova
- *   esse plugin — a CLI resolve o processo externo, o plugin e o que da ao
- *   Claude Code os agentes/comandos para falar com ele, e as duas reprovacoes
- *   sao independentes (CLI instalada nao implica plugin instalado). Ordem
- *   estavel: a mesma entrada produz sempre a mesma lista.
+ *   relatorio de preflight. MCPs opcionais ausentes primeiro, na ordem de
+ *   `MCP_CHECK_KEYS` (contexto antes de execucao), depois cada CLI do
+ *   Required_CLI_Set com check reprovado, em ordem canonica (`codex` antes de
+ *   `agy`), cada uma seguida imediatamente pelo plugin do Claude Code que a
+ *   conecta (`openai-codex` para `codex`, `cc-antigravity-plugin` para `agy`)
+ *   quando `checks.plugins` reprova esse plugin — a CLI resolve o processo
+ *   externo, o plugin e o que da ao Claude Code os agentes/comandos para
+ *   falar com ele, e as duas reprovacoes sao independentes (CLI instalada nao
+ *   implica plugin instalado). Ordem estavel: a mesma entrada produz sempre a
+ *   mesma lista.
  * - `summarizeInstallOutcome(item, outcome)`: registro allowlisted por
  *   dependencia, com exatamente as chaves `name`, `decision`, `command`,
- *   `exitCode` e `durationMs` (Req 4.14).
+ *   `exitCode` e `durationMs`.
  *
- * Redacao (Req 4.14, Req 1.10): o registro nunca carrega stdout, stderr,
- * conteudo de arquivo de configuracao, cabecalho de autenticacao ou chave de
- * API. `summarizeInstallOutcome` **nao le** `outcome.stdout`, `outcome.stderr`
- * nem `outcome.output`, e o campo `command` vem sempre do catalogo do proprio
- * item — nunca de uma linha de comando reconstruida pelo chamador, que poderia
- * carregar variavel de ambiente ou token.
+ * Redacao: o registro nunca carrega stdout, stderr, conteudo de arquivo de
+ * configuracao, cabecalho de autenticacao ou chave de API.
+ * `summarizeInstallOutcome` **nao le** `outcome.stdout`, `outcome.stderr` nem
+ * `outcome.output`, e o campo `command` vem sempre do catalogo do proprio
+ * item — nunca de uma linha de comando reconstruida pelo chamador, que
+ * poderia carregar variavel de ambiente ou token.
  *
- * O modulo nao importa `mcp-detect.mjs`: o insumo e o relatorio ja serializado,
- * o que mantem a derivacao testavel sem filesystem.
+ * `MCP_CHECK_KEYS` inclui `context7` e `codebase-memory` — o Executor usa os
+ * dois (ver `references/mcp-context.md`, Parte 1, para o escopo reduzido do
+ * grafo numa execucao curta); a diferenca em relacao ao catalogo do
+ * Orchestrador e so a profundidade do uso na Fase 1/5, nao a disponibilidade
+ * do MCP em si.
  */
 
 /** Tipos de dependencia reconhecidos. */
 export const DEPENDENCY_KINDS = Object.freeze(["mcp", "cli", "plugin"]);
 
-/** Decisoes possiveis do usuario por dependencia (Req 4.2). */
+/** Decisoes possiveis do usuario por dependencia. */
 export const INSTALL_DECISION_INSTALL = "instalar";
 export const INSTALL_DECISION_SKIP = "seguir sem instalar";
 export const INSTALL_DECISIONS = Object.freeze([INSTALL_DECISION_INSTALL, INSTALL_DECISION_SKIP]);
 
-/** Chaves — exatamente estas — do registro por dependencia (Req 4.14). */
+/** Chaves — exatamente estas — do registro por dependencia. */
 export const INSTALL_OUTCOME_FIELDS = Object.freeze([
   "name",
   "decision",
@@ -59,8 +63,8 @@ export const INSTALL_OUTCOME_FIELDS = Object.freeze([
   "durationMs",
 ]);
 
-/** Chave dos checks de MCP no relatorio de preflight. */
-export const MCP_CHECK_KEYS = Object.freeze(["codebase-memory", "context7"]);
+/** Chaves dos checks de MCP no relatorio de preflight, na ordem de oferta. */
+export const MCP_CHECK_KEYS = Object.freeze(["context7", "codebase-memory"]);
 
 export class DependencyPlanError extends Error {
   constructor(code, message, details = {}) {
@@ -103,46 +107,15 @@ function commandsFor(byPlatform, platform) {
   return Object.freeze([...commands]);
 }
 
-const CBM_INSTALL_SCRIPT_BASE = "https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main";
-
 /**
  * Catalogo estatico das dependencias que o Dependency_Installer sabe instalar.
  *
- * `command` e a sequencia documentada por SO (Req 4.5 a 4.9);
- * `interactiveFollowUp` e o passo que **o usuario** precisa rodar depois, porque
- * exige interacao (`codex login`, primeira execucao de `agy`) e por isso nunca
- * entra na sequencia automatica.
+ * `command` e a sequencia documentada por SO; `interactiveFollowUp` e o passo
+ * que **o usuario** precisa rodar depois, porque exige interacao
+ * (`codex login`, primeira execucao de `agy`) e por isso nunca entra na
+ * sequencia automatica.
  */
 const DEPENDENCY_SPECS = Object.freeze({
-  "codebase-memory": {
-    name: "codebase-memory-mcp",
-    kind: "mcp",
-    optional: true,
-    benefit:
-      "Consultas estruturais no grafo do repositorio (arquitetura, quem chama o que, impacto de diff) "
-      + "com custo de tokens muito menor que exploracao arquivo-a-arquivo.",
-    impact:
-      "Sem ele, classificacao de tasks, expectedFiles/allowedPaths e raio de impacto do diff dependem "
-      + "da varredura deterministica de scripts/intelligence/, mais lenta e mais caras em tokens.",
-    commands: {
-      // Sequencia documentada: baixar install.ps1, remover a marca de origem da
-      // internet (Mark-of-the-Web) e executar o script (Req 4.5).
-      [PLATFORM_WINDOWS]: [
-        `Invoke-WebRequest -Uri ${CBM_INSTALL_SCRIPT_BASE}/install.ps1 -OutFile install.ps1`,
-        "Unblock-File .\\install.ps1",
-        ".\\install.ps1",
-      ],
-      // Instalador install.sh publicado no repositorio (Req 4.6).
-      posix: [`curl -fsSL ${CBM_INSTALL_SCRIPT_BASE}/install.sh | bash`],
-    },
-    alternatives: Object.freeze([
-      "Instalacao manual: baixar o pacote da release mais recente e rodar o install.sh/install.ps1 incluido.",
-    ]),
-    interactiveFollowUp: null,
-    interactiveFollowUpNote:
-      "Reiniciar o agente de codigo depois da instalacao para que o servidor MCP seja carregado.",
-    docs: "https://github.com/DeusData/codebase-memory-mcp",
-  },
   context7: {
     name: "context7",
     kind: "mcp",
@@ -154,7 +127,7 @@ const DEPENDENCY_SPECS = Object.freeze({
       "Sem ele, o subagente segue apenas os padroes ja presentes no projeto e a memoria do modelo, com "
       + "risco de usar API obsoleta ou inexistente.",
     commands: {
-      // Mesmo comando em qualquer SO (Req 4.7).
+      // Mesmo comando em qualquer SO.
       posix: ["npx ctx7 setup --claude"],
     },
     alternatives: Object.freeze([
@@ -163,8 +136,33 @@ const DEPENDENCY_SPECS = Object.freeze({
     interactiveFollowUp: null,
     interactiveFollowUpNote:
       "A chave de API do Context7, quando usada, e configurada pelo proprio usuario e nunca entra em "
-      + "prompt, artefato da Run ou telemetria.",
+      + "prompt, artefato da execucao ou telemetria.",
     docs: "https://github.com/upstash/context7",
+  },
+  "codebase-memory": {
+    name: "codebase-memory",
+    kind: "mcp",
+    optional: true,
+    benefit:
+      "Grafo de codigo persistente (arquitetura, quem chama o que, impacto de diff) para localizar o "
+      + "simbolo da task na Fase 1 (Triagem) e o raio de impacto do diff na Fase 5 (Integracao), mais "
+      + "barato em tokens que varrer arquivos.",
+    impact:
+      "Sem ele, a Fase 1 usa Read/Glob/Grep e a Fase 5 usa inspect-diff.mjs/rg — o caminho de sempre, "
+      + "mais lento para localizar simbolos e mapear chamadores em bases de codigo grandes.",
+    commands: {
+      [PLATFORM_WINDOWS]: [
+        "Invoke-WebRequest -Uri https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.ps1 -OutFile install.ps1; .\\install.ps1",
+      ],
+      posix: [
+        "curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash",
+      ],
+    },
+    alternatives: Object.freeze([]),
+    interactiveFollowUp: null,
+    interactiveFollowUpNote:
+      "Depois de instalar, o agente de codigo precisa ser reiniciado para carregar o servidor MCP.",
+    docs: "https://github.com/DeusData/codebase-memory-mcp",
   },
   codex: {
     name: "codex",
@@ -177,14 +175,13 @@ const DEPENDENCY_SPECS = Object.freeze({
       "Sem ela, as tasks desses papeis nao tem executor: e preciso trocar o papel para claude-code ou "
       + "encerrar o workflow.",
     commands: {
-      // Req 4.8.
       posix: ["npm install -g @openai/codex"],
     },
     alternatives: Object.freeze([]),
-    // Autenticacao interativa: o usuario roda, o orquestrador nao (Req 4.8).
+    // Autenticacao interativa: o usuario roda, o executor nao.
     interactiveFollowUp: "codex login",
     interactiveFollowUpNote:
-      "codex login exige uma execucao interativa do usuario; o orquestrador nao autentica no lugar dele.",
+      "codex login exige uma execucao interativa do usuario; o executor nao autentica no lugar dele.",
     docs: "https://github.com/openai/codex",
   },
   agy: {
@@ -198,12 +195,12 @@ const DEPENDENCY_SPECS = Object.freeze({
       "Sem ela, as tasks desses papeis nao tem executor: e preciso trocar o papel para claude-code ou "
       + "encerrar o workflow.",
     commands: {
-      // Instalador oficial do Antigravity por SO (Req 4.9).
+      // Instalador oficial do Antigravity por SO.
       [PLATFORM_WINDOWS]: ["irm https://antigravity.google/cli/install.ps1 | iex"],
       posix: ["curl -fsSL https://antigravity.google/cli/install.sh | bash"],
     },
     alternatives: Object.freeze([]),
-    // Primeira execucao de `agy` conclui a autenticacao (Req 4.9).
+    // Primeira execucao de `agy` conclui a autenticacao.
     interactiveFollowUp: "agy",
     interactiveFollowUpNote:
       "A autenticacao exige abrir `agy` uma vez, em execucao interativa do usuario.",
@@ -218,10 +215,10 @@ const DEPENDENCY_SPECS = Object.freeze({
     optional: false,
     benefit:
       "Plugin do Claude Code que conecta o Claude Code a CLI codex: registra os agentes e comandos que "
-      + "o Orquestrador invoca para delegar implementacao e review ao Codex.",
+      + "o Executor invoca para delegar implementacao e review ao Codex.",
     impact:
       "Sem ele, a CLI codex instalada nao basta: o Claude Code nao tem como invocar o Codex pelos "
-      + "agentes/comandos que o Orquestrador espera, mesmo com `codex login` ja feito.",
+      + "agentes/comandos que o Executor espera, mesmo com `codex login` ja feito.",
     commands: {
       // Comandos de plugin do Claude Code: mesma sequencia em qualquer SO, roda
       // dentro de uma sessao do Claude Code (nao em shell externo).
@@ -242,10 +239,10 @@ const DEPENDENCY_SPECS = Object.freeze({
     optional: false,
     benefit:
       "Plugin do Claude Code que conecta o Claude Code a CLI agy: registra os agentes e comandos que o "
-      + "Orquestrador invoca para delegar implementacao e review ao Antigravity.",
+      + "Executor invoca para delegar implementacao e review ao Antigravity.",
     impact:
       "Sem ele, a CLI agy instalada nao basta: o Claude Code nao tem como invocar o Antigravity pelos "
-      + "agentes/comandos que o Orquestrador espera, mesmo com a autenticacao do `agy` ja feita.",
+      + "agentes/comandos que o Executor espera, mesmo com a autenticacao do `agy` ja feita.",
     commands: {
       posix: ["claude plugin install AllanHarlen/cc-antigravity-plugin"],
     },
@@ -265,7 +262,7 @@ export const INSTALLABLE_CLIS = Object.freeze(
 /**
  * Plugin do Claude Code que conecta cada CLI ao Claude Code, indexado pela
  * mesma chave de `REQUIRED_CLI_ORDER` e valendo a chave que `checks.plugins`
- * do preflight usa para aquele plugin (Req 5.2 a 5.5 do preflight).
+ * do preflight usa para aquele plugin.
  */
 export const CLI_PLUGIN_KEY = Object.freeze({
   codex: "openai-codex",
@@ -275,7 +272,7 @@ export const CLI_PLUGIN_KEY = Object.freeze({
 /**
  * Monta um DependencyPlanItem do catalogo.
  *
- * @param {string} key Chave do catalogo (`codebase-memory`, `context7`, `codex`, `agy`,
+ * @param {string} key Chave do catalogo (`context7`, `codex`, `agy`,
  *   `openai-codex`, `cc-antigravity-plugin`).
  * @param {{ platform?: string, affectedRoles?: string[] }} [options]
  * @returns {Readonly<object>} Item congelado.
@@ -324,7 +321,7 @@ function checkFailed(check) {
  * Ordem de precedencia: `options.projectConfig` (papeis explicitos), depois
  * `report.projectConfig.roles`, depois `report.projectConfig.requiredCliSet`
  * (relatorio que traz so a lista derivada), depois a configuracao padrao — que
- * e a mesma regra do preflight para projeto sem Project_Config_File (Req 5.6).
+ * e a mesma regra do preflight para projeto sem Project_Config_File.
  *
  * Quando ha papeis, a derivacao vem de `deriveRequiredCliSet`: este modulo nao
  * reimplementa a regra de obrigatoriedade.
@@ -408,14 +405,14 @@ function failedPluginNames(report) {
 }
 
 /**
- * Deriva a lista de dependencias ausentes do relatorio de preflight (Req 4.1).
+ * Deriva a lista de dependencias ausentes do relatorio de preflight.
  *
  * Composicao, em ordem estavel:
  *
- * 1. `codebase-memory-mcp`, quando `checks.optional.mcp.codebase-memory.ok` nao
- *    e `true` (check ausente conta como ausente).
- * 2. `context7`, quando `checks.optional.mcp.context7.ok` nao e `true`.
- * 3. Para cada CLI do Required_CLI_Set, na ordem canonica (`codex`, depois
+ * 1. Cada chave de `MCP_CHECK_KEYS` (`context7`, depois `codebase-memory`),
+ *    quando `checks.optional.mcp.<chave>.ok` nao e `true` (check ausente
+ *    conta como ausente).
+ * 2. Para cada CLI do Required_CLI_Set, na ordem canonica (`codex`, depois
  *    `agy`): a CLI, quando seu check `cli.*` esta reprovado, seguida
  *    imediatamente pelo plugin do Claude Code que a conecta (`openai-codex`
  *    para `codex`, `cc-antigravity-plugin` para `agy`), quando o check
@@ -429,9 +426,9 @@ function failedPluginNames(report) {
  * que o preflight usa para `plugins.*` em `REQUIRED_BY_CHECK`.
  *
  * MCP vem antes de CLI/plugin porque contexto de codigo e documentacao valem
- * para qualquer executor, e porque a decisao de CLI pode mudar a Project_Config
- * (Req 4.13). Item de MCP e `optional: true`; item de CLI e de plugin do
- * Required_CLI_Set sao `optional: false`.
+ * para qualquer executor, e porque a decisao de CLI pode mudar a Project_Config.
+ * Item de MCP e `optional: true`; item de CLI e de plugin do Required_CLI_Set
+ * sao `optional: false`.
  *
  * @param {object} report Relatorio de preflight ja serializado.
  * @param {{ platform?: string, projectConfig?: object }} [options] `platform`
@@ -513,7 +510,7 @@ function normalizeDurationMs(outcome) {
 }
 
 /**
- * Registro allowlisted de uma decisao de instalacao (Req 4.14).
+ * Registro allowlisted de uma decisao de instalacao.
  *
  * Devolve **exatamente** `{ name, decision, command, exitCode, durationMs }`.
  * `command` e sempre a sequencia do catalogo do item: o modulo nao aceita linha
@@ -522,8 +519,8 @@ function normalizeDurationMs(outcome) {
  * autenticacao e conteudo de arquivo de configuracao nao tem caminho para o
  * registro, mesmo que o instalador os tenha impresso.
  *
- * `exitCode` diferente de zero e preservado como veio (e o insumo do Req 4.11);
- * decisao `seguir sem instalar` sem execucao produz `exitCode: null` e
+ * `exitCode` diferente de zero e preservado como veio; decisao
+ * `seguir sem instalar` sem execucao produz `exitCode: null` e
  * `durationMs: null`.
  *
  * @param {object} item DependencyPlanItem de `buildMissingDependencies`.

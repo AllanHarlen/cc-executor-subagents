@@ -9,9 +9,57 @@ O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor prátic
 - sem duplas fixas back-end/front-end;
 - com slices independentes por ownership;
 - com suporte a plano pré-definido, preservando baseline e comparando entrega final com Codex high;
-- com Codex como executor principal de backend, testes e review;
-- com Antigravity (AGY) obrigatório para front-end/UI, imagem e contexto largo;
+- com Codex como executor padrão de backend/testes/review e Antigravity (AGY) como executor padrão de front-end/imagem/contexto largo — ambos configuráveis por projeto (ver abaixo);
 - com verificação e reporte enxutos.
+
+## Stack de agentes (Project_Config)
+
+A stack do executor não é fixa. Quatro papéis decidem quem implementa e quem revisa, cada um configurado como `codex`, `agy` ou `claude-code`:
+
+| Papel | Decide | Default |
+|---|---|---|
+| `backendExecutor` | tasks de backend/teste/refactor | `codex` |
+| `frontendExecutor` | tasks de front-end/UI/imagem | `agy` |
+| `backendReviewer` | review de backend + review plano-vs-entrega | `codex` |
+| `frontendReviewer` | review de front-end | `agy` |
+
+Configurar um papel como `claude-code` significa que aquele trabalho vai para um subagente do próprio Claude Code, sem exigir CLI externa. Configure com:
+
+```bash
+/executor project-config
+```
+
+ou diretamente:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write \
+  --backend-executor claude-code --frontend-executor claude-code \
+  --backend-reviewer claude-code --frontend-reviewer claude-code
+```
+
+O preflight (`/executor preflight`) deriva quais CLIs/plugins são obrigatórios dessa configuração — com os quatro papéis em `claude-code`, nenhuma CLI externa é exigida. Ver `skills/executor-subagents/references/project-config.md`.
+
+Quando um papel é `agy`, a implementação sempre é roteada para `cc-antigravity-plugin:antigravity-coder` (o agente com poder de escrita via bridge); `cc-antigravity-plugin:antigravity-agent` é somente leitura e serve apenas para análise de arquitetura ou review — nunca implementa. Uma task front-end pode devolver um bloco `IMAGE_SUGGESTIONS` com sugestões de imagem (hero, banners, ilustrações de empty-state); o executor apresenta essas opções ao usuário via `AskUserQuestion` antes de gerar qualquer imagem.
+
+## Estado persistente e retomada
+
+Cada execução ganha seu próprio `{artefatos_dir}/state.json` + `events.jsonl`, seguro contra crash (o evento é gravado com fsync antes do snapshot trocar atomicamente — um crash no meio da escrita é reparado por replay, não perdido). `.executor/checkpoint.json` é um índice leve (`execucao_atual`, `historico[]`) apontando para a execução ativa. Retome com:
+
+```bash
+/executor resume
+```
+
+Uma task `RUNNING` interrompida sempre volta como `UNKNOWN` — nunca um `FAILED`/`DONE` presumido — e é reconciliada contra Git/arquivos/validações antes de qualquer redelegação. Ver `skills/executor-subagents/references/persistent-state.md`.
+
+## Gates proporcionais ao risco
+
+Execuções `risco: LOW` continuam exatamente tão rápidas quanto antes — nenhum gate extra. `MEDIUM` em diante acrescenta validadores determinísticos (`inspect-diff`, `validate-scope`) e, quando escalado (`HIGH`, plano pré-definido ou modo conjunto com o Orchestrador), evidência de resultado de teste, validação de wire format, review Codex high plano-vs-entrega e — quando front-end e back-end são origens separadas — verificação E2E no navegador real (Playwright MCP). Um comando decide a lista:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/executor-gates.mjs" plan --risk MEDIUM --agent-count 2
+```
+
+Cinco gates de conclusão (`verificacao`, `review`, `e2e`, `reports`, `handoff`) precisam fechar antes de uma execução ser marcada `DONE`. Ver `skills/executor-subagents/references/persistent-state.md` e `references/programmatic-intelligence.md`.
 
 ## Quando usar
 
@@ -48,7 +96,7 @@ Roteamento padrão:
 
 - front-end/UI: AGY em modo agentic;
 - vários entregáveis AGY independentes (relatórios, componentes): AGY com `--parallel` (fan-out nativo de subagentes Gemini; `--subagent-model` opcional para subagentes mais baratos);
-- imagem/asset explícito: AGY com `--generate-imagem`;
+- imagem/asset explícito: AGY com `--generate-image`;
 - análise cross-file: AGY com `--read-only`;
 - backend, testes e review: Codex.
 
@@ -81,9 +129,9 @@ Obrigatórios:
 |---|---|
 | Node.js | `node --version` |
 | Codex CLI | `codex --version` |
-| Antigravity CLI (`agy`) | `agy --version` |
+| Antigravity CLI (`agy`) `>= 1.1.8` (`1.1.16` recomendada) | `agy --version` |
 | plugin `openai-codex` | instalado no Claude Code |
-| plugin `cc-antigravity-plugin` `>= 3.6.0` | instalado no Claude Code |
+| plugin `cc-antigravity-plugin` `>= 4.0.0` | instalado no Claude Code |
 | permissão `Bash(node:*)` | `.claude/settings.json` |
 
 Opcionais:
@@ -91,7 +139,10 @@ Opcionais:
 | Item | Uso |
 |---|---|
 | Context7 MCP | docs atuais de libs/frameworks/APIs |
+| Codebase Memory MCP | grafo de codigo para localizar simbolo/chamador antes de varrer arquivos |
 | `/goal` hooks | autonomia entre turnos |
+
+O agregado `checks.optional.mcp.<servidor>.ok` acima so prova que o servidor esta registrado *em algum lugar* da maquina — nao que o Codex ou o AGY especificamente o tem. Rode `node scripts/preflight.mjs --check-agent-mcp` para tambem consultar `codex mcp list --json`/`agy mcp list` ao vivo e obter `checks.optional.mcpPerAgent.<agent>.<servidor>`, com um campo `install` trazendo o comando exato de `mcp add`. Nada instala sozinho — o executor so roda isso depois que o usuario aprova via `AskUserQuestion`, o mesmo padrao do instalador do Open Design. Ver `skills/executor-subagents/references/mcp-context.md`.
 
 Instalar Codex:
 
@@ -174,7 +225,7 @@ Validar:
 /executor [--model <id>] [--effort <nível>] [--parallel] [--subagent-model <id>] <demanda>
 ```
 
-Subcomandos: `help`, `preflight`, `config`, `status`, `resume [slug]`. O `config` lê e grava o mesmo `.orchestrator/project-config.md` do `/orquestrador` — configurar por um dos dois basta.
+Subcomandos: `help`, `preflight`, `project-config` (alias `config`), `status [dir]`, `resume [dir]`. O Executor mantém a Project_Config dele em `.executor/project-config.md`; o `/orquestrador` mantém a dele em `.orchestrator/project-config.md` — configurar um não configura o outro.
 
 ```text
 /executor corrija o bug que quebra o login quando o usuário não tem avatar
@@ -189,7 +240,7 @@ Subcomandos: `help`, `preflight`, `config`, `status`, `resume [slug]`. O `config
 ```
 
 ```text
-/executor crie um mockup de hero e salve o asset em assets/onboarding usando AGY --generate-imagem
+/executor crie um mockup de hero e salve o asset em assets/onboarding usando AGY --generate-image
 ```
 
 ```text
@@ -208,10 +259,10 @@ Casos comuns:
 - testes quebrados e glue code: Codex
 - review de risco: Codex high
 - plano pré-definido: executar sobre o baseline + Codex high read-only em `plan-vs-output-review.md`
-- front-end/UI do dia a dia: AGY `gemini-3.5-flash-medium`
-- front-end/UI complexa: AGY `gemini-3.1-pro-high`
-- análise de arquitetura ou impacto: AGY `--read-only`
-- asset visual explícito: AGY `--generate-imagem`
+- front-end/UI do dia a dia: AGY `--model flash --effort medium` (`antigravity-coder`)
+- front-end/UI complexa: AGY `--model pro --effort high` (`antigravity-coder`)
+- análise de arquitetura ou impacto: AGY `--read-only` (`antigravity-agent`, somente leitura)
+- asset visual explícito: AGY `--generate-image` (`antigravity-coder`)
 
 ## Modo autônomo
 
@@ -262,4 +313,4 @@ cc-executor-subagents/
 - **Front-end com AGY.** UI e assets visuais seguem pelo `cc-antigravity-plugin`.
 - **Fallback explícito.** Falha de AGY não vira fallback silencioso; o executor pede decisão ao usuário.
 - **Verificação proporcional.** Teste o suficiente para o risco da mudança.
-- **Sem OpenSpec.** Este plugin não depende de OpenSpec.
+- **Sem OpenSpec.** Este plugin não depende de OpenSpec e nunca chama `/opsx:*`/`openspec-*`. Ainda assim pode consumir um artefato de handoff `openspec-change` do Orchestrador como baseline somente-leitura (ver `references/handoff-contract.md`).

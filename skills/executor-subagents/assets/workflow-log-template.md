@@ -37,7 +37,7 @@
 | Onda | ID | Tipo/Modelo | Slice/Ownership | Status | Tokens (in/out/cache/total) | Arquivos alterados |
 |---|---|---|---|---|---|---|
 | 1 | A | codex gpt-5.4 medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED | N/A | <arquivos> |
-| 1 | B | agy gemini-3.5-flash-medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING | N/A | <arquivos> |
+| 1 | B | agy --model flash --effort medium | <slice> | DONE \| FALHOU \| QUOTA_EXHAUSTED \| AUTH_REQUIRED \| TIMEOUT \| AGY_MISSING | N/A | <arquivos> |
 
 _Adicione linhas conforme as ondas e agentes reais da execucao._
 
@@ -58,7 +58,7 @@ _N/A se nenhuma falha ocorreu._
 | # | Fase | Decisao | Motivo | Impacto |
 |---|---|---|---|---|
 | 1 | 3 | Execucao direta (sem agentes) | Mudanca de 1 arquivo, baixo risco | Nenhum agente lancado |
-| 2 | 4 | Front-end roteado para AGY | AGY 3.6.0+ validado no preflight | Fluxo UI seguiu com antigravity-coder |
+| 2 | 4 | Front-end roteado para AGY | cc-antigravity-plugin 4.0.0+ validado no preflight | Fluxo UI seguiu com antigravity-coder |
 
 _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 
@@ -81,9 +81,4 @@ _Registre apenas decisoes nao-triviais que afetam o resultado ou o rastreio._
 | Agente B (<modelo>) | N/A | N/A | N/A | N/A |
 | **TOTAL** | **<n>** | **<n>** | **<n>** | **<n>** |
 
-Regras de fechamento:
-- Dado nao reportado e `N/A` e nunca `0`.
-- Agente/componente que nao executou nesta execucao fica `N/A` na linha inteira.
-- Com `--parallel`, o total do AGY ja e o agregado da sessao (subagentes nativos incluidos) — nao some o fan-out por fora dele.
-- Rodada de review repetida por `REPROVADO`/`DESALINHADO` soma na mesma linha do agente, com a contagem de rodadas indicada (ex.: "Codex review high (2 rodadas)").
-- Esta tabela e a de `{artefatos_dir}/subagents-context.md` precisam fechar no mesmo total.
+_Use N/A para agentes que nao reportaram tokens. O orquestrador calcula o total consolidado._

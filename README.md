@@ -13,9 +13,57 @@ Focus has shifted from "architectural orchestrator with OpenSpec" to **practical
 - no fixed back-end/front-end pairs;
 - independent slices by ownership;
 - support for pre-defined plans, preserving baseline and comparing final delivery with Codex high;
-- Codex as main executor for backend, tests, and review;
-- Antigravity (AGY) mandatory for front-end/UI, images, and wide context;
+- Codex as the default backend/test/review executor, Antigravity (AGY) as the default front-end/image/wide-context executor — both configurable per project (see below);
 - lean verification and reporting.
+
+## Agent stack (Project_Config)
+
+The executor stack is not hardcoded. Four roles decide who implements and who reviews, each set to `codex`, `agy`, or `claude-code`:
+
+| Role | Decides | Default |
+|---|---|---|
+| `backendExecutor` | backend/test/refactor tasks | `codex` |
+| `frontendExecutor` | front-end/UI/image tasks | `agy` |
+| `backendReviewer` | backend review + plan-vs-delivery review | `codex` |
+| `frontendReviewer` | front-end review | `agy` |
+
+Setting a role to `claude-code` means that work is delegated to a Claude Code subagent directly, with no external CLI required. Configure with:
+
+```bash
+/executor project-config
+```
+
+or directly:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/project-config.mjs" write \
+  --backend-executor claude-code --frontend-executor claude-code \
+  --backend-reviewer claude-code --frontend-reviewer claude-code
+```
+
+Preflight (`/executor preflight`) derives which CLIs/plugins are required from this configuration — with all four roles set to `claude-code`, no external CLI is required at all. See `skills/executor-subagents/references/project-config.md`.
+
+When a role is `agy`, implementation always routes to `cc-antigravity-plugin:antigravity-coder` (the agent with write access via the bridge); `cc-antigravity-plugin:antigravity-agent` is read-only and is only used for architecture analysis or review — it never implements. A front-end task can return an `IMAGE_SUGGESTIONS` block with proposed imagery (hero, banners, empty-state illustrations); the executor presents those options to the user via `AskUserQuestion` before generating any image.
+
+## Persistent state and resume
+
+Each run gets its own crash-safe `{artefatos_dir}/state.json` + `events.jsonl` (event fsynced before the snapshot swaps atomically — a crash mid-write is repaired by replay, not lost). `.executor/checkpoint.json` is a lightweight index (`execucao_atual`, `historico[]`) pointing at the active run. Resume with:
+
+```bash
+/executor resume
+```
+
+An interrupted `RUNNING` task always comes back as `UNKNOWN` — never a presumed `FAILED`/`DONE` — and is reconciled against Git/files/validations before anything is redelegated. See `skills/executor-subagents/references/persistent-state.md`.
+
+## Gates proportional to risk
+
+`risco: LOW` runs stay exactly as fast as before — no extra gate. `MEDIUM` and up add deterministic validators (`inspect-diff`, `validate-scope`) and, when escalated (`HIGH`, a pre-defined plan, or joint mode with the Orchestrator), test-result evidence, wire-format validation, a Codex high plan-vs-delivery review, and — when front-end and back-end are separate origins — a real-browser E2E check (Playwright MCP). One command decides the list:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/executor-gates.mjs" plan --risk MEDIUM --agent-count 2
+```
+
+Five completion gates (`verificacao`, `review`, `e2e`, `reports`, `handoff`) must close before a run can be marked `DONE`. See `skills/executor-subagents/references/persistent-state.md` and `references/programmatic-intelligence.md`.
 
 ## When to Use
 
@@ -52,7 +100,7 @@ Default routing:
 
 - front-end/UI: AGY in agentic mode;
 - multiple independent AGY deliverables (reports, components): AGY with `--parallel` (native fan-out of Gemini subagents; `--subagent-model` optional for cheaper subagents);
-- explicit image/asset: AGY with `--generate-imagem`;
+- explicit image/asset: AGY with `--generate-image`;
 - cross-file analysis: AGY with `--read-only`;
 - backend, tests, and review: Codex.
 
@@ -85,9 +133,9 @@ Mandatory:
 |---|---|
 | Node.js | `node --version` |
 | Codex CLI | `codex --version` |
-| Antigravity CLI (`agy`) | `agy --version` |
+| Antigravity CLI (`agy`) `>= 1.1.8` (`1.1.16` recommended) | `agy --version` |
 | `openai-codex` plugin | installed in Claude Code |
-| `cc-antigravity-plugin` `>= 3.6.0` plugin | installed in Claude Code |
+| `cc-antigravity-plugin` `>= 4.0.0` plugin | installed in Claude Code |
 | `Bash(node:*)` permission | `.claude/settings.json` |
 
 Optional:
@@ -95,7 +143,10 @@ Optional:
 | Item | Use |
 |---|---|
 | Context7 MCP | current docs for libs/frameworks/APIs |
+| Codebase Memory MCP | code graph to locate a symbol/caller before scanning files |
 | `/goal` hooks | autonomy between turns |
+
+The aggregate `checks.optional.mcp.<server>.ok` above only proves a server is registered *somewhere* on the machine — not that Codex or AGY specifically have it. Run `node scripts/preflight.mjs --check-agent-mcp` to also query `codex mcp list --json`/`agy mcp list` live and get `checks.optional.mcpPerAgent.<agent>.<server>`, with an `install` field carrying the exact `mcp add` command. Nothing installs automatically — the executor only runs it after the user approves via `AskUserQuestion`, same pattern as the Open Design installer. See `skills/executor-subagents/references/mcp-context.md`.
 
 Install Codex:
 
@@ -178,7 +229,7 @@ Validate:
 /executor [--model <id>] [--effort <level>] [--parallel] [--subagent-model <id>] <request>
 ```
 
-Sub-commands: `help`, `preflight`, `config`, `status`, `resume [slug]`. `config` reads and writes the same `.orchestrator/project-config.md` as `/orquestrador` — configuring through either one is enough.
+Sub-commands: `help`, `preflight`, `project-config` (alias `config`), `status [dir]`, `resume [dir]`. The Executor keeps its own Project_Config in `.executor/project-config.md`; `/orquestrador` keeps a separate one in `.orchestrator/project-config.md` — configuring one does not configure the other.
 
 ```text
 /executor fix the bug that breaks login when user has no avatar
@@ -193,7 +244,7 @@ Sub-commands: `help`, `preflight`, `config`, `status`, `resume [slug]`. `config`
 ```
 
 ```text
-/executor create a hero mockup and save the asset to assets/onboarding using AGY --generate-imagem
+/executor create a hero mockup and save the asset to assets/onboarding using AGY --generate-image
 ```
 
 ```text
@@ -212,10 +263,10 @@ Common cases:
 - broken tests and glue code: Codex
 - risk review: Codex high
 - pre-defined plan: execute against baseline + Codex high read-only in `plan-vs-output-review.md`
-- daily front-end/UI: AGY `gemini-3.5-flash-medium`
-- complex front-end/UI: AGY `gemini-3.1-pro-high`
-- architecture analysis or impact: AGY `--read-only`
-- explicit visual asset: AGY `--generate-imagem`
+- daily front-end/UI: AGY `--model flash --effort medium` (`antigravity-coder`)
+- complex front-end/UI: AGY `--model pro --effort high` (`antigravity-coder`)
+- architecture analysis or impact: AGY `--read-only` (`antigravity-agent`, read-only)
+- explicit visual asset: AGY `--generate-image` (`antigravity-coder`)
 
 ## Autonomous Mode
 
@@ -266,4 +317,4 @@ cc-executor-subagents/
 - **Front-end with AGY.** UI and visual assets go through `cc-antigravity-plugin`.
 - **Explicit fallback.** AGY failure is not a silent fallback; the executor asks the user for a decision.
 - **Proportional verification.** Test enough for the risk of the change.
-- **No OpenSpec.** This plugin does not depend on OpenSpec.
+- **No OpenSpec.** This plugin does not depend on OpenSpec and never invokes `/opsx:*`/`openspec-*`. It can still consume an `openspec-change` handoff artifact from the Orchestrator as a read-only baseline (see `references/handoff-contract.md`).

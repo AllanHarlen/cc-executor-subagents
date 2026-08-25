@@ -1,11 +1,5 @@
-/**
- * Minimal CLI helpers shared by the executor's intelligence scripts
- * (`inspect-diff.mjs`, `validate-task-scope.mjs`).
- *
- * Deliberately small and dependency-free: the executor does not carry a
- * state engine, so these scripts take everything they need as CLI args
- * instead of reading a persisted run/task model.
- */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 export function parseArgs(argv) {
   const result = { _: [] };
@@ -32,18 +26,67 @@ export function parseArgs(argv) {
 
 export function required(args, key, fallback = undefined) {
   const value = args[key] ?? fallback;
-  if (value === undefined || value === "") {
-    const error = new Error(`Missing required argument --${key}`);
+  // `true` e o que `parseArgs` produz para uma flag sem valor (`--payload`).
+  // Para um argumento que exige valor, isso e ausencia: sem este caso o `true`
+  // vaza para o corpo do script e vira um erro cru do Node
+  // (`ERR_INVALID_ARG_TYPE`, "Cannot read properties of undefined") em vez do
+  // `MISSING_ARGUMENT` com exit 2 que o contrato da CLI promete.
+  if (value === undefined || value === "" || value === true) {
+    const error = new Error(`Missing value for required argument --${key}`);
     error.code = "MISSING_ARGUMENT";
     throw error;
   }
   return value;
 }
 
-export function listArg(value) {
-  if (value === undefined) return [];
-  const values = Array.isArray(value) ? value : [value];
-  return values.flatMap((entry) => String(entry).split(",")).map((entry) => entry.trim()).filter(Boolean);
+export function numberArg(value, fallback = undefined) {
+  if (value === undefined) return fallback;
+  // `Number(true)` e 1, entao uma flag numerica sem valor (`--limit`) viraria
+  // silenciosamente o numero 1. Trate como entrada invalida, nao como 1.
+  if (value === true) {
+    const error = new Error("Expected a number, received a flag with no value");
+    error.code = "INVALID_NUMBER";
+    throw error;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    const error = new Error(`Expected a number, received ${value}`);
+    error.code = "INVALID_NUMBER";
+    throw error;
+  }
+  return parsed;
+}
+
+export function boolArg(value, fallback = undefined) {
+  if (value === undefined) return fallback;
+  if (typeof value === "boolean") return value;
+  if (["true", "yes", "1"].includes(String(value).toLowerCase())) return true;
+  if (["false", "no", "0"].includes(String(value).toLowerCase())) return false;
+  const error = new Error(`Expected a boolean, received ${value}`);
+  error.code = "INVALID_BOOLEAN";
+  throw error;
+}
+
+export function jsonArg(value, fallback = undefined) {
+  if (value === undefined) return fallback;
+  try {
+    return JSON.parse(String(value));
+  } catch (error) {
+    const wrapped = new Error(`Invalid JSON argument: ${error.message}`);
+    wrapped.code = "INVALID_JSON_ARGUMENT";
+    throw wrapped;
+  }
+}
+
+export function readJsonFile(path) {
+  const absolute = resolve(path);
+  try {
+    return JSON.parse(readFileSync(absolute, "utf8"));
+  } catch (error) {
+    const wrapped = new Error(`Could not read JSON file ${absolute}: ${error.message}`);
+    wrapped.code = "INVALID_JSON_FILE";
+    throw wrapped;
+  }
 }
 
 export function executeJsonCli(main) {
@@ -61,6 +104,6 @@ export function executeJsonCli(main) {
           details: error?.details,
         },
       }, null, 2));
-      process.exitCode = error?.code === "MISSING_ARGUMENT" ? 2 : 1;
+      process.exitCode = ["RUN_NOT_FOUND", "MISSING_ARGUMENT"].includes(error?.code) ? 2 : 1;
     });
 }
