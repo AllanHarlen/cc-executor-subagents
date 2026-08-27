@@ -1,6 +1,6 @@
 ---
 description: Executar uma resolucao rapida multiagente sem OpenSpec, dividindo a demanda em fatias independentes, roteando front-end e imagem para AGY e backend/testes/review para Codex, integrando e verificando.
-argument-hint: "<demanda de resolucao rapida>"
+argument-hint: "help | preflight | project-config | status | resume [dir] | [--model <id>] [--effort <nivel>] [--parallel] [--subagent-model <id>] <demanda>"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Agent, TaskCreate, TaskUpdate, TaskList, Skill
 ---
 
@@ -11,6 +11,64 @@ Inicia o **Executor Subagents** para resolver a demanda descrita em `$ARGUMENTS`
 Este comando substitui o antigo fluxo de orquestrador pesado. Ele nao cria OpenSpec e nao trabalha por duplas fixas. Quando a demanda ja trouxer um plano pre-definido, preserve esse plano como baseline e rode review Codex high comparando o plano inicial com a entrega gerada. Fora desse caso, o foco e resolver rapido com um mix pragmatico de execucao direta e subagentes independentes.
 
 Nota de permissao: este comando declara `Bash` amplo porque o executor precisa rodar verificacoes proporcionais ao risco do projeto (testes, lint, typecheck, build e preflight). Mesmo assim, use comandos destrutivos somente com autorizacao explicita do usuario.
+
+Para produzir uma especificacao antes de implementar, use `/pensador`; para orquestracao pesada a partir de um PRD pronto, use `/orquestrador`.
+
+## Sinopse
+
+```text
+/executor <demanda>                 resolve a demanda com subagentes
+/executor help                      esta ajuda
+/executor preflight                 valida dependencias e encerra
+/executor project-config            mostra/altera a stack de agentes do projeto
+/executor status [dir]              estado da execucao, read-only
+/executor resume [dir]              retoma a execucao interrompida
+
+flags (antes da demanda, em qualquer ordem):
+  --model <id>           modelo do executor de front-end
+  --effort <nivel>       effort do executor de back-end/review
+  --parallel             forca fan-out nativo nas delegacoes AGY
+  --subagent-model <id>  modelo dos subagentes AGY (implica --parallel)
+```
+
+## Subcomandos reservados
+
+Interceptam o argumento: se `$ARGUMENTS` comeca com um destes, a demanda **nao** e ingerida.
+
+| Subcomando | O que faz | Executa |
+|---|---|---|
+| `help` | imprime a Sinopse acima e encerra | nada |
+| `preflight` | valida dependencias e mostra status, falhas, avisos e remediacao | `scripts/preflight.mjs` |
+| `project-config` (alias `config`) | mostra e altera a stack de agentes do projeto | `scripts/project-config.mjs` |
+| `status [dir]` | estado da execucao, sem reparar nem reconciliar | `scripts/executor-state.mjs status` |
+| `resume [dir]` | repara, reconcilia e retoma da fase gravada | `scripts/executor-state.mjs resume` |
+
+> A Project_Config do Executor vive em `.executor/project-config.md` e e **propria do Executor** — o `/orquestrador` mantem a dele em `.orchestrator/project-config.md`. Configurar um nao configura o outro.
+
+## Flags
+
+| Flag | Valores | Default | Alias legado |
+|---|---|---|---|
+| `--model <id>` | alias/slug aceito pelo executor de front-end | escolha por categoria da task | `--agy-model` |
+| `--effort <nivel>` | `low`, `medium`, `high` | `medium` na implementacao, `high` no review | `--agy-effort` |
+| `--parallel` | — | heuristica (2+ entregaveis AGY independentes) | `--agy-parallel` |
+| `--subagent-model <id>` | mesmos valores de `--model`; implica `--parallel` | `inherit` | `--agy-subagent-model` |
+
+As flags sobrescrevem **apenas os parametros da delegacao** (modelo, effort, fan-out). Elas nao mudam **quem** executa: isso vem inteiro da Project_Config. Os aliases legados continuam aceitos em silencio.
+
+## Modo help
+
+Imprima a Sinopse, a tabela de Subcomandos reservados e a tabela de Flags. Nao rode script nenhum e encerre.
+
+## Modo status
+
+Se o primeiro argumento for `status`, mostre o estado da execucao sem muta-lo:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/executor-state.mjs" status [--dir <artefatos_dir>]
+```
+
+Sem `--dir`, resolve a execucao ativa por `execucao_atual` do indice (`.executor/checkpoint.json`). Apresente fase atual, status por task, risco e pendencias. Este modo e **read-only**: nao repara tail de evento, nao reconcilia e nao muda estado — para isso existe `resume`. Se nao houver execucao (`RUN_NOT_FOUND`), informe e encerre.
 
 ## Modo preflight
 

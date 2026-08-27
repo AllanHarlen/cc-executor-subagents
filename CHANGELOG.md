@@ -2,6 +2,19 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.6.0] - 2026-08-27 - Reconciliacao da superficie unificada com os gates do Executor
+
+Esta versao integra a linha remota 2.4.0 de comandos com as entregas locais 2.4.0–2.5.0,
+eliminando a colisao de versoes e preservando ambos os conjuntos de mudancas:
+
+- `argument-hint` passa a declarar a superficie completa.
+- Novos subcomandos `help` e `status [dir]`; `config` tambem funciona como alias de
+  `project-config`.
+- Flags publicas `--model`, `--effort`, `--parallel` e `--subagent-model`, com `--agy-*` mantidas
+  como aliases legados.
+- O handoff passa a apontar para `/orquestrador`.
+- Mantidos a simetria de waived-gates e o schema/validador de `handoff.json` da linha local.
+
 ## [2.5.0] - 2026-08-24 - Schema + validador do envelope `handoff.json` (`validate-handoff.mjs`)
 
 Achado de auditoria: `handoff.json` e a "ancora unica de descoberta" entre os tres plugins do

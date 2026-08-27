@@ -226,6 +226,12 @@ Validate:
 ## Usage
 
 ```text
+/executor [--model <id>] [--effort <level>] [--parallel] [--subagent-model <id>] <request>
+```
+
+Sub-commands: `help`, `preflight`, `project-config` (alias `config`), `status [dir]`, `resume [dir]`. The Executor keeps its own Project_Config in `.executor/project-config.md`; `/orquestrador` keeps a separate one in `.orchestrator/project-config.md` — configuring one does not configure the other.
+
+```text
 /executor fix the bug that breaks login when user has no avatar
 ```
 
