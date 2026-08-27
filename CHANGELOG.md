@@ -2,6 +2,51 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.5.0] - 2026-08-24 - Schema + validador do envelope `handoff.json` (`validate-handoff.mjs`)
+
+Achado de auditoria: `handoff.json` e a "ancora unica de descoberta" entre os tres plugins do
+workflow (handoff-contract.md secao 4) — o unico sinal que distingue modo conjunto de modo
+independente — mas nenhum codigo em nenhum dos tres repositorios escrevia, lia ou validava esse
+arquivo. Um produtor podia divergir do contrato em silencio (como ja havia acontecido:
+`feature-isolation.md` do Pensador sem os roles `api-contract`/`openspec-change`) sem nenhum teste
+pegar ate um consumidor falhar a achar um artefato esperado — e o Executor e quem mais depende de
+seguir `upstream` corretamente ate o Pensador para rastreabilidade.
+
+- `skills/executor-subagents/scripts/lib/handoff-validator.mjs` (novo, canonico, byte-identico nos
+  tres plugins): `validateHandoff(handoff)` colige todas as violacoes do envelope numa passada —
+  campos obrigatorios, enums de `stage`/`status`, e o vocabulario de `role` **por stage**, incluindo
+  o caso de um role valido para outro estagio ser reivindicado pelo estagio errado.
+- `skills/executor-subagents/scripts/validate-handoff.mjs` (novo, CLI) + `scripts/validate-handoff.mjs`
+  (wrapper de compatibilidade): `node validate-handoff.mjs --file <path>`, JSON
+  `{ ok, file, errors[] }`, exit 0 somente com `ok: true`.
+- `skills/executor-subagents/assets/handoff.schema.json` (novo): schema formal documentando o
+  envelope, sem dependencia de biblioteca de JSON Schema — so o validador escrito a mao.
+- `references/handoff-contract.md` (canonico, replicado byte-identico nos tres plugins): nova secao
+  9 documentando o validador.
+- `tests/handoff-validator.test.mjs` (novo, 38 testes): caminho positivo (handoff bem formado por
+  estagio) e negativo (cada violacao especifica, incluindo role cruzado entre estagios) + round-trip
+  do CLI + guarda que fixa `HANDOFF_ROLES_BY_STAGE` contra as tabelas de `handoff-contract.md`.
+
+## [2.4.0] - 2026-08-24 - Simetria de waived-gate (`requiredOverride`) com o Orchestrador
+
+Achado de auditoria: dispensar um gate `waivable` (`review`, `e2e`, `handoff`) via `N/A` fechava
+`run --status DONE` normalmente no Executor, enquanto o mesmo waiver no Orchestrador ja forcava
+`complete: false`/`PARTIAL`. A prosa do `SKILL.md` (Fase 6.6) sempre disse "sem essa verificacao, a
+entrega NAO pode ser marcada DONE" — o codigo nao aplicava isso. Isso mordia exatamente o modo mais
+comum do Executor: execucao avulsa, front-end de origem separada, sem Playwright disponivel.
+
+- `scripts/lib/executor-state.mjs`: `updateCompletionGate` agora rastreia `requiredOverride` e
+  detecta automaticamente quando um gate que **ja foi** `required: true` fecha `N/A` — isso e um
+  *waiver*, distinto de um gate que nunca foi aplicavel. `updateRunStatus` rejeita `DONE` com o novo
+  codigo `RUN_GATES_WAIVED` enquanto existir qualquer gate waived, mirror exato de
+  `completionAudit`/`waivedGates` do `cc-orchestrador-subagents`. Todo `N/A` agora exige `--reason`
+  (`GATE_WAIVER_REQUIRES_REASON`); um `--required` explicito num gate nao-waivable falha com
+  `GATE_APPLICABILITY_FIXED`.
+- `references/persistent-state.md`: documenta a distincao waiver-vs-nao-aplicavel e o novo fluxo.
+- `tests/completion-gates.test.mjs`: cobertura de caminho positivo (gate nunca obrigatorio fecha
+  N/A sem bloquear; gate obrigatorio genuinamente fechado DONE nao e waiver) e negativo (waiver de
+  gate obrigatorio bloqueia DONE; N/A sem motivo e rejeitado; override em gate fixo e rejeitado).
+
 ## [2.3.0] - 2026-08-24 - Deteccao de MCP por agente (`--check-agent-mcp`) e oferta de instalacao
 
 O check agregado `checks.optional.mcp.<servidor>.ok` prova apenas que o Codebase Memory MCP ou o

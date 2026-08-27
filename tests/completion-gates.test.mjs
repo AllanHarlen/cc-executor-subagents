@@ -70,17 +70,86 @@ test("a non-waivable gate (verificacao, reports) cannot be marked N/A", () => {
   );
 });
 
-test("a waivable gate (review, e2e, handoff) can close as N/A and does not block DONE", () => {
+test("a waivable gate that was never required (review, e2e, handoff) closes N/A with a reason and does not block DONE", () => {
   const root = fixture();
   const artifactDir = initFixture(root);
   updateCompletionGate(artifactDir, "verificacao", "DONE", { projectRoot: root });
   updateCompletionGate(artifactDir, "reports", "DONE", { projectRoot: root });
-  updateCompletionGate(artifactDir, "review", "N/A", { projectRoot: root });
-  updateCompletionGate(artifactDir, "e2e", "N/A", { projectRoot: root });
-  updateCompletionGate(artifactDir, "handoff", "N/A", { projectRoot: root });
+  updateCompletionGate(artifactDir, "review", "N/A", { projectRoot: root, reason: "no predefined plan" });
+  updateCompletionGate(artifactDir, "e2e", "N/A", { projectRoot: root, reason: "no separate front-end origin" });
+  updateCompletionGate(artifactDir, "handoff", "N/A", { projectRoot: root, reason: "independent mode, no upstream handoff" });
 
   const result = updateRunStatus(artifactDir, "DONE", { projectRoot: root });
   assert.equal(result.state.status, "DONE");
+});
+
+test("marking N/A without a reason is rejected", () => {
+  const root = fixture();
+  const artifactDir = initFixture(root);
+  assert.throws(
+    () => updateCompletionGate(artifactDir, "review", "N/A", { projectRoot: root }),
+    (error) => error.code === "GATE_WAIVER_REQUIRES_REASON",
+  );
+});
+
+test("waiving a gate that was marked --required true blocks DONE (RUN_GATES_WAIVED), even with a reason", () => {
+  const root = fixture();
+  const artifactDir = initFixture(root);
+  updateCompletionGate(artifactDir, "verificacao", "DONE", { projectRoot: root });
+  updateCompletionGate(artifactDir, "reports", "DONE", { projectRoot: root });
+  updateCompletionGate(artifactDir, "e2e", "N/A", { projectRoot: root, reason: "no separate front-end origin" });
+  updateCompletionGate(artifactDir, "handoff", "N/A", { projectRoot: root, reason: "independent mode" });
+
+  // review was determined applicable (predefined plan detected in Fase 1) ...
+  updateCompletionGate(artifactDir, "review", "PENDING", { projectRoot: root, required: true });
+  // ... but the LLM/operator later dispenses it instead of actually running it.
+  const { gate } = updateCompletionGate(artifactDir, "review", "N/A", {
+    projectRoot: root,
+    reason: "Codex quota exhausted, no fallback available",
+  });
+  assert.equal(gate.status, "N/A");
+  assert.equal(gate.required, false);
+  assert.equal(gate.requiredOverride, false);
+
+  assert.throws(
+    () => updateRunStatus(artifactDir, "DONE", { projectRoot: root }),
+    (error) =>
+      error.code === "RUN_GATES_WAIVED" &&
+      error.details.gates.some((g) => g.id === "review" && g.reason === "Codex quota exhausted, no fallback available"),
+  );
+});
+
+test("a gate marked --required true and then genuinely closed DONE is not a waiver and does not block the run", () => {
+  const root = fixture();
+  const artifactDir = initFixture(root);
+  updateCompletionGate(artifactDir, "verificacao", "DONE", { projectRoot: root });
+  updateCompletionGate(artifactDir, "reports", "DONE", { projectRoot: root });
+  updateCompletionGate(artifactDir, "e2e", "N/A", { projectRoot: root, reason: "no separate front-end origin" });
+  updateCompletionGate(artifactDir, "handoff", "N/A", { projectRoot: root, reason: "independent mode" });
+
+  updateCompletionGate(artifactDir, "review", "PENDING", { projectRoot: root, required: true });
+  updateCompletionGate(artifactDir, "review", "DONE", { projectRoot: root, evidence: "plan-vs-output-review.md" });
+
+  const result = updateRunStatus(artifactDir, "DONE", { projectRoot: root });
+  assert.equal(result.state.status, "DONE");
+});
+
+test("declaring a gate required and N/A in the same call is a contradiction and is rejected", () => {
+  const root = fixture();
+  const artifactDir = initFixture(root);
+  assert.throws(
+    () => updateCompletionGate(artifactDir, "review", "N/A", { projectRoot: root, required: true, reason: "contradiction" }),
+    (error) => error.code === "REQUIRED_GATE_CANNOT_BE_SKIPPED",
+  );
+});
+
+test("a non-waivable gate rejects an explicit --required override", () => {
+  const root = fixture();
+  const artifactDir = initFixture(root);
+  assert.throws(
+    () => updateCompletionGate(artifactDir, "verificacao", "DONE", { projectRoot: root, required: false }),
+    (error) => error.code === "GATE_APPLICABILITY_FIXED",
+  );
 });
 
 test("--required true on a waivable gate makes it block DONE until closed", () => {

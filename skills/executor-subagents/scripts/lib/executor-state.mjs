@@ -451,6 +451,15 @@ function validateCompletionGates(gates) {
     if (typeof gate.required !== "boolean") {
       throw new ExecutorStateError("INVALID_COMPLETION_GATE", `Completion gate ${gateId} must declare required`);
     }
+    if (gate.requiredOverride != null && typeof gate.requiredOverride !== "boolean") {
+      throw new ExecutorStateError("INVALID_COMPLETION_GATE", `Completion gate ${gateId} has an invalid requiredOverride`);
+    }
+    if (gate.requiredOverride === false && !definition.waivable) {
+      throw new ExecutorStateError(
+        "INVALID_COMPLETION_GATE",
+        `Completion gate ${gateId} cannot override required applicability`,
+      );
+    }
     if (gate.status === "N/A" && !definition.waivable) {
       throw new ExecutorStateError(
         "INVALID_COMPLETION_GATE",
@@ -873,6 +882,7 @@ function initialCompletionGates(now) {
       id: gateId,
       phase: definition.phase,
       required: !definition.waivable,
+      requiredOverride: null,
       status: "PENDING",
       evidence: [],
       updatedAt: now,
@@ -1440,6 +1450,16 @@ export function updateCompletionGate(artifactDir, gateId, status, options = {}) 
     throw new ExecutorStateError("GATE_NOT_WAIVABLE", `Completion gate ${gateId} is not waivable and cannot be N/A`);
   }
 
+  if (options.required != null && typeof options.required !== "boolean") {
+    throw new ExecutorStateError("INVALID_GATE_APPLICABILITY", "Completion gate required override must be a boolean");
+  }
+  if (options.required != null && !definition.waivable) {
+    throw new ExecutorStateError(
+      "GATE_APPLICABILITY_FIXED",
+      `Completion gate ${gateId} is not waivable and always required`,
+    );
+  }
+
   return withLock(artifactDir, () => {
     const state = loadRun(artifactDir, { repairSnapshot: true }).state;
     assertRunMutable(state, "update a completion gate");
@@ -1448,14 +1468,45 @@ export function updateCompletionGate(artifactDir, gateId, status, options = {}) 
       id: gateId,
       phase: definition.phase,
       required: !definition.waivable,
+      requiredOverride: null,
       status: "PENDING",
       evidence: [],
       updatedAt: now,
     };
+
+    // A gate that was previously REQUIRED (explicitly marked applicable via
+    // `--required true` for review/e2e/handoff, or always-required for
+    // verificacao/reports) and is now being closed N/A is a WAIVER, not an
+    // ordinary "not applicable" close — the corresponding verification never
+    // ran, just with a documented reason instead of silently. This holds even
+    // when the caller does not repeat `--required false`: closing a required
+    // gate as N/A is itself the waiver signal (mirrors the Orchestrador's
+    // synchronizeCompletionGates/gate() semantics in orchestration-state.mjs).
+    let requiredOverride = options.required ?? previous.requiredOverride ?? null;
+    if (normalizedStatus === "N/A" && previous.required) {
+      // definition.waivable is already guaranteed true here — the GATE_NOT_WAIVABLE
+      // guard above rejects N/A on a non-waivable gate before this point is reached.
+      requiredOverride = false;
+    }
+    const required = requiredOverride == null ? previous.required : requiredOverride;
+    if (normalizedStatus === "N/A" && required) {
+      throw new ExecutorStateError(
+        "REQUIRED_GATE_CANNOT_BE_SKIPPED",
+        `Completion gate ${gateId} is required and cannot be N/A`,
+      );
+    }
+    if (normalizedStatus === "N/A" && !options.reason) {
+      throw new ExecutorStateError(
+        "GATE_WAIVER_REQUIRES_REASON",
+        `Completion gate ${gateId} requires a reason when marked N/A`,
+      );
+    }
+
     const gate = {
       ...previous,
       status: normalizedStatus,
-      required: options.required === undefined ? previous.required : Boolean(options.required),
+      required,
+      requiredOverride,
       evidence: options.evidence ? [...new Set([...(previous.evidence ?? []), ...normalizeList(options.evidence)])] : previous.evidence,
       reason: options.reason ?? previous.reason ?? null,
       updatedAt: now,
@@ -1795,6 +1846,24 @@ export function updateRunStatus(artifactDir, status, options = {}) {
           "RUN_GATES_NOT_CLOSED",
           "Run cannot be DONE while a required completion gate is still open",
           { gates: openGates.map((gate) => ({ id: gate.id, status: gate.status })) },
+        );
+      }
+      // A waivable gate explicitly closed N/A after having been required (see
+      // updateCompletionGate's requiredOverride auto-detection) means the
+      // corresponding verification never ran — just with a documented reason
+      // instead of silently. That still means DONE cannot self-report success:
+      // a run with any waived gate must close as PARTIAL in the handoff (see
+      // WORKFLOW.md sec. 14, scenario E), with the waiver surfaced for a human
+      // to accept, reject, or unblock. Mirrors the Orchestrador's
+      // completionAudit waivedGates check in orchestration-state.mjs.
+      const waivedGates = Object.values(state.completionGates).filter(
+        (gate) => gate.requiredOverride === false,
+      );
+      if (waivedGates.length > 0) {
+        throw new ExecutorStateError(
+          "RUN_GATES_WAIVED",
+          "Run cannot be DONE while a required completion gate was waived (closed N/A) — close the handoff as PARTIAL instead",
+          { gates: waivedGates.map((gate) => ({ id: gate.id, reason: gate.reason ?? null })) },
         );
       }
     }

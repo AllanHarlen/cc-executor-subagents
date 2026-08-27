@@ -70,11 +70,28 @@ nao estiver `DONE` nem `N/A`. Um gate so aceita `N/A` quando e "waivable"
 `N/A`. Use `--required true` para declarar que a condicao de um gate
 condicional se aplica a esta run (ex.: `review` quando `plano_predefinido:
 true` for detectado na Fase 1) — sem isso, o gate nao bloqueia o fechamento.
+Todo `N/A` exige `--reason`.
+
+**Waiver vs. nao-aplicavel.** Um gate `waivable` que nunca foi marcado
+`--required true` e fecha `N/A` e simplesmente **nao-aplicavel** — nao
+bloqueia `run --status DONE`. Mas um gate que **ja foi** marcado `required:
+true` (a condicao que o aciona se aplica a esta run) e depois e fechado
+`N/A` e um **waiver**: a verificacao correspondente nunca rodou, so que com
+um motivo documentado em vez de silenciosamente. `updateCompletionGate`
+detecta isso automaticamente — nao e preciso passar `--required false` — e
+grava `requiredOverride: false` no gate. `run --status DONE` falha com
+`RUN_GATES_WAIVED` enquanto existir qualquer gate nesse estado; o handoff
+correspondente deve fechar `PARTIAL`, nunca `DONE` (ver `WORKFLOW.md` §14,
+cenario E). Mirror exato do `completionAudit`/`waivedGates` do Orchestrador
+em `orchestration-state.mjs`.
 
 ```bash
 node "$STATE" gate --dir <dir> --gate verificacao --status DONE --evidence <evidenceId>
 node "$STATE" gate --dir <dir> --gate e2e --status N/A --reason "sem front-end separado"
 node "$STATE" gate --dir <dir> --gate review --status PENDING --required true
+# waiver: review era obrigatorio (linha acima) e fecha sem rodar de fato —
+# run --status DONE falhara com RUN_GATES_WAIVED ate isso ser revertido.
+node "$STATE" gate --dir <dir> --gate review --status N/A --reason "Codex sem quota, sem fallback"
 ```
 
 Runs criadas antes da Fase 2.0 nao tem `completionGates` no snapshot — o
