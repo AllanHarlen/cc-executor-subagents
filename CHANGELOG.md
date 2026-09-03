@@ -2,6 +2,27 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.6.1] - 2026-09-03 - Descoberta de handoff passa a preferir o Testador
+
+Uma sincronizacao anterior trouxe `testador` para `HANDOFF_STAGES`/`HANDOFF_ROLES_BY_STAGE` e
+estendeu `tests/handoff-validator.test.mjs` corretamente (unico dos tres plugins consumidores
+que fez isso na mesma leva — `cc-pensador` e `cc-orchestrador-subagents` ficaram com a suite
+quebrada ate esta data, ver changelogs deles). O que faltava aqui era o lado da instrucao
+executiva: `SKILL.md` e `references/workflow.md` ainda descreviam "Modo conjunto" como
+Orchestrador -> Executor direto, contradizendo `references/handoff-contract.md` secao 7, que ja
+documentava o Testador como fonte preferencial.
+
+- `skills/executor-subagents/SKILL.md` (alterado, Fase 1 e Fase 9): descoberta de modo conjunto
+  agora procura primeiro `.testador/<slug>/artefatos/handoff.json` (`stage: testador`); cai para
+  `.orchestration/<slug>/report/handoff.json` apenas quando o Testador nao rodou. Quando o
+  handoff do Testador vem com laudo `REPROVADO`, `review/test-report.md` passa a ser usado como
+  o plano pre-definido em si. A gravacao de `handoff.json` na Fase 9 registra `upstream` com o
+  mesmo criterio de preferencia.
+- `skills/executor-subagents/references/workflow.md` (alterado): mesma correcao na Fase 1.
+- `skills/executor-subagents/references/handoff-contract.md` (alterado, replicado nos quatro
+  plugins): secao 9 corrigida — nao afirma mais byte-identidade de schema/validador entre
+  plugins (ver changelog de `cc-pensador`).
+
 ## [2.6.0] - 2026-08-27 - Reconciliacao da superficie unificada com os gates do Executor
 
 Esta versao integra a linha remota 2.4.0 de comandos com as entregas locais 2.4.0–2.5.0,
