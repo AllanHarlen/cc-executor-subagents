@@ -130,7 +130,7 @@ function help() {
       heartbeat: "heartbeat --dir <dir> --task <id> [--api-calls N] [--tool-calls N] [--current-tool name]",
       sweep: "sweep --dir <dir> [--stale-idle-seconds 450] [--stale-in-tool-seconds 1200] [--stall-grace-seconds 120]",
       phase: "phase --dir <dir> --phase <n> --status RUNNING|DONE|FAILED|BLOCKED|CANCELLED|UNKNOWN",
-      gate: "gate --dir <dir> --gate verificacao|review|e2e|reports|handoff --status PENDING|DONE|BLOCKED|N/A [--required bool] [--evidence id]... [--reason text]",
+      gate: "gate --dir <dir> --gate verificacao|review|testadorRevalidacao|e2e|reports|handoff --status PENDING|DONE|BLOCKED|N/A [--required bool] [--evidence id]... [--reason text]",
       reconcile: "reconcile --dir <dir> [--probe-file <json>]",
       resume: "resume [--dir <dir>] [--root <project>] [--probe-file <json>]",
       run: "run --dir <dir> --status RUNNING|DONE|FAILED|BLOCKED|STALLED|CANCELLED|UNKNOWN",

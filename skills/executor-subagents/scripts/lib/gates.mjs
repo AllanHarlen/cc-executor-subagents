@@ -52,6 +52,8 @@ function actionGate(id, phase, reason) {
  *   jointMode?: boolean,
  *   interfaceContract?: boolean,
  *   frontendSeparateOrigin?: boolean,
+ *   upstreamStage?: "pensador"|"orchestrador"|"testador"|null,
+ *   upstreamStatus?: "DONE"|"PARTIAL"|"BLOCKED"|null,
  * }} context
  * @returns {{ gates: Array<object>, skipped: Array<{ id: string, reason: string }> }}
  */
@@ -78,8 +80,41 @@ export function planGates(context = {}) {
   const gates = [];
   const skipped = [];
 
+  // WORKFLOW.md §8.6 / backlog P0: when the upstream handoff came from the
+  // Testador with a blocking or partial verdict (BLOCKED/PARTIAL, i.e. not
+  // DONE), the same scope must be revalidated by the Testador before the
+  // Executor can close DONE. This is a status cap, not a schema change: no
+  // handoff field changes shape, and the Testador/handoff-validator contract
+  // is untouched (EXECUTOR_NEXT_STAGE_SHOULD_BE_NULL still holds — the
+  // Executor never points nextStage back at the Testador). It applies
+  // unconditionally, independent of risk tier, so it is planned before the
+  // LOW-risk early return below.
+  if (context.upstreamStage === "testador" && context.upstreamStatus != null && context.upstreamStatus !== "DONE") {
+    gates.push(
+      actionGate(
+        "testador-revalidation",
+        6.5,
+        "Upstream Testador handoff is not DONE (PARTIAL/BLOCKED): the corrected scope must be revalidated by the "
+          + "Testador (same scope, same requirements) before this run can close DONE. Without fresh revalidation "
+          + "evidence referencing the corrected scope, the maximum closing status is PARTIAL — never DONE.",
+      ),
+    );
+  } else {
+    skipped.push({
+      id: "testador-revalidation",
+      reason: context.upstreamStage === "testador"
+        ? "upstream Testador handoff is already DONE"
+        : "no Testador handoff in this run's upstream chain",
+    });
+  }
+
   if (risk === "LOW" && !escalated) {
-    skipped.push({ id: "all", reason: "LOW risk: no gate beyond today's baseline verification" });
+    skipped.push({
+      id: "all",
+      reason: gates.length === 0
+        ? "LOW risk: no gate beyond today's baseline verification"
+        : "LOW risk: no risk-scaled gate beyond today's baseline verification (unconditional gates above still apply)",
+    });
     return { gates, skipped };
   }
 

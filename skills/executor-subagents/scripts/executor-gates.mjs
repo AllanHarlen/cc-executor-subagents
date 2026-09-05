@@ -18,7 +18,8 @@ function help() {
     commands: {
       plan:
         "plan --risk <LOW|MEDIUM|HIGH> [--agent-count N] [--predefined-plan bool] "
-        + "[--joint-mode bool] [--interface-contract bool] [--frontend-separate-origin bool]",
+        + "[--joint-mode bool] [--interface-contract bool] [--frontend-separate-origin bool] "
+        + "[--upstream-stage pensador|orchestrador|testador] [--upstream-status DONE|PARTIAL|BLOCKED]",
     },
   };
 }
@@ -34,6 +35,8 @@ function plan(args) {
     jointMode: boolArg(args["joint-mode"], false),
     interfaceContract: boolArg(args["interface-contract"], false),
     frontendSeparateOrigin: boolArg(args["frontend-separate-origin"], false),
+    upstreamStage: args["upstream-stage"] ? String(args["upstream-stage"]) : null,
+    upstreamStatus: args["upstream-status"] ? String(args["upstream-status"]) : null,
   });
 }
 

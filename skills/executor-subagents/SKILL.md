@@ -128,7 +128,31 @@ Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte u
 
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
-**Modo conjunto (Testador → Executor, preferencial; Orchestrador → Executor, fallback):** antes de tratar a demanda como avulsa, procure primeiro `.testador/<slug>/artefatos/handoff.json` (`stage: testador`); so na ausencia dele procure `.orchestration/<slug>/report/handoff.json` (`stage: orchestrador`) — o Orchestrador agrupa `handoff.json` sob `report/` desde o layout v2; caia para `.orchestration/<slug>/handoff.json` (raiz) apenas se a run for anterior a esse layout. Se existir qualquer um dos dois, o executor esta no papel de **corrigir e fazer os ajustes finos** da entrega upstream — adote esse handoff como plano pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do handoff, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex high plano-vs-entrega (Fase 6.5) como obrigatorio. Quando o handoff for do Testador com laudo `REPROVADO`, use `{artefatos_dir}/review/test-report.md` (referenciado pelo proprio handoff) como o plano pre-definido em si, nao so como contexto. Para rastreabilidade, siga `upstream` ate o `handoff.json` do Pensador (raiz de `.pensador/<slug>-vN/`) e use `prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Sem `handoff.json` de nenhum dos dois estagios, leia `.orchestration/<slug>/report/implementation-report.md` + `.orchestration/<slug>/plan/tasks-classification.md` + `.orchestration/<slug>/plan/waves.md` + `.orchestration/<slug>/contracts/`. Detalhes em `references/handoff-contract.md` (secao 7, "Executor ingere Testador (preferencial) ou Orchestrador (fallback)").
+**Modo conjunto (Testador → Executor, preferencial; Orchestrador → Executor, fallback):** rode a ingestao deterministica em vez de escanear `.testador/`/`.orchestration/` manualmente (WF-011; `lib/upstream-ingest.mjs`, testado em `tests/upstream-ingest.test.mjs`):
+
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/ingest-upstream.mjs" --root . [--slug <slug>]
+```
+
+`result.mode === "ambiguous"`: confirme via `AskUserQuestion` usando `result.slugCandidates` e rode
+de novo com `--slug`. `result.mode === "standalone"`: sem `handoff.json` de nenhum dos dois
+estagios (ver `result.warning`), leia `.orchestration/<slug>/report/implementation-report.md` +
+`.orchestration/<slug>/plan/tasks-classification.md` + `.orchestration/<slug>/plan/waves.md` +
+`.orchestration/<slug>/contracts/`. `result.mode === "joint"`: `result.upstreamStage` diz se veio
+do Testador ou do Orchestrador, e `result.upstreamHandoffPath` ja resolveu a preferencia
+(`.testador/<slug>/artefatos/handoff.json` > `.orchestration/<slug>/report/handoff.json` v2 >
+`.orchestration/<slug>/handoff.json` raiz, pre-v2) — o executor esta no papel de **corrigir e
+fazer os ajustes finos** da entrega upstream. Adote `result.upstreamHandoff` como plano
+pre-definido baseline: registre `plano_predefinido: true`, `plano_predefinido_fonte` = caminho do
+handoff, preserve o essencial em `{artefatos_dir}/initial-plan-baseline.md` e trate o review Codex
+high plano-vs-entrega (Fase 6.5) como obrigatorio. Quando `result.upstreamStage === "testador"` e
+o laudo for `REPROVADO`, use `{artefatos_dir}/review/test-report.md` (referenciado pelo proprio
+handoff) como o plano pre-definido em si, nao so como contexto — e declare o gate
+`testadorRevalidacao --required true` (§Gates de conclusao). Para rastreabilidade, siga `upstream`
+ate o `handoff.json` do Pensador (raiz de `.pensador/<slug>-vN/`) e use
+`prd`/`api-contract`/`design-system-files` como referencia de escopo, contrato e design. Detalhes
+em `references/handoff-contract.md` (secao 7, "Executor ingere Testador (preferencial) ou
+Orchestrador (fallback)").
 
 ### Fase 2 - Mapa de execucao curto
 
@@ -392,7 +416,11 @@ Use os templates de `assets/` como base. Regras:
 - Se houver plano pre-definido, os tres entregaveis devem referenciar `{artefatos_dir}/initial-plan-baseline.md` e `{artefatos_dir}/plan-vs-output-review.md`.
 - Grave `{artefatos_dir}/handoff.json` (`HANDOFF_VERSION = 1`, veja `references/handoff-contract.md`) com `stage: "executor"`, `upstream` apontando para o caminho onde o handoff upstream foi de fato encontrado — `.testador/<slug>/artefatos/handoff.json` quando o Testador rodou (preferencial), senao `.orchestration/<slug>/report/handoff.json` na maioria das runs, ou `.orchestration/<slug>/handoff.json` (raiz) apenas para runs em layout anterior ao v2 (quando houve ingestao upstream) —, `artifacts[]` com os roles do executor (`initial-plan-baseline`, `execution-brief`, `plan-vs-output-review`, `implementation-report`, `workflow-log`, `subagents-context`, `monitoring`, `screenshots`) e `status` final. Como o executor e o ultimo estagio da cadeia, `nextStage` pode ser `null`.
 
-**Gates de conclusao.** Quando a execucao usa `executor-state.mjs` (2+ agentes, plano pre-definido ou sessao longa), feche os gates antes de `run --status DONE`: `node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" gate --dir {artefatos_dir} --gate <verificacao|review|e2e|reports|handoff> --status DONE|N/A`. `verificacao` e `reports` sao sempre obrigatorios; `review`/`e2e`/`handoff` so bloqueiam quando `--required true` foi declarado (plano pre-definido, front-end separado, ou modo conjunto respectivamente) — caso contrario, feche-os como `N/A`. Ver `references/persistent-state.md`.
+**Gates de conclusao.** Quando a execucao usa `executor-state.mjs` (2+ agentes, plano pre-definido ou sessao longa), feche os gates antes de `run --status DONE`: `node "${CLAUDE_SKILL_DIR}/scripts/executor-state.mjs" gate --dir {artefatos_dir} --gate <verificacao|review|testadorRevalidacao|e2e|reports|handoff> --status DONE|N/A`. `verificacao` e `reports` sao sempre obrigatorios; `review`/`testadorRevalidacao`/`e2e`/`handoff` so bloqueiam quando `--required true` foi declarado — caso contrario, feche-os como `N/A`. Use `executor-gates.mjs plan` (Fases 6/6.5/6.6) para decidir automaticamente quais sao aplicaveis a esta run, incluindo `testadorRevalidacao`.
+
+**Gate de revalidacao pelo Testador (WORKFLOW.md sec. 8.6, backlog P0).** Quando o handoff upstream veio do Testador com `status` diferente de `DONE` (achado bloqueante ou parcial), declare `testadorRevalidacao --required true`. So feche `DONE` apos uma nova validacao do Testador sobre o **mesmo escopo** corrigido — referencie a evidencia dessa nova run (ex.: `--evidence <slug-da-run-de-revalidacao>`). Fechar `testadorRevalidacao` como `N/A` sem essa revalidacao e um waiver: `run --status DONE` fica bloqueado (`RUN_GATES_WAIVED`) e a entrega deve ser encerrada como `PARTIAL` no `handoff.json`, nunca `DONE`. Isso nao muda o schema do handoff nem o contrato do Testador — `nextStage` do Executor continua podendo ser `null`; a revalidacao e uma nova run avulsa do Testador sobre o mesmo alvo, nao um ciclo automatico no handoff.
+
+Ver `references/persistent-state.md`.
 - Cada subagente deve ter reportado seus tokens (input/output/cache_read/total); use N/A quando nao disponivel.
 - O orquestrador calcula o total consolidado de tokens de toda a execucao.
 - Os tres arquivos ficam dentro de `{artefatos_dir}/`, **nunca** na raiz do projeto, em `.executor/` diretamente ou em `openspec/`.

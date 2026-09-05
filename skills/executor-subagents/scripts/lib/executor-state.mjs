@@ -95,6 +95,14 @@ export const GATE_STATUSES = Object.freeze(["PENDING", "DONE", "BLOCKED", "N/A"]
 export const COMPLETION_GATE_DEFINITIONS = Object.freeze({
   verificacao: { phase: 6, label: "Verificacao (Fase 6)", waivable: false },
   review: { phase: 6.5, label: "Review plano vs entrega (Fase 6.5)", waivable: true },
+  // Backlog P0 / WORKFLOW.md sec. 8.6: when the upstream Testador handoff is
+  // not DONE (PARTIAL/BLOCKED), the corrected scope must go back through the
+  // Testador before this run can close DONE. `--required true` is declared
+  // when planGates() reports the testador-revalidation gate (upstream is
+  // Testador and its status isn't DONE); closing it N/A instead of DONE caps
+  // the run at PARTIAL via the existing RUN_GATES_WAIVED path — no schema
+  // change, no new enforcement mechanism.
+  testadorRevalidacao: { phase: 6.5, label: "Revalidacao pelo Testador apos achado bloqueante (Fase 6.5)", waivable: true },
   e2e: { phase: 6.6, label: "Verificacao E2E no navegador real (Fase 6.6)", waivable: true },
   reports: { phase: 9, label: "Relatorios finais (Fase 9)", waivable: false },
   handoff: { phase: 9, label: "handoff.json (modo conjunto, Fase 9)", waivable: true },
@@ -874,7 +882,7 @@ function computeProjectConfigDrift(state, projectRoot) {
   };
 }
 
-/** Estado inicial dos 5 gates de conclusao: todos `PENDING`, `required` conforme `COMPLETION_GATE_DEFINITIONS`. */
+/** Estado inicial dos gates de conclusao: todos `PENDING`, `required` conforme `COMPLETION_GATE_DEFINITIONS`. */
 function initialCompletionGates(now) {
   const gates = {};
   for (const [gateId, definition] of Object.entries(COMPLETION_GATE_DEFINITIONS)) {

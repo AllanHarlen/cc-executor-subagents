@@ -59,10 +59,12 @@ nao-vazia serve).
 
 ## Gates de conclusao (Fase 2.0)
 
-Cinco gates fecham uma run: `verificacao` (Fase 6, sempre obrigatorio),
-`review` (Fase 6.5, condicional a `plano_predefinido`), `e2e` (Fase 6.6,
-condicional a front-end separado do back), `reports` (Fase 9, sempre
-obrigatorio) e `handoff` (Fase 9, condicional a modo conjunto).
+Seis gates fecham uma run: `verificacao` (Fase 6, sempre obrigatorio),
+`review` (Fase 6.5, condicional a `plano_predefinido`), `testadorRevalidacao`
+(Fase 6.5, condicional a handoff do Testador com `status` diferente de
+`DONE` — WORKFLOW.md sec. 8.6, backlog P0), `e2e` (Fase 6.6, condicional a
+front-end separado do back), `reports` (Fase 9, sempre obrigatorio) e
+`handoff` (Fase 9, condicional a modo conjunto).
 
 `run --status DONE` falha com `RUN_GATES_NOT_CLOSED` se algum gate `required`
 nao estiver `DONE` nem `N/A`. Um gate so aceita `N/A` quando e "waivable"

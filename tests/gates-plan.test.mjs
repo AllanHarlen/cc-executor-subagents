@@ -103,3 +103,30 @@ test("risk level is accepted case-insensitively", () => {
   assert.deepEqual(planGates({ risk: "low" }).gates, []);
   assert.ok(planGates({ risk: "medium" }).gates.some((gate) => gate.id === "inspect-diff"));
 });
+
+// Backlog P0 / WORKFLOW.md sec. 8.6: revalidation gate is planned whenever
+// the upstream Testador handoff is not DONE, unconditionally of risk tier —
+// including LOW risk, which otherwise yields zero gates.
+test("testador-revalidation is planned when the upstream Testador handoff is not DONE, even at LOW risk", () => {
+  for (const upstreamStatus of ["PARTIAL", "BLOCKED"]) {
+    const { gates } = planGates({ risk: "LOW", upstreamStage: "testador", upstreamStatus });
+    assert.ok(
+      gates.some((g) => g.id === "testador-revalidation"),
+      `expected testador-revalidation gate for upstreamStatus=${upstreamStatus}`,
+    );
+  }
+});
+
+test("testador-revalidation is skipped when the upstream Testador handoff is already DONE", () => {
+  const { gates, skipped } = planGates({ risk: "LOW", upstreamStage: "testador", upstreamStatus: "DONE" });
+  assert.ok(!gates.some((g) => g.id === "testador-revalidation"));
+  assert.ok(skipped.some((s) => s.id === "testador-revalidation" && /already DONE/.test(s.reason)));
+});
+
+test("testador-revalidation is skipped when there is no Testador handoff in the upstream chain", () => {
+  for (const upstreamStage of [null, undefined, "orchestrador", "pensador"]) {
+    const { gates, skipped } = planGates({ risk: "LOW", upstreamStage, upstreamStatus: "BLOCKED" });
+    assert.ok(!gates.some((g) => g.id === "testador-revalidation"));
+    assert.ok(skipped.some((s) => s.id === "testador-revalidation" && /no Testador handoff/.test(s.reason)));
+  }
+});

@@ -164,7 +164,7 @@ Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhas
 
    Se a tool de Skill recusar por `disable-model-invocation: true`, leia `${CLAUDE_PLUGIN_ROOT}/skills/executor-subagents/SKILL.md` e siga diretamente.
 
-5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao do Orchestrador, aplique a ingestao de handoff upstream (`references/handoff-contract.md`): descubra `.orchestration/<slug>/report/handoff.json` (raiz `.orchestration/<slug>/handoff.json` apenas em runs anteriores ao layout v2 do Orchestrador), siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline.
+5. Faca triagem curta da demanda. Se `$ARGUMENTS` trouxer um plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente), registre `plano_predefinido: true`; depois que `artefatos_dir` for definido, preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` e use esse baseline como fonte de verdade. Se a demanda for um review de implementacao anterior, aplique a ingestao de handoff upstream (`references/handoff-contract.md` secao 7, "Executor ingere Testador (preferencial) ou Orchestrador (fallback)"): procure primeiro `.testador/<slug>/artefatos/handoff.json` (preferencial); so na ausencia dele procure `.orchestration/<slug>/report/handoff.json` (raiz `.orchestration/<slug>/handoff.json` apenas em runs anteriores ao layout v2 do Orchestrador); siga `upstream` ate `.pensador/<slug>-vN/handoff.json` e consolide essas fontes no baseline. Quando o handoff for do Testador com laudo `REPROVADO`, trate `{artefatos_dir}/review/test-report.md` (referenciado pelo handoff) como o proprio plano de correcao, nao so como contexto.
 
 6. Decida:
 
@@ -180,7 +180,7 @@ Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhas
    - analise pura, quando `frontendExecutor` for AGY: `cc-antigravity-plugin:antigravity-agent --read-only` (somente leitura, nunca implementa);
    - backend/testes/review: `backendExecutor`/`backendReviewer` (default Codex; `claude-code` delega a um subagente Task do proprio Claude).
 
-7. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
+8. Se usar 2+ agentes ou houver plano pre-definido, determine `artefatos_dir` a partir da demanda passada em `$ARGUMENTS`: gere um slug curto em kebab-case, use `.executor/{demanda_slug}/artefatos`, e salve no checkpoint. Exemplo: `/executor desenvolva uma pagina clientes` fica `.executor/desenvolva-pagina-clientes/artefatos`. Se a pasta ja existir, acrescente o primeiro sufixo livre (`-n2`, `-n3`, ...). Artefatos obrigatorios desta fase:
 
    ```text
    {artefatos_dir}/initial-plan-baseline.md (somente se houver plano pre-definido)
@@ -191,13 +191,13 @@ Depois de reconciliar, carregue a skill e continue exatamente de `resumeFromPhas
 
    Mantenha `{artefatos_dir}/monitoring.md` atualizado durante as Fases 4-8: status por task, log com timestamp, SLOW_CHECKIN quando agente demorar, e politica de cota conforme tipo de agente e fase. **Nunca crie artefatos .md na raiz do projeto.**
 
-8. Delegue em paralelo por ownership, nao por dupla fixa.
+9. Delegue em paralelo por ownership, nao por dupla fixa.
 
-9. Integre e rode verificacoes.
+10. Integre e rode verificacoes.
 
-10. Se `plano_predefinido: true`, execute a **Fase 6.5 - Review plano vs entrega**: use Codex high read-only para comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e os arquivos gerados. Salve o parecer em `{artefatos_dir}/plan-vs-output-review.md`; se houver desalinhamento, corrija ou registre o bloqueio antes de fechar.
+11. Se `plano_predefinido: true`, execute a **Fase 6.5 - Review plano vs entrega**: use Codex high read-only para comparar `{artefatos_dir}/initial-plan-baseline.md` com o diff e os arquivos gerados. Salve o parecer em `{artefatos_dir}/plan-vs-output-review.md`; se houver desalinhamento, corrija ou registre o bloqueio antes de fechar.
 
-11. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH, plano pre-definido ou rastreabilidade solicitada, gere em `{artefatos_dir}/`:
+12. **Fase 9 - Relatorio final:** para execucoes com 2+ agentes, risco MEDIUM/HIGH, plano pre-definido ou rastreabilidade solicitada, gere em `{artefatos_dir}/`:
 
    ```text
    {artefatos_dir}/workflow-log.md
