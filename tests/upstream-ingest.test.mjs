@@ -84,6 +84,38 @@ test("falls back to the legacy pre-v2 Orchestrador root handoff", () => {
   assert.equal(result.upstreamStage, "orchestrador");
 });
 
+/* -------------------------------------------------------------------------- */
+/* Achado 14 — raiz atual .orchestrator/runs/<slug>/ (Orquestrador migrado)    */
+/* -------------------------------------------------------------------------- */
+
+test("falls back to the Orchestrador handoff at the current .orchestrator/runs/ root when the Testador did not run", () => {
+  const root = fixture();
+  writeHandoff(root, ".orchestrator/runs/login-social/report/handoff.json", baseHandoff("orchestrador", "login-social"));
+
+  const result = ingestUpstream({ projectRoot: root, slug: "login-social" });
+  assert.equal(result.mode, "joint");
+  assert.equal(result.upstreamStage, "orchestrador");
+  assert.equal(result.upstreamHandoffPath, join(root, ".orchestrator/runs/login-social/report/handoff.json"));
+});
+
+test("prefers the current .orchestrator/runs/ root over a legacy .orchestration/ copy for the same slug", () => {
+  const root = fixture();
+  writeHandoff(root, ".orchestration/login-social/report/handoff.json", baseHandoff("orchestrador", "login-social"));
+  writeHandoff(root, ".orchestrator/runs/login-social/report/handoff.json", baseHandoff("orchestrador", "login-social"));
+
+  const result = ingestUpstream({ projectRoot: root, slug: "login-social" });
+  assert.equal(result.upstreamHandoffPath, join(root, ".orchestrator/runs/login-social/report/handoff.json"));
+});
+
+test("discovers a slug that only exists under the current .orchestrator/runs/ root (no --slug given)", () => {
+  const root = fixture();
+  writeHandoff(root, ".orchestrator/runs/oficina/report/handoff.json", baseHandoff("orchestrador", "oficina"));
+
+  const result = ingestUpstream({ projectRoot: root });
+  assert.equal(result.mode, "joint");
+  assert.equal(result.slug, "oficina");
+});
+
 test("a corrupt Testador handoff does not mask a valid Orchestrador handoff", () => {
   const root = fixture();
   writeHandoff(root, ".testador/login-social/artefatos/handoff.json", "{ not valid json");
