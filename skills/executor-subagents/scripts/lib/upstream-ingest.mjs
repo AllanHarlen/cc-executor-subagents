@@ -15,20 +15,26 @@ import { validateHandoff } from "./handoff-validator.mjs";
  * `upstream-ingest.mjs` ja usa: probe ordenado, deteccao de ambiguidade,
  * fallback legado, degradacao explicita quando nada valida.
  *
- * Ordem de descoberta (por slug):
+ * Ordem de descoberta (por slug; Achado 14: a raiz do Orchestrador migrou de
+ * `.orchestration/<slug>/` para `.orchestrator/runs/<slug>/` — a raiz legada
+ * continua sendo lida, nunca migrada automaticamente):
  * 1. `.testador/<slug>/artefatos/handoff.json` (preferencial)
- * 2. `.orchestration/<slug>/report/handoff.json` (layout v2 do Orchestrador,
- *    quando o Testador nao rodou)
- * 3. `.orchestration/<slug>/handoff.json` (raiz, layout pre-v2)
- * 4. Nada disso resolve -> modo avulso (o Executor le
+ * 2. `.orchestrator/runs/<slug>/report/handoff.json` (raiz atual do
+ *    Orchestrador, layout v2, quando o Testador nao rodou)
+ * 3. `.orchestrator/runs/<slug>/handoff.json` (raiz atual, pre-v2)
+ * 4. `.orchestration/<slug>/report/handoff.json` (raiz legada, layout v2)
+ * 5. `.orchestration/<slug>/handoff.json` (raiz legada, pre-v2)
+ * 6. Nada disso resolve -> modo avulso (o Executor le
  *    `implementation-report.md` + `plan/` + `contracts/` por convencao).
  *
- * Sem slug explicito, o slug e descoberto escaneando `.testador/` e
- * `.orchestration/` — cada diretorio so conta como candidato se tiver um
- * `handoff.json` legivel em algum dos caminhos acima (um diretorio orfao de
- * uma run cancelada nao deve forcar uma ambiguidade espuria).
+ * Sem slug explicito, o slug e descoberto escaneando `.testador/`,
+ * `.orchestrator/runs/` e `.orchestration/` — cada diretorio so conta como
+ * candidato se tiver um `handoff.json` legivel em algum dos caminhos acima
+ * (um diretorio orfao de uma run cancelada nao deve forcar uma ambiguidade
+ * espuria).
  *
- * Regra absoluta: NUNCA escreve em `.testador/` ou `.orchestration/`. Apenas le.
+ * Regra absoluta: NUNCA escreve em `.testador/`, `.orchestrator/` ou
+ * `.orchestration/`. Apenas le.
  */
 
 export class UpstreamIngestError extends Error {
@@ -65,6 +71,8 @@ function readHandoffSafe(path) {
 function upstreamHandoffCandidates(projectRoot, slug) {
   return [
     { stage: "testador", path: join(projectRoot, ".testador", slug, "artefatos", "handoff.json") },
+    { stage: "orchestrador", path: join(projectRoot, ".orchestrator", "runs", slug, "report", "handoff.json") },
+    { stage: "orchestrador", path: join(projectRoot, ".orchestrator", "runs", slug, "handoff.json") },
     { stage: "orchestrador", path: join(projectRoot, ".orchestration", slug, "report", "handoff.json") },
     { stage: "orchestrador", path: join(projectRoot, ".orchestration", slug, "handoff.json") },
   ];
@@ -88,11 +96,15 @@ function readUpstreamHandoff(projectRoot, slug) {
   return firstInvalid;
 }
 
-/** Descobre slugs candidatos escaneando `.testador/` e `.orchestration/`, filtrando por presenca real de um handoff.json legivel. */
+/** Descobre slugs candidatos escaneando `.testador/`, `.orchestrator/runs/` e `.orchestration/` (legada), filtrando por presenca real de um handoff.json legivel. */
 function discoverUpstreamSlugs(projectRoot) {
   const slugs = new Set();
-  for (const [base, ] of [[".testador"], [".orchestration"]]) {
-    const dir = join(projectRoot, base);
+  const scanRoots = [
+    join(projectRoot, ".testador"),
+    join(projectRoot, ".orchestrator", "runs"),
+    join(projectRoot, ".orchestration"),
+  ];
+  for (const dir of scanRoots) {
     if (!existsSync(dir)) continue;
     try {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -126,8 +138,9 @@ function buildStandaloneResult(warning, extras = {}) {
  * @param {object} options
  * @param {string} options.projectRoot  Raiz do projeto.
  * @param {string} [options.slug]       Slug do handoff a ingerir. Sem slug,
- *                                      varre `.testador/`/`.orchestration/`
- *                                      e usa o unico slug distinto disponivel.
+ *                                      varre `.testador/`, `.orchestrator/runs/`
+ *                                      e `.orchestration/` e usa o unico slug
+ *                                      distinto disponivel.
  * @returns {{
  *   mode: "joint"|"ambiguous"|"standalone",
  *   slug: string|null,
@@ -146,7 +159,7 @@ export function ingestUpstream(options = {}) {
   if (!slug) {
     const slugs = discoverUpstreamSlugs(projectRoot);
     if (slugs.length === 0) {
-      return buildStandaloneResult("No .testador/ or .orchestration/ handoff found — running in standalone mode.");
+      return buildStandaloneResult("No .testador/, .orchestrator/runs/ or .orchestration/ handoff found — running in standalone mode.");
     }
     if (slugs.length > 1) {
       return {
