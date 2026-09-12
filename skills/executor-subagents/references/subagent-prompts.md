@@ -17,7 +17,7 @@ Se ficar bloqueado, retorne Status: BLOCKED com a menor pergunta ou decisao nece
 
 Auto-verificação local obrigatoria antes de reportar DONE: Execute o build/compilacao e os testes/validacoes da sua fatia no seu diretorio/worktree (`<BUILD_CMD>` e `<TEST_CMD>`). Se houver qualquer falha de compilacao, sintaxe, tipagem ou lint, corrija antes de encerrar. So retorne Status: DONE se todos os comandos concluirem com exit code 0.
 
-Antes de prometer Codebase Memory ou Context7 no prompt de uma task Codex/AGY, prefira `checks.optional.mcpPerAgent.<agent>.<servidor>.ok` (verdade ao vivo por agente, so existe quando o preflight rodou com `--check-agent-mcp`) em vez do agregado `checks.optional.mcp.<servidor>.ok`, que so prova registro em algum lugar da maquina, nao necessariamente na CLI que vai executar a task (ver `references/mcp-context.md`). Se o sinal aplicavel indicar disponibilidade do Codebase Memory e voce tiver acesso ao servidor, use search_graph/trace_path/get_code_snippet para localizar o simbolo, quem o chama e o que ele chama, antes de varrer arquivos com Read/Glob/Grep. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente.
+Antes de prometer Codebase Memory ou Context7 no prompt de uma task Codex/AGY, prefira `checks.optional.mcpPerAgent.<agent>.<servidor>.ok` (verdade ao vivo por agente, so existe quando o preflight rodou com `--check-agent-mcp`) em vez do agregado `checks.optional.mcp.<servidor>.ok`, que so prova registro em algum lugar da maquina, nao necessariamente na CLI que vai executar a task (ver `references/mcp-context.md`). Se o sinal aplicavel indicar disponibilidade para Context7, use-o com consultas atomicas por conceito (Single-Concept Scoping, sem misturar multiplos topicos), versao canonica `/org/project/version` quando compativel com o projeto, e limite de ate 3 consultas por tarefa. Se o sinal aplicavel indicar disponibilidade do Codebase Memory e voce tiver acesso ao servidor, use search_graph/trace_path/get_code_snippet para localizar o simbolo, quem o chama e o que ele chama, antes de varrer arquivos com Read/Glob/Grep. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente.
 
 Nao amplie escopo. Nao instale dependencia nova sem justificar e sem autorizacao explicita no prompt.
 ```
@@ -51,7 +51,7 @@ Verificacao esperada:
 <COMANDOS OU TESTES>
 
 Context7:
-<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
+<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar APIs/libs/frameworks externos. Regras: (1) resolve-library-id com nome oficial pontuado (ex: 'Next.js'); (2) se houver versao no projeto compativel com Versions, use o ID '/org/project/version'; (3) query-docs escopada a UM UNICO conceito por chamada (Single-Concept Scoping, nao misture temas); (4) limite maximo de 3 chamadas no total; (5) nunca use para logica de negocio interna ou refatoracao local. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
 
 Codebase Memory:
 <SE DISPONIVEL: antes de varrer arquivos, use search_graph/trace_path/get_code_snippet para localizar o simbolo citado na demanda, quem o chama e o que ele chama. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente. SENAO: varra arquivos normalmente.>
@@ -191,7 +191,7 @@ Estados obrigatorios:
 - hover/focus: use regras CSS reais (`:hover`, `:focus`, `@keyframes`) para elementos interativos — `style={{}}` inline nao expressa pseudo-classe.
 
 Context7:
-<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar uso de APIs/libs/frameworks. Use resolve-library-id -> query-docs. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
+<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de alterar APIs/libs/frameworks externos. Regras: (1) resolve-library-id com nome oficial pontuado (ex: 'Next.js'); (2) se houver versao no projeto compativel com Versions, use o ID '/org/project/version'; (3) query-docs escopada a UM UNICO conceito por chamada (Single-Concept Scoping, nao misture temas); (4) limite maximo de 3 chamadas no total; (5) nunca use para logica de negocio interna ou refatoracao local. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
 
 Codebase Memory:
 <SE DISPONIVEL: antes de varrer arquivos, use search_graph/trace_path/get_code_snippet para localizar o simbolo citado na demanda, quem o chama e o que ele chama. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente. SENAO: varra arquivos normalmente.>
@@ -358,7 +358,7 @@ Ownership:
 - Nao edite: <ARQUIVOS DA BASE DE CODIGO DA APLICACAO, exceto se o prompt disser para conectar>
 
 Context7:
-<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de gerar. Use resolve-library-id -> query-docs. SENAO: siga padroes locais.>
+<SE DISPONIVEL E A TASK ENVOLVE LIB/API/FRAMEWORK: consulte Context7 antes de gerar. Regras: (1) resolve-library-id com nome oficial pontuado (ex: 'Next.js'); (2) se houver versao no projeto compativel com Versions, use o ID '/org/project/version'; (3) query-docs escopada a UM UNICO conceito por chamada (Single-Concept Scoping, nao misture temas); (4) limite maximo de 3 chamadas no total; (5) nunca use para logica de negocio interna ou refatoracao local. No retorno, cite docs consultadas. SENAO: siga padroes locais.>
 
 Codebase Memory:
 <SE DISPONIVEL E OS ENTREGAVEIS TOCAM CODIGO EXISTENTE: use search_graph/trace_path/get_code_snippet para localizar simbolos afetados antes de varrer arquivos. Grafo e pista, nao prova. SENAO: varra arquivos normalmente ou ignore se os entregaveis forem inteiramente novos.>

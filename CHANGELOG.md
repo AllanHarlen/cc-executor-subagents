@@ -2,6 +2,16 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.7.3] - 2026-09-12 - Diretrizes avançadas de Context7 MCP (Single-Concept Scoping, ID versionado e filtros de escopo)
+
+- `skills/executor-subagents/references/mcp-context.md`: incorporação das melhores práticas oficiais do Upstash Context7:
+  - Regra de **Single-Concept Scoping** para consultas ao `query-docs`, evitando diluição de ranking semântico gerada por buscas compostas.
+  - Seleção de versão canônica no formato `/org/project/version` quando disponível em `Versions`.
+  - Pontuação e casing oficiais na resolução de bibliotecas (`Next.js`, `ASP.NET Core`, etc.).
+  - Orçamento estrito de no máximo 3 chamadas por tarefa.
+  - Filtros negativos documentados: não acionar para regras de negócio internas ou refatorações de código local.
+- `skills/executor-subagents/references/subagent-prompts.md`: templates de prompts de subagentes (Codex executor, AGY front-end e AGY multi-subagentes) atualizados com as diretrizes atômicas sob os marcadores `Context7:`.
+
 ## [2.7.2] - 2026-09-12 - Auto-verificação local obrigatória antes de reportar DONE
 
 - `skills/executor-subagents/references/subagent-prompts.md`: inclusão da regra de auto-verificação local mandatória no Protocolo Comum e nas instruções de prompt do Codex executor geral e do AGY front-end/UI.

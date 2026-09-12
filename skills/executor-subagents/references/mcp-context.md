@@ -103,25 +103,31 @@ Contexto de codigo por MCP (codebase-memory):
 
 `checks.optional.mcp.context7.ok` no relatorio de preflight indica se esta disponivel.
 
-**Quando usar:** a task envolve biblioteca, framework, SDK, API, CLI ou cloud service — implementacao, debug ou migracao de versao.
+**Quando usar:** a task envolve biblioteca, framework, SDK, API, CLI ou cloud service externo — implementacao de sintaxe, debug de integracao ou migracao de versao.
+
+**Quando NAO usar (filtros negativos):** logica de negocio interna do projeto, refatoracao de codigo local sem APIs novas, scripts utilitarios simples sem dependencias externas ou code review geral.
 
 **Protocolo, nesta ordem estrita — nunca pule o passo 1:**
 
-1. `resolve-library-id` com o nome da biblioteca e a pergunta/tarefa concreta.
-2. Escolha o melhor match por: nome exato, relevancia da descricao, contagem de snippets, reputacao da fonte (High/Medium preferida), score do benchmark.
-3. `query-docs` com o ID resolvido e a pergunta completa (nao uma palavra isolada).
-4. Implemente usando a doc retornada; cite no retorno do subagente quais docs foram consultadas.
-
-Passe a versao fixada do projeto (`package.json`/`*.csproj`/lockfile) quando a biblioteca tiver breaking changes entre versoes — sem isso, o Context7 pode devolver docs de uma versao diferente da instalada.
+1. `resolve-library-id` com o nome oficial pontuado da biblioteca (ex.: `Next.js` em vez de `nextjs`, `ASP.NET Core` em vez de `aspnetcore`) e o que buscar.
+2. Escolha o melhor match por: nome exato, relevancia da descricao, contagem de snippets, reputacao da fonte (High/Medium preferida) e score do benchmark.
+   - **Versao canônica no ID:** se o retorno listar `Versions` compativeis com a versao fixada no projeto (`package.json`, `*.csproj`, lockfile), use diretamente o formato `/org/project/version` (ex.: `/vercel/next.js/v14.2.0`).
+3. `query-docs` com o ID resolvido e a consulta **escopada a um unico conceito** (Single-Concept Scoping).
+   - *Correto:* "Next.js App Router route handlers POST body parsing" ou "Fastify JWT cookie authentication plugin".
+   - *Incorreto (composto/diluido):* "rotas, autenticacao e conexao com banco no Fastify" (dilui o ranking semântico e retorna snippets rasos). Se a duvida envolver multiplos conceitos independentes, faca chamadas separadas.
+4. **Limite de consultas:** no maximo 3 chamadas a ferramentas do Context7 por tarefa. Se nao encontrar o necessario apos 3 chamadas, adote a melhor resposta obtida ou caia para os padroes locais do projeto.
+5. Implemente usando a doc retornada; cite no retorno do subagente quais docs e versoes foram consultadas.
 
 **Prompt para subagente:**
 
 ```text
 Se a task envolver biblioteca/framework/SDK/API/CLI/cloud service e Context7 estiver disponivel:
-1. resolve-library-id com o nome da lib e a tarefa.
-2. Escolha o melhor match (nome exato, relevancia, snippets, reputacao).
-3. query-docs com o ID e a pergunta completa.
-4. Implemente usando a doc retornada; cite as docs consultadas no retorno.
+1. resolve-library-id com o nome oficial pontuado da lib (ex: 'Next.js') e a tarefa.
+2. Escolha o melhor match; se houver versao correspondente no projeto, use '/org/project/version'.
+3. query-docs com o ID resolvido e consulta escopada a UM UNICO conceito por chamada (nao misture temas).
+4. Limite de no maximo 3 consultas por tarefa. Se nao resolver, caia para os padroes locais.
+5. Implemente usando a doc retornada; cite as docs consultadas no retorno.
+Nao use Context7 para logica de negocio interna ou refatoracao de funcoes locais do projeto.
 Se Context7 nao estiver disponivel, siga os padroes ja presentes no codigo e registre a limitacao no retorno.
 ```
 
