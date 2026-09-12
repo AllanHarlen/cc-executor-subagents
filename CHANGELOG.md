@@ -2,6 +2,11 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.7.2] - 2026-09-12 - Auto-verificação local obrigatória antes de reportar DONE
+
+- `skills/executor-subagents/references/subagent-prompts.md`: inclusão da regra de auto-verificação local mandatória no Protocolo Comum e nas instruções de prompt do Codex executor geral e do AGY front-end/UI.
+- Subagentes executores devem rodar build/compilação e testes locais em sua worktree/workspace (`<BUILD_CMD>` e `<TEST_CMD>`), corrigindo eventuais falhas antes de finalizar a task. Só é permitido retornar `Status: DONE` com exit code 0.
+
 ## [2.7.1] - 2026-09-12 - Contrato de handoff visual: novos roles `ui-prototype`/`brand-assets`
 
 Sincronizacao com a extensao aditiva v1 do pacote visual resolvido (`references/handoff-contract.md`

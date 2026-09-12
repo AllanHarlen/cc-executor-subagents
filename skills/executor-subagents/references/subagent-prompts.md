@@ -15,6 +15,8 @@ Se encontrar o sinal bruto QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING
 
 Se ficar bloqueado, retorne Status: BLOCKED com a menor pergunta ou decisao necessaria.
 
+Auto-verificação local obrigatoria antes de reportar DONE: Execute o build/compilacao e os testes/validacoes da sua fatia no seu diretorio/worktree (`<BUILD_CMD>` e `<TEST_CMD>`). Se houver qualquer falha de compilacao, sintaxe, tipagem ou lint, corrija antes de encerrar. So retorne Status: DONE se todos os comandos concluirem com exit code 0.
+
 Antes de prometer Codebase Memory ou Context7 no prompt de uma task Codex/AGY, prefira `checks.optional.mcpPerAgent.<agent>.<servidor>.ok` (verdade ao vivo por agente, so existe quando o preflight rodou com `--check-agent-mcp`) em vez do agregado `checks.optional.mcp.<servidor>.ok`, que so prova registro em algum lugar da maquina, nao necessariamente na CLI que vai executar a task (ver `references/mcp-context.md`). Se o sinal aplicavel indicar disponibilidade do Codebase Memory e voce tiver acesso ao servidor, use search_graph/trace_path/get_code_snippet para localizar o simbolo, quem o chama e o que ele chama, antes de varrer arquivos com Read/Glob/Grep. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente.
 
 Nao amplie escopo. Nao instale dependencia nova sem justificar e sem autorizacao explicita no prompt.
@@ -60,6 +62,7 @@ Regras:
 - Respeite seu ownership.
 - Preserve padroes existentes.
 - Evite refactor amplo nao solicitado.
+- Auto-verificação local obrigatoria antes de reportar DONE: execute o build e a suite de testes locais da sua fatia no workspace (`<BUILD_CMD>` e `<TEST_CMD>`). Corrija erros antes de finalizar; so retorne Status: DONE com exit code 0.
 - Reporte arquivos alterados de forma completa.
 
 Retorne:
@@ -197,6 +200,7 @@ Regras:
 - Modo agentic ativo: implemente a UI diretamente; nao use --read-only.
 - Preserve design system existente.
 - Mantenha responsividade e acessibilidade.
+- Auto-verificação local obrigatoria antes de reportar DONE: execute build/typecheck/lint (`<BUILD_CMD>` / `npm run build` / `npx tsc --noEmit` / `npm run lint`). Corrija erros antes de finalizar; so retorne Status: DONE com exit code 0.
 - Nao altere payload/API sem avisar.
 - Se identificar oportunidades de imagery (hero, banner, ilustracao de empty/error state, icone), NAO gere sem aprovacao: liste as sugestoes no item IMAGE_SUGGESTIONS do retorno. O executor principal (nunca voce) apresenta as opcoes ao usuario antes de qualquer geracao.
 - Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
