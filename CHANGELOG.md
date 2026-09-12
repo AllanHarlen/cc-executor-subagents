@@ -2,6 +2,22 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.7.1] - 2026-09-12 - Contrato de handoff visual: novos roles `ui-prototype`/`brand-assets`
+
+Sincronizacao com a extensao aditiva v1 do pacote visual resolvido (`references/handoff-contract.md`
+secao 10) publicada por `cc-pensador`, `cc-orchestrador-subagents` e `cc-testador-subagents` na
+mesma leva.
+
+- `references/handoff-contract.md`: adicionados os roles `ui-prototype` (`prototypes/`) e
+  `brand-assets` (`assets/`, com `assets/manifest.json`) na tabela de artefatos do estagio DESIGN.
+- `skills/executor-subagents/scripts/lib/handoff-validator.mjs`: `ui-prototype` e `brand-assets`
+  passam a validar como roles conhecidos do vocabulario por estagio.
+- `tests/docs-links.test.mjs`: o teste de citacoes `assets/*` deixa de varrer `handoff-contract.md`,
+  espelhando a excecao ja existente no `cc-testador-subagents` — o documento descreve, por
+  contrato, caminhos dentro do pacote resolvido de um *produtor* (Pensador), nao assets proprios
+  do Executor. Corrige uma suite quebrada (`assert.ok` falhando por `assets/manifest.json`
+  inexistente).
+
 ## [2.6.1] - 2026-09-03 - Descoberta de handoff passa a preferir o Testador
 
 Uma sincronizacao anterior trouxe `testador` para `HANDOFF_STAGES`/`HANDOFF_ROLES_BY_STAGE` e
