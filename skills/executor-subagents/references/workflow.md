@@ -103,7 +103,7 @@ Roteamento padrao (o Executor deriva o agente do papel efetivo na Project_Config
 - analise pura: AGY `--read-only` via `antigravity-agent` (somente leitura) quando `frontendExecutor` for AGY;
 - backend, testes, integracao e review: `backendExecutor`/`backendReviewer` (default Codex).
 
-Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>`. Acima de 28.000 caracteres, divida a task em subtasks por entregaveis independentes antes de delegar.
+Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>`. E um orcamento indicativo (nunca bloqueia desde o bridge 4.4.0): acima de 28.000 caracteres, considere dividir a task em subtasks por entregaveis independentes.
 
 ## Fase 5 - Integracao
 

@@ -1,22 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * Verifica se um prompt destinado ao AGY fica dentro do limite de 28.000
+ * Mede um prompt destinado ao AGY contra um orcamento indicativo de 28.000
  * caracteres antes da delegacao.
  *
- * O limite existe porque um prompt real infla ~14% quando o Node monta a
- * linha de comando no Windows, e passar disso vira `ENAMETOOLONG` em tempo de
- * execucao — uma falha dura, nao um problema de qualidade. Antes deste
- * script, a regra so existia como prosa (`references/agent-stack.md`); nada
- * media de fato.
+ * O limite era duro porque um prompt real inflava ~14% quando o Node montava
+ * a linha de comando no Windows, e passar disso virava `ENAMETOOLONG` em
+ * tempo de execucao. Desde o bridge cc-antigravity-plugin 4.4.0, isso deixou
+ * de ser um limite real: o bridge faz stream do prompt final via stdin
+ * sempre que ele excede o argv seguro da plataforma (8.191 chars no Windows,
+ * 100.000 nas demais), preservando o contexto inline inteiro em vez de
+ * descarta-lo. A checagem continua indicativa (`ok: false` nunca falha) como
+ * sinal de qualidade: um prompt muito grande costuma indicar escopo mal
+ * recortado.
  *
  * Uso:
  *   node check-agy-prompt.mjs --file <path>
  *   node check-agy-prompt.mjs --stdin < prompt.txt
  *   echo "$PROMPT" | node check-agy-prompt.mjs --stdin
  *
- * Saida: `{ chars, limit, overBy, ok, suggestedSplits }`. Exit 1 quando
- * `ok: false` (chamador propaga a falha em vez de precisar checar o JSON).
+ * Saida: `{ chars, limit, overBy, ok, suggestedSplits }`. Exit 0 sempre;
+ * `ok: false` e um sinal a revisar, nao um bloqueio.
  */
 
 import { readFileSync } from "node:fs";
@@ -52,18 +56,7 @@ function main(argv) {
   const ok = chars <= limit;
   const overBy = ok ? 0 : chars - limit;
 
-  if (!ok) {
-    const error = new Error(
-      `Prompt has ${chars} chars, ${overBy} over the ${limit}-char AGY limit. `
-      + "Split the task into independent-deliverable subtasks (see references/workflow.md "
-      + "\"Regra de limite de prompt AGY\") before delegating.",
-    );
-    error.code = "AGY_PROMPT_OVER_LIMIT";
-    error.details = { chars, limit, overBy, suggestedSplits: suggestSplits(chars, limit) };
-    throw error;
-  }
-
-  return { chars, limit, overBy, ok, suggestedSplits: 1 };
+  return { chars, limit, overBy, ok, suggestedSplits: ok ? 1 : suggestSplits(chars, limit) };
 }
 
 executeJsonCli(main);
