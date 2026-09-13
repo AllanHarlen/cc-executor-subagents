@@ -102,7 +102,7 @@ test("validate-wire-format.mjs catches a JSON Schema violation", () => {
   assert.ok(parsed.result.details.issues.some((issue) => issue.code === "TYPE_MISMATCH"));
 });
 
-test("check-agy-prompt.mjs approves a prompt under the limit and rejects one over it", () => {
+test("check-agy-prompt.mjs approves a prompt under the limit and flags one over it as advisory (exit 0)", () => {
   const root = fixture();
   const ok = runScript("check-agy-prompt.mjs", ["--stdin"], root, "a".repeat(100));
   assert.equal(ok.ok, true);
@@ -113,9 +113,9 @@ test("check-agy-prompt.mjs approves a prompt under the limit and rejects one ove
     encoding: "utf8",
     input: "a".repeat(28_001),
   });
-  assert.equal(over.status, 1);
-  const parsed = JSON.parse(over.stdout || over.stderr);
-  assert.equal(parsed.ok, false);
-  assert.equal(parsed.error.code, "AGY_PROMPT_OVER_LIMIT");
-  assert.equal(parsed.error.details.overBy, 1);
+  assert.equal(over.status, 0, over.stderr);
+  const parsed = JSON.parse(over.stdout);
+  assert.equal(parsed.ok, false, "ok still reports whether the prompt is within the indicative budget");
+  assert.equal(parsed.overBy, 1);
+  assert.equal(parsed.suggestedSplits, 2);
 });

@@ -231,7 +231,7 @@ Roteamento padrao:
 
 **Nota sobre camadas de paralelismo:** quando a wave e so de dominio AGY com entregaveis independentes, prefira 1 agente AGY com `--parallel` (fan-out interno). Para waves que misturam AGY e Codex, use agentes separados (waves na camada Claude). `--parallel` e incompativel com `--generate-image`.
 
-**Limite de prompt AGY.** Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>` (ou `--stdin`). Acima de 28.000 caracteres o bridge pode falhar com `ENAMETOOLONG` no Windows — divida a task em subtasks por entregaveis independentes antes de delegar, nunca envie o prompt acima do limite.
+**Orcamento indicativo de prompt AGY.** Antes de delegar para AGY, meca o prompt: `node "${CLAUDE_SKILL_DIR}/scripts/check-agy-prompt.mjs" --file <prompt.txt>` (ou `--stdin`). Desde o bridge cc-antigravity-plugin 4.4.0, o prompt final faz stream via stdin sempre que excede o argv seguro da plataforma, entao um prompt acima de 28.000 caracteres nao falha mais (`ok: false`, exit 0) — mas ainda e sinal de escopo mal recortado; considere dividir a task em subtasks por entregaveis independentes.
 
 Ao montar cada prompt, inclua as instrucoes de skills: se o ambiente suportar listagem de skills, o subagente deve consultalas, ignorar as que comecam com `openspec` ou `opsx`, usar as compativeis e reportar no campo `Skills utilizadas`. Se nao houver listagem disponivel, o subagente deve seguir com `skills nao acessiveis`.
 
@@ -490,7 +490,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `scripts/executor-state.mjs` | init/task/heartbeat/sweep/phase/reconcile/resume/run/status/verify da execucao |
 | `scripts/executor-probe.mjs` | normalizar retorno bruto de subagente em probe estavel para `reconcile`/`resume` |
 | `scripts/executor-gates.mjs` | `plan`: lista exata de gates por risco/plano-predefinido/modo-conjunto (Fase 1) |
-| `scripts/check-agy-prompt.mjs` | medir prompt AGY contra o limite de 28.000 chars antes de delegar (Fase 4) |
+| `scripts/check-agy-prompt.mjs` | medir prompt AGY contra o orcamento indicativo de 28.000 chars antes de delegar (Fase 4); nunca bloqueia desde o bridge 4.4.0 |
 | `scripts/inspect-diff.mjs` | estatisticas e riscos mecanicos do diff (Fase 6) |
 | `scripts/validate-scope.mjs` | arquivos alterados x ownership declarado (Fase 6, 2+ agentes) |
 | `scripts/validate-wire-format.mjs` | payload x contrato/schema (Fase 6, `interface_contract: true`) |

@@ -16,7 +16,7 @@ Scripts disponiveis:
 | `validate-wire-format.mjs` | payload x JSON Schema ou exemplo de contrato |
 | `validate-scope.mjs` | arquivos alterados x ownership declarado (`--own`/`--deny` ou task registrada em `state.json`) |
 | `collect-test-results.mjs` | JUnit/TRX/JSON/texto em resumo unico |
-| `check-agy-prompt.mjs` | tamanho do prompt AGY contra o limite de 28.000 chars antes de delegar |
+| `check-agy-prompt.mjs` | tamanho do prompt AGY contra o orcamento indicativo de 28.000 chars antes de delegar; nunca bloqueia desde o bridge 4.4.0 |
 | `executor-gates.mjs plan` | lista exata de gates a rodar nas Fases 6/6.5/6.6, dado risco/plano-predefinido/modo-conjunto |
 
 ## Baseline de `validate-scope.mjs`

@@ -2,6 +2,18 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.8.0] - 2026-09-13 - Orcamento de prompt AGY passa a ser indicativo
+
+- `check-agy-prompt.mjs` deixa de falhar (`exit 1`, `AGY_PROMPT_OVER_LIMIT`) quando o prompt AGY
+  excede 28.000 chars: desde o bridge cc-antigravity-plugin >= 4.4.0, o prompt final faz stream via
+  stdin sempre que excede o argv seguro da plataforma, entao nao ha mais descarte de contexto por
+  tamanho no caminho headless. A checagem continua indicativa (`ok: false`, exit 0 sempre) — um
+  prompt muito grande ainda e sinal de escopo mal recortado.
+- `SKILL.md`/`references/workflow.md`/`references/programmatic-intelligence.md` atualizados para
+  refletir o comportamento indicativo.
+- `.claude-plugin/marketplace.json` realinhado com `package.json`/`plugin.json` (drift 2.7.1 →
+  2.8.0 corrigido).
+
 ## [2.7.3] - 2026-09-12 - Diretrizes avançadas de Context7 MCP (Single-Concept Scoping, ID versionado e filtros de escopo)
 
 - `skills/executor-subagents/references/mcp-context.md`: incorporação das melhores práticas oficiais do Upstash Context7:
