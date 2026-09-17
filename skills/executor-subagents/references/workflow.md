@@ -32,6 +32,7 @@ Extraia em poucos minutos:
 - se existe plano pre-definido (texto estruturado, arquivo citado, checkpoint, "siga este plano", "plano aprovado" ou equivalente);
 - risco (`LOW`, `MEDIUM`, `HIGH`);
 - tipo de trabalho (`BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`);
+- politica de imagem por task, calculada com `scripts/visual-imagery-plan.mjs`: catalogo/vitrine de pecas, equipamentos, produtos ou servicos, OU area/pagina publica, landing page, homepage, institucional ou marketing — ambas `required` (sinal estrutural de superficie, nao palavra solta); preserve `project-baseline.json.visualImageryPlan` do Pensador quando houver;
 - verificacoes obvias;
 - pergunta bloqueante, se houver.
 
@@ -100,6 +101,7 @@ Roteamento padrao (o Executor deriva o agente do papel efetivo na Project_Config
 
 - front-end/UI: `frontendExecutor` (default AGY agentic via `antigravity-coder`);
 - imagem/asset explicito: `frontendExecutor` com `--generate-image` quando for AGY (`antigravity-coder`);
+- task visual classificada `required`: uma slice `IMAGE_ASSET` separada no plano, executada pelo `frontendExecutor` com uma chamada AGY `--generate-image` por arquivo; nao fecha sem arquivo real vinculado — nao ha dispensa por justificativa;
 - analise pura: AGY `--read-only` via `antigravity-agent` (somente leitura) quando `frontendExecutor` for AGY;
 - backend, testes, integracao e review: `backendExecutor`/`backendReviewer` (default Codex).
 

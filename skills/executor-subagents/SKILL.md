@@ -117,6 +117,7 @@ Antes de delegar, levante somente o que muda a execucao:
 - objetivo final em uma frase;
 - arquivos/modulos provaveis;
 - tipo de trabalho: `BUG`, `REFACTOR`, `FEATURE_SLICE`, `TEST_FIX`, `UI_FRONTEND`, `IMAGE_ASSET`, `DOCS`, `REVIEW`;
+- para cada slice de front-end, rode `node "${CLAUDE_SKILL_DIR}/scripts/visual-imagery-plan.mjs" --text "<descricao da task>"` e registre `visual_imagery_policy`, `reasons` e `minimumAssets`. Se o handoff do Pensador trouxer `project-baseline.json.visualImageryPlan`, preserve a politica mais forte entre o baseline e a classificacao local;
 - se a demanda trouxer plano pre-definido (texto estruturado, arquivo citado, artefato existente, checkpoint, ou termos como "siga este plano", "plano aprovado", "plano ja definido"), marque `plano_predefinido: true`;
 - risco: `LOW`, `MEDIUM`, `HIGH`;
 - comandos de verificacao obvios;
@@ -196,6 +197,7 @@ Use esta regra:
 | UI/front-end complexa | 1 agente AGY (`antigravity-coder`) com `--model pro --effort high` — Codex nao participa |
 | Varios entregaveis AGY independentes (relatorios, componentes) sem Codex | 1 agente AGY (`antigravity-coder`) com `--parallel`; adicione `--subagent-model flash` para subagentes baratos |
 | Imagem ou asset explicito | 1 agente AGY (`antigravity-coder`) com `--generate-image` — Codex nao participa |
+| Catalogo/vitrine de pecas, equipamentos, produtos ou servicos, OU area publica/landing page/homepage/institucional/marketing | crie uma slice `IMAGE_ASSET` AGY obrigatoria, com pelo menos 3 imagens reais e vinculo aos registros/cards — as duas superficies sao sinal estrutural igualmente forte (toda referencia publica do benchmark cross-setor usa fotografia real), nao uma "nice to have" |
 | Analise cross-file pre-execucao | 1 agente AGY com `--read-only` |
 | N areas independentes de dominios diferentes (AGY + Codex) | N agentes em paralelo (waves na camada Claude); sem limite fixo — o criterio e ownership disjunto |
 | Mesmo arquivo central compartilhado | Serialize ou deixe com um unico agente |
@@ -223,7 +225,7 @@ Roteamento padrao:
 
 - front-end/UI: `cc-antigravity-plugin:antigravity-coder --mode accept-edits`;
 - varios entregaveis AGY independentes sem Codex: `cc-antigravity-plugin:antigravity-coder --parallel` (fan-out nativo de subagentes Gemini; opcional `--subagent-model` para subagentes mais baratos);
-- imagem/asset explicito: `cc-antigravity-plugin:antigravity-coder --generate-image`;
+- imagem/asset explicito ou slice marcada `visual_imagery_policy: required`: `cc-antigravity-plugin:antigravity-coder --generate-image`, uma chamada sequencial por imagem;
 - analise pura: `cc-antigravity-plugin:antigravity-agent --read-only`;
 - backend/testes/review: Codex.
 
@@ -246,7 +248,7 @@ Quando agentes retornarem:
 3. Resolva conflitos pequenos diretamente quando for seguro.
 4. Redelegue apenas se a correcao exigir contexto grande ou houver risco.
 5. Atualize `{artefatos_dir}/subagents-context.md` se houve 2+ agentes ou se a sessao pode precisar de retomada.
-6. Se um agente front-end devolveu `IMAGE_SUGGESTIONS` preenchido (nao `N/A`), trate antes de fechar a fase: apresente as opcoes ao usuario via `AskUserQuestion` (`multiSelect: true`) e delegue cada aprovacao de volta ao `antigravity-coder` com `--generate-image` (uma chamada por imagem). Ver `references/subagent-prompts.md` secao 3a.
+6. Se a triagem marcou `visual_imagery_policy: required`, gere e vincule as imagens AGY antes de fechar, sem depender de uma sugestao tardia — nao ha dispensa por justificativa, a politica e binaria (`required`/`not-applicable`). `IMAGE_SUGGESTIONS` continua cobrindo oportunidades nao detectadas na triagem. Ver `references/subagent-prompts.md` secao 3a.
 
 Se um agente falhar por cota, auth, timeout ou ausencia do AGY, normalize `QUOTA_EXAUSTED` para `QUOTA_EXHAUSTED`, registre a evidencia e aplique o fallback gradual (ver "Politica de falhas" abaixo) antes de pausar para o usuario.
 
@@ -491,6 +493,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `scripts/executor-probe.mjs` | normalizar retorno bruto de subagente em probe estavel para `reconcile`/`resume` |
 | `scripts/executor-gates.mjs` | `plan`: lista exata de gates por risco/plano-predefinido/modo-conjunto (Fase 1) |
 | `scripts/check-agy-prompt.mjs` | medir prompt AGY contra o orcamento indicativo de 28.000 chars antes de delegar (Fase 4); nunca bloqueia desde o bridge 4.4.0 |
+| `scripts/visual-imagery-plan.mjs` | classificar por task se imagery AGY e obrigatoria (superficie `conversion`/`catalog` ou mandato explicito por item) ou nao aplicavel |
 | `scripts/inspect-diff.mjs` | estatisticas e riscos mecanicos do diff (Fase 6) |
 | `scripts/validate-scope.mjs` | arquivos alterados x ownership declarado (Fase 6, 2+ agentes) |
 | `scripts/validate-wire-format.mjs` | payload x contrato/schema (Fase 6, `interface_contract: true`) |

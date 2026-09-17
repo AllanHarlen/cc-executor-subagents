@@ -2,6 +2,37 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.9.0] - 2026-09-17 - Triagem de imagery por superficie (`visual-imagery-plan.mjs`)
+
+Nova classificacao deterministica, na Fase 1, de se uma task front-end precisa de imagery AGY real
+— fecha a mesma lacuna endereçada em paralelo em `cc-pensador` (2.27.0) e
+`cc-orchestrador-subagents` (4.19.0): antes, a unica forma de gerar imagem era o subagente front-end
+notar a oportunidade espontaneamente e listar em `IMAGE_SUGGESTIONS`, sem nenhuma garantia
+estrutural de que uma superficie publica (vitrine/catalogo, site institucional, landing page)
+receberia fotografia real.
+
+- **`scripts/visual-imagery-plan.mjs`** (`classifyVisualImageryTask`): classifica a task por
+  **superficie** — `conversion` (site/pagina/area publica, landing page, homepage, institucional,
+  marketing) ou `catalog` (vitrine/catalogo de pecas, equipamentos, produtos, servicos, incluindo o
+  padrao "catalogo/vitrine de X" com palavras arbitrarias no meio) — ou por mandato explicito por
+  item ("upload de foto do produto"). Politica binaria: `required`/`not-applicable`. Uma superficie
+  `conversion` e tratada com o mesmo peso de um `catalog` (nao um "bom ter" a parte) porque o
+  benchmark cross-setor que fundamentou a correcao em `cc-pensador` mostrou fotografia real em toda
+  referencia publica analisada, nao so nas de catalogo.
+- **Fase 1** roda a triagem para cada slice de front-end e preserva a politica mais forte de
+  `project-baseline.json.visualImageryPlan` quando o handoff do Pensador a trouxer.
+- **Roteamento**: uma task marcada `required` vira uma slice `IMAGE_ASSET` dedicada, executada pelo
+  `frontendExecutor` com uma chamada AGY `--generate-image` sequencial por arquivo; exige o recibo
+  `AGY_IMAGE_RESULT` (`count: 1`, SHA-256, destino) e a conexao real do arquivo ao componente/seed
+  binding — nao ha dispensa por justificativa, e arquivo gerado e nao referenciado nao fecha a task.
+- `IMAGE_SUGGESTIONS` continua existindo para oportunidades que a triagem nao detectou (a task foi
+  classificada `not-applicable` mas o subagente encontrou uma real) — segue passando por
+  `AskUserQuestion` antes de gerar; uma sugestao dentro de uma task ja `required` nao precisa de
+  pergunta nova, ja pertence ao escopo aprovado.
+- `SKILL.md`/`references/workflow.md`/`references/subagent-prompts.md` atualizados com o novo
+  `visual_imagery_policy`, a nova entrada da tabela de roteamento e o novo script na tabela de
+  scripts.
+
 ## [2.8.0] - 2026-09-13 - Orcamento de prompt AGY passa a ser indicativo
 
 - `check-agy-prompt.mjs` deixa de falhar (`exit 1`, `AGY_PROMPT_OVER_LIMIT`) quando o prompt AGY
