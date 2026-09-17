@@ -202,7 +202,7 @@ Regras:
 - Mantenha responsividade e acessibilidade.
 - Auto-verificação local obrigatoria antes de reportar DONE: execute build/typecheck/lint (`<BUILD_CMD>` / `npm run build` / `npx tsc --noEmit` / `npm run lint`). Corrija erros antes de finalizar; so retorne Status: DONE com exit code 0.
 - Nao altere payload/API sem avisar.
-- Se identificar oportunidades de imagery (hero, banner, ilustracao de empty/error state, icone), NAO gere sem aprovacao: liste as sugestoes no item IMAGE_SUGGESTIONS do retorno. O executor principal (nunca voce) apresenta as opcoes ao usuario antes de qualquer geracao.
+- Respeite `visual_imagery_policy` recebida do plano. Em `required`, a task so termina depois das imagens AGY serem geradas e ligadas a `src`/import/registro — nao ha dispensa por justificativa. Para oportunidades fora do plano (`not-applicable`), liste em `IMAGE_SUGGESTIONS`.
 - Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
 
 Retorne:
@@ -222,14 +222,14 @@ Retorne:
 
 Se o item 9 do retorno da Secao 3 vier preenchido (nao `N/A`), o executor principal segue este fluxo **antes de considerar a task concluida**:
 
-1. Apresente cada entrada do bloco ao usuario via `AskUserQuestion` (`multiSelect: true`), um `option` por imagem sugerida (label = nome curto, description = prompt resumido).
+1. Se a sugestao veio de `visual_imagery_policy: required`, ela ja pertence ao escopo aprovado: gere sem nova pergunta. Sugestoes espontaneas fora do plano (a triagem classificou a task como `not-applicable`, mas o subagente encontrou uma oportunidade real) continuam sendo apresentadas ao usuario via `AskUserQuestion` (`multiSelect: true`).
 2. Para cada opcao aprovada, delegue de volta ao `cc-antigravity-plugin:antigravity-coder` (uma chamada por imagem — o bridge nao mistura `--generate-image` com `--parallel`):
    ```text
    --generate-image --output-dir <DIR DO ENTREGAVEL> -- "<prompt da sugestao>"
    ```
 3. Apos gerar, confirme que o arquivo foi referenciado em algum componente (import/`src`/`background-image`) — imagem gerada e nao referenciada e uma pendencia, nao uma entrega.
 4. Registre em `{artefatos_dir}/subagents-context.md`: quais imagens foram sugeridas, quais o usuario aprovou, e o caminho final de cada arquivo gerado.
-5. Se o usuario nao aprovar nenhuma, registre a recusa e siga sem bloquear a task — imagery e um enriquecimento, nao um requisito obrigatorio, exceto quando a demanda explicitamente exigir imagem de produto/servico.
+5. `required` bloqueia o fechamento sem imagem real e vinculada — nao ha dispensa por justificativa. Sugestao espontanea recusada segue sem bloquear.
 
 ## 4. Investigacao read-only
 
@@ -386,7 +386,7 @@ Retorne:
 
 **Subagent type:** `cc-antigravity-plugin:antigravity-coder`
 
-Use quando o usuario pedir explicitamente asset, mockup, ilustracao, banner, logo ou imagem, ou quando uma sugestao de `IMAGE_SUGGESTIONS` (secao 3a) for aprovada.
+Use quando o usuario pedir explicitamente asset, quando a triagem marcar `visual_imagery_policy: required`, ou quando uma sugestao de `IMAGE_SUGGESTIONS` (secao 3a) for aprovada.
 
 ```text
 --generate-image --files <ARQUIVOS_DE_REFERENCIA> --output-dir <DESTINO>
@@ -410,6 +410,8 @@ Regras:
 - Use `--files` quando houver guias de estilo, paleta, texto ou referencias locais.
 - Nao edite codigo da aplicacao, exceto se o prompt disser para conectar o asset gerado.
 - Se o bridge emitir QUOTA_EXAUSTED, AUTH_REQUIRED, TIMEOUT ou AGY_MISSING, pare e reporte o sinal bruto.
+- Exija `AGY_IMAGE_RESULT` com `count: 1`, SHA-256 e destino; ausencia desse recibo e falha, mesmo que o processo retorne exit code 0.
+- Depois da geracao, conecte o arquivo ao componente e, em catalogos, aos registros/seed bindings definidos no plano. Arquivo solto nao conclui a task.
 
 Retorne:
 0. Status: DONE | BLOCKED | FAILED | QUOTA_EXHAUSTED | AUTH_REQUIRED | TIMEOUT | AGY_MISSING
