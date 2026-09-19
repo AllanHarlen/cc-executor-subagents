@@ -135,7 +135,7 @@ Antes de delegar, levante somente o que muda a execucao:
 
 Ambiguidade pequena: assuma e diga no resumo. Ambiguidade bloqueante: pergunte uma vez, com opcoes concretas.
 
-**Gates por risco.** Depois de fixar `risco`, rode `node "${CLAUDE_SKILL_DIR}/scripts/executor-gates.mjs" plan --risk <risco> --agent-count <N> --predefined-plan <bool> --joint-mode <bool> --interface-contract <bool> --frontend-separate-origin <bool>`. Ele devolve a lista exata de gates das Fases 6/6.5/6.6 — comandos prontos quando `kind: "script"`, acao a tomar quando `kind: "action"`. Em `risco: LOW` sem plano pre-definido nem modo conjunto, a lista vem vazia e nada muda em relacao ao fluxo direto de hoje.
+**Gates por risco.** Depois de fixar `risco`, rode `node "${CLAUDE_SKILL_DIR}/scripts/executor-gates.mjs" plan --risk <risco> --agent-count <N> --predefined-plan <bool> --joint-mode <bool> --interface-contract <bool> --frontend-separate-origin <bool>`. Ele devolve a lista exata de gates das Fases 6/6.5/6.6 — comandos prontos quando `kind: "script"`, acao a tomar quando `kind: "action"`. Quando a task consome um design system (`resolved/design-contract.json`), acrescente `--design-contract true`: o gate `design-tokens` (`executor-gates.mjs design-lint`, hash do contrato + hex/px/cor em atributo/ternario/constante/inline/token inventado) entra na lista independentemente do risco; token novo exigido por uma correcao vira `DESIGN_CHANGE_REQUEST` no relatorio, nunca um token criado aqui. Em `risco: LOW` sem plano pre-definido, modo conjunto nem design system, a lista vem vazia e nada muda em relacao ao fluxo direto de hoje.
 
 **Plano pre-definido:** se detectado, leia a fonte antes de montar slices. Preserve o conteudo original em `{artefatos_dir}/initial-plan-baseline.md` antes de delegar ou editar. Registre no checkpoint `plano_predefinido: true`, `plano_predefinido_fonte`, `baseline_plano_path` e `review_plano_vs_entrega.obrigatorio: true`. O plano do executor deve derivar desse baseline; nao substitua criterio de aceite, escopo ou ordem relevante sem registrar o desvio.
 
@@ -501,7 +501,7 @@ Antes de lancar ou redelegar agentes, veja a mensagem mais recente do usuario. S
 | `scripts/project-config.mjs` | ler/gravar `.executor/project-config.md` |
 | `scripts/executor-state.mjs` | init/task/heartbeat/sweep/phase/reconcile/resume/run/status/verify da execucao |
 | `scripts/executor-probe.mjs` | normalizar retorno bruto de subagente em probe estavel para `reconcile`/`resume` |
-| `scripts/executor-gates.mjs` | `plan`: lista exata de gates por risco/plano-predefinido/modo-conjunto (Fase 1) |
+| `scripts/executor-gates.mjs` | `plan`: lista exata de gates por risco/plano-predefinido/modo-conjunto/design-system (Fase 1); `design-lint`: hash do contrato + lint de tokens (Fase 6) |
 | `scripts/check-agy-prompt.mjs` | medir prompt AGY contra o orcamento indicativo de 28.000 chars antes de delegar (Fase 4); nunca bloqueia desde o bridge 4.4.0 |
 | `scripts/visual-imagery-plan.mjs` | classificar por task se imagery AGY e obrigatoria (superficie `conversion`/`catalog` ou mandato explicito por item) ou nao aplicavel |
 | `scripts/inspect-diff.mjs` | estatisticas e riscos mecanicos do diff (Fase 6) |

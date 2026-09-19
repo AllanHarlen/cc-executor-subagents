@@ -54,6 +54,7 @@ function actionGate(id, phase, reason) {
  *   frontendSeparateOrigin?: boolean,
  *   upstreamStage?: "pensador"|"orchestrador"|"testador"|null,
  *   upstreamStatus?: "DONE"|"PARTIAL"|"BLOCKED"|null,
+ *   designContract?: boolean,
  * }} context
  * @returns {{ gates: Array<object>, skipped: Array<{ id: string, reason: string }> }}
  */
@@ -106,6 +107,24 @@ export function planGates(context = {}) {
         ? "upstream Testador handoff is already DONE"
         : "no Testador handoff in this run's upstream chain",
     });
+  }
+
+  // Fase 9 do plano de design system: quando a task consome um design system
+  // (`resolved/design-contract.json`), o lint de tokens + hash do contrato e
+  // incondicional — independe do risco, pois hex/px/token inventado nao e
+  // questao de risco, e regressao de design.
+  if (context.designContract === true) {
+    gates.push(
+      scriptGate(
+        "design-tokens",
+        6,
+        "executor-gates.mjs",
+        ["design-lint", "--contract", "{design_contract}", "--files", "{changed_frontend_files}", "--expected-sha", "{contract_sha256}"],
+        "Design system in use: reprova hex literal, px de espaco/raio, style inline e token inventado; token novo vira DESIGN_CHANGE_REQUEST (so entra por nova versao do Pensador) e o contractSha256 do handoff precisa bater",
+      ),
+    );
+  } else {
+    skipped.push({ id: "design-tokens", reason: "no design system contract in this run" });
   }
 
   if (risk === "LOW" && !escalated) {

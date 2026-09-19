@@ -2,6 +2,10 @@
 
 Plugin de Claude Code para resoluções rápidas com subagentes. Ele adiciona a skill **`executor-subagents`** e o comando **`/executor`**.
 
+> **Gate de tokens de design (2.14.0):** `executor-gates.mjs design-lint` reprova hex literal, px de espaco/raio, style inline, literais de design em objetos JS/TS, CSS-in-JS e valores arbitrarios do Tailwind (`p-[13px]`), declaracoes multilinha, arrays de espaco, expressoes (`base * 2`), `rem`/`em` de espaco, qualquer cor nomeada do CSS px de `width`/`height`/`min-*`/`max-*`/`font-size`/`line-height` (excecoes estruturais via `--allow-size`), cores nomeadas/funcionais em atributos SVG/JSX (`fill`, `stroke`, `stopColor`), ternarios com literais visuais (`dense ? 8 : 16`), constantes do mesmo arquivo usadas como valor (`const p = 12; padding: p`, reportadas na linha do uso com a origem) e `var(--x)` inventado contra o `design-contract.json` e confere o `contractSha256`; correcao que exige token novo registra um `DESIGN_CHANGE_REQUEST` (o token so entra por nova versao do Pensador).
+>
+> **Handoff de design (2.10.0):** o contrato visual em `references/handoff-contract.md` (secao 6, byte-identica nos quatro plugins do workflow) passa a ter `design-systems/<id>/resolved/` como unico pacote normativo; `source/` guarda a proveniencia do engine. A entrada do handoff carrega `contractSha256`, `themes` e `designBriefPath`; token novo so entra por nova versao do Pensador (`DESIGN_CHANGE_REQUEST`).
+
 O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor prático multiagente**:
 
 - sem OpenSpec obrigatório;
