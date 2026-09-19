@@ -52,7 +52,7 @@ O design system deixa de existir so como prosa no prompt do Executor (E1) e ganh
 - **Politica E2:** o Executor nunca cria token. Uma correcao que exige token novo gera `DESIGN_CHANGE_REQUEST` no relatorio (token, usos `arquivo:linha`); o token so entra por uma nova versao do Pensador. `subagent-prompts.md` (secao 9) e `SKILL.md` atualizados.
 - **Testes:** `tests/design-tokens.test.mjs` — token inventado e reprovado, hash adulterado reprova, propriedade `fast-check` (todo `var(--x)` fora do contrato e sinalizado), CLI ponta a ponta.
 
-## [2.10.0] — 2026-09-19 — Contrato de handoff do design system (Fase 6 do plano)
+## [2.10.1] — 2026-09-19 — Contrato de handoff do design system (Fase 6 do plano)
 
 Sync com `cc-pensador` 2.32.0 (Fase 6 do plano de design system): `handoff-contract.md` reescrito (secao 6) e byte-identico nos 4 plugins; a linha `ui-prototype` (papel removido no Pensador 2.28.0) sai do contrato e do validador.
 
@@ -60,6 +60,27 @@ Sync com `cc-pensador` 2.32.0 (Fase 6 do plano de design system): `handoff-contr
 - **Novos campos da entrada:** `contractSha256` (sha256 hex ou `null`), `themes` (inclui `light` e `dark`), `designBriefPath` (relativo ao `artifactRoot`), alem de `variant`, `authoritative`, `sourcePath`, `assetsManifest` e `validation.{status,audit}` no schema.
 - **Politica de token:** token novo so por nova versao do Pensador; a correcao que o exigir registra `DESIGN_CHANGE_REQUEST`.
 - **Validador:** `validateHandoff()` rejeita `contractSha256` malformado (`INVALID_CONTRACT_SHA256`), `themes` sem `light`/`dark` (`INVALID_DESIGN_THEMES`) e `designBriefPath` vazio (`INVALID_DESIGN_BRIEF_PATH`) em entradas `resolved`; fixture e casos de teste em cada um dos 4 plugins.
+## [2.10.0] - 2026-09-19 - Guard do estado da run, handoff validado no DONE e sync com cc-pensador 2.28/2.29
+
+Endurece o plugin contra as falhas observadas numa run real do Pensador (OficinaAI, sessao
+`oficinaai-dd`, 2026-09-18): etapas delegadas a um fork em segundo plano (74 min sem progresso),
+checkpoint movido a mao de `INIT` para `DONE` pulando seis estagios, e um `handoff.json` escrito a
+mao que reprovava em `validate-handoff.mjs` apresentado como "PRD completo". O estado deste plugin
+ja e event-sourced e gated; o que faltava era impedir o contorno manual e validar o handoff no fechamento.
+
+- **Novo hook `PreToolUse`** (`hooks/hooks.json` → `scripts/guard-state.mjs`, decisao em
+  `lib/state-guard.mjs`): bloqueia `Edit`/`Write`/`MultiEdit` e escritas via Bash/PowerShell em
+  `state.json`, `events.jsonl` e `.state.lock` dentro de `.executor/`. Leituras e o proprio `executor-state.mjs`
+  passam; falha aberta. O `verify`/replay do CLI continua sendo a rede de seguranca.
+- **`run --status DONE` valida o handoff**: se `handoff.json` existe na pasta da run e reprova em
+  `validateHandoff()` (ou nao e JSON), o fechamento falha com `HANDOFF_INVALID`. Sem `handoff.json`
+  (run avulsa) nada muda; o gate `handoff` continua controlando a obrigatoriedade do arquivo.
+- **SKILL**: nova secao "Execucao no fio principal e estado so via CLI" — proibe delegar a conducao a
+  fork/segundo plano/`ScheduleWakeup`/`/loop`, proibe editar o estado a mao, exige validar o handoff e
+  obriga o recap final a declarar o que foi pulado, dispensado ou degradado (nunca "concluido" com lacunas).
+- Sync com o contrato do `cc-pensador` 2.28: role `ui-prototype` removido de `HANDOFF_ROLES_BY_STAGE.pensador`
+  e do `handoff-contract.md` (byte-identico nos 4 plugins).
+- Testes: `tests/state-guard.test.mjs`, `tests/handoff-gate-on-done.test.mjs`.
 
 ## [2.9.0] - 2026-09-17 - Triagem de imagery por superficie (`visual-imagery-plan.mjs`)
 
