@@ -2,6 +2,10 @@
 
 Claude Code plugin for rapid execution with subagents. It adds the skill **`executor-subagents`** and the command **`/executor`**.
 
+> **Design token gate (2.14.0):** `executor-gates.mjs design-lint` rejects hex literals, spacing/radius px, inline styles, design literals in JS/TS objects, CSS-in-JS and Tailwind arbitrary values (`p-[13px]`), multiline declarations, spacing arrays, arithmetic expressions (`base * 2`), `rem`/`em` spacing, any CSS named color, px `width`/`height`/`min-*`/`max-*`/`font-size`/`line-height` (structural exceptions via `--allow-size`), named/functional colors in SVG/JSX attributes (`fill`, `stroke`, `stopColor`), ternaries with visual literals (`dense ? 8 : 16`), same-file constants used as values (`const p = 12; padding: p`, reported at the use line with the origin), and invented `var(--x)` tokens against `design-contract.json` and checks its `contractSha256`; a fix that needs a new token records a `DESIGN_CHANGE_REQUEST` (it only enters through a new Pensador version).
+>
+> **Design handoff (2.10.0):** the visual contract in `references/handoff-contract.md` (section 6, byte-identical across the four workflow plugins) now makes `design-systems/<id>/resolved/` the only normative package; `source/` holds engine provenance. The handoff entry carries `contractSha256`, `themes` and `designBriefPath`; a new token only enters through a new Pensador version (`DESIGN_CHANGE_REQUEST`).
+
 📖 **[Documentação em Português](./README.pt-BR.md)** | **Portuguese Documentation**
 
 ## Overview

@@ -9,7 +9,10 @@
  * plano pre-definido e modo conjunto entao...".
  */
 
+import { readFileSync } from "node:fs";
+
 import { boolArg, executeJsonCli, numberArg, parseArgs, required } from "./lib/cli-utils.mjs";
+import { runDesignGate } from "./lib/design-tokens.mjs";
 import { planGates } from "./lib/gates.mjs";
 
 function help() {
@@ -19,7 +22,13 @@ function help() {
       plan:
         "plan --risk <LOW|MEDIUM|HIGH> [--agent-count N] [--predefined-plan bool] "
         + "[--joint-mode bool] [--interface-contract bool] [--frontend-separate-origin bool] "
-        + "[--upstream-stage pensador|orchestrador|testador] [--upstream-status DONE|PARTIAL|BLOCKED]",
+        + "[--upstream-stage pensador|orchestrador|testador] [--upstream-status DONE|PARTIAL|BLOCKED] "
+        + "[--design-contract bool]",
+      "design-lint":
+        "design-lint --contract <resolved/design-contract.json> --files <a.css,b.tsx,...> "
+        + "[--expected-sha <contractSha256 do handoff>] [--allow-token-definitions bool] "
+        + "[--allow-size prop,prop:24px,*:24px]. "
+        + "Reprova hex literal, px de espaco/raio/largura/altura/fonte, cores em atributos SVG/JSX, style inline, literais via ternario ou constante do arquivo e token inventado; token novo vira DESIGN_CHANGE_REQUEST.",
     },
   };
 }
@@ -37,7 +46,23 @@ function plan(args) {
     frontendSeparateOrigin: boolArg(args["frontend-separate-origin"], false),
     upstreamStage: args["upstream-stage"] ? String(args["upstream-stage"]) : null,
     upstreamStatus: args["upstream-status"] ? String(args["upstream-status"]) : null,
+    designContract: boolArg(args["design-contract"], false),
   });
+}
+
+function designLint(args) {
+  const contract = JSON.parse(readFileSync(String(required(args, "contract")), "utf8"));
+  const files = String(required(args, "files")).split(",").map((item) => item.trim()).filter(Boolean);
+  const sources = files.map((file) => ({ file, content: readFileSync(file, "utf8") }));
+  const result = runDesignGate({
+    contract,
+    expectedSha: args["expected-sha"] ? String(args["expected-sha"]) : null,
+    sources,
+    allowTokenDefinitions: boolArg(args["allow-token-definitions"], false),
+    allowSize: args["allow-size"] ? String(args["allow-size"]).split(",").map((item) => item.trim()).filter(Boolean) : [],
+  });
+  if (result.status === "FAIL") process.exitCode = 1;
+  return result;
 }
 
 function main(argv) {
@@ -50,6 +75,8 @@ function main(argv) {
       return help();
     case "plan":
       return plan(args);
+    case "design-lint":
+      return designLint(args);
     default: {
       const error = new Error(`Unknown command: ${command}`);
       error.code = "UNKNOWN_COMMAND";

@@ -2,6 +2,65 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.14.0] — 2026-09-19 — Lint de tokens: tamanho em px, atributos SVG/JSX, ternarios e constantes do arquivo
+
+Fecha as limitacoes da 2.13.0 que nao exigem AST real.
+
+- **Tamanho em px:** `width`, `height`, `min-*`, `max-*`, `block-size`/`inline-size`, `flex-basis`, `font-size` e `line-height` reprovam px literal > 1 (`hardcoded-px`) em CSS, CSS-in-JS, objetos e atributos JSX. Passam: `0`, `1px`, `%`, `auto`, `rem`/`em`, unidades de viewport, `var()` e numero cru (so `fontSize: 14` reprova em objeto). Queries (`@media`, `@container`, `@supports`, `matchMedia(...)`, `useMediaQuery(...)`) ficam isentas.
+- **Excecoes estruturais:** `allowSize` (API) / `--allow-size` (CLI, lista separada por virgula) libera por `propriedade`, `propriedade:valor` (`width:24px`), `*:valor` ou RegExp sobre `propriedade:valor`. Nunca vale para espaco/raio nem cor. `viewBox` e `width="24"` sem unidade nunca reprovam.
+- **Cores em atributos SVG/JSX:** `fill`, `stroke`, `stop-color`/`stopColor`, `flood-color`, `lighting-color`, `color` (e os demais atributos de cor) com cor nomeada ou funcional (`rgb()`, `hsl()`, `oklch()`...) reprovam; hex ja reprovava. `currentColor`, `none`, `url(#id)`, `var()` e valores nao cor (`color="primary"`) passam. `fill="url(#abc)"` deixou de ser lido como hex.
+- **Ternarios:** `padding: dense ? 8 : 16` reprova cada ramo numerico > 1; ramos com px, cor nomeada/funcional ou hex ja eram cobertos e seguem. `??` nao e ternario. Em atributo JSX o ramo numerico nao reprova (indice de escala do tema); o ramo com px ou cor sim.
+- **Constantes do arquivo:** `const p = 12`, `const GAP = '16px'`, `const C = 'red'` (tambem `let`/`var` sem reatribuicao) sao resolvidas quando usadas como valor, elemento de array ou ramo de ternario em propriedade de espaco, tamanho ou cor; a violacao aponta a linha do uso e traz `via: "const"` e `origin: { name, line, value }`. Nao resolve nome declarado mais de uma vez, `let`/`var` reatribuido/incrementado, valor nao literal (`base * 2`) nem import. Em atributo JSX so valem px e cor (numero pode ser indice de escala).
+- **Chaves de espaco extras:** `paddingHorizontal`/`paddingVertical`/`marginHorizontal`, sufixos `-x`/`-y`, `spacing`, `gutter`, `inset-x`/`inset-y` recebem o mesmo rigor de `padding`/`margin`/`gap` (numero cru > 1 reprova).
+- **Atributos JSX de espaco/tamanho:** `padding="12px"`, `gap={"16px"}`, `width="240px"` reprovam; `gap={4}` e `spacing={2}` nao.
+- **Limites (sem AST real):** valores vindos de chamada de funcao (`theme.spacing(2)`, `rem(12)`), constantes importadas de outro arquivo, objetos de tema aninhados lidos por caminho (`theme.space.md` resolvido em outro modulo), sombreamento de escopo (a resolucao e por arquivo, nao por bloco; nome redeclarado e ignorado por seguranca), condicoes complexas com `:` dentro de strings, numeros crus em `width`/`height`/`line-height` (ambiguos), cor em prop arbitraria de componente (`tint="red"`) e valores montados por concatenacao.
+- **Testes:** `tests/design-tokens.test.mjs` (40 casos): tamanho, queries, allowlist, chaves extras, atributos SVG/JSX, ternarios, constantes (incluindo os casos de nao resolucao), CLI `--allow-size` e propriedades `fast-check` (px > 1 em chave de tamanho sempre reprova, 0/1 e outras unidades nunca; constante resolvida so reprova quando o literal e > 1, na linha do uso).
+
+## [2.13.0] — 2026-09-19 — Lint de tokens por declaracao (multilinha, arrays, expressoes, rem/em)
+
+Reduz as limitacoes da 2.12.0: o lint deixa de ser linha a linha e passa a analisar o arquivo inteiro por declaracao.
+
+- **Tokenizador simples:** `maskSource()` mascara comentarios (`//`, `/* */`) e strings nao visuais (`href`, `src`, `id`, `aria-*`, `data-*`, `import`/`from`/`require`, `url(...)`) preservando quebras de linha. Menos falso positivo em `href="#add-to-cart"` e URLs.
+- **Multilinha:** valor na linha seguinte ao `:`, objetos, arrays e template strings CSS multilinha. A violacao aponta a linha em que o valor comeca. Propriedades sem separador (`padding: number
+ margin: number`) nao engolem a chave seguinte. `style={{ ... }}` multilinha gera um unico `inline-style`.
+- **Arrays:** `padding: [8, 16]` reprova cada elemento numerico > 1 (`hardcoded-number`).
+- **Expressoes:** `padding: base * 2`, `gap: 8 * 2` e `margin: ${base * 2}px` viram `hardcoded-expression`; `${8}px` vira `hardcoded-px`. `calc(12px + ...)` reprova o literal; multiplicador sobre token (`calc(var(--space-2) * 2)`) passa.
+- **rem/em:** `padding: 1rem` e `border-radius: 0.5em` reprovam em CSS e objetos (0 e tokens passam; `px` continua tolerando 0/1).
+- **Cores nomeadas:** lista CSS completa (exceto `transparent`, `inherit`, `currentColor`, `initial`, `unset`), tambem em atalhos (`border`, `outline`, `background`, `box-shadow`, `text-shadow`) varrendo cada palavra.
+- **`--allow-token-definitions`:** continua liberando `--x: valor` e `key: valor,` de objeto, agora tambem multilinha; uso em CSS (`padding: 1rem;`) segue reprovado.
+- **Limites (sem AST real):** ternarios (`dense ? 8 : 16`), valores vindos de variaveis (`padding: p`), template strings aninhadas dentro de `${}`, regex literals com aspas, chaves de espaco fora da lista (`paddingHorizontal`, `spacing`), `width`/`height`/`font-size` em px, e cores em atributos SVG/props arbitrarias continuam fora do alcance.
+- **Testes:** `tests/design-tokens.test.mjs` (27 casos): multilinha, arrays, expressoes, rem/em, cores nomeadas, mascaramento e propriedade `fast-check` de que a linha reportada e a do inicio do valor.
+
+## [2.12.0] — 2026-09-19 — Lint de tokens alcanca objetos JS/TS, CSS-in-JS e Tailwind
+
+Fecha a limitacao da 2.11.0: valores de design fora de `style` escapavam do lint.
+
+- **Objetos JS/TS:** `{ padding: 12, borderRadius: 8 }` (`hardcoded-number`), `{ gap: '16px' }` (`hardcoded-px`) e `{ color: 'red', backgroundColor: 'rgba(...)' }` (`hardcoded-color`). Numero cru so em chaves inequivocas (`padding`, `margin`, `gap`, `radius`); `top`/`left`/`inset` sao ignorados por serem comuns em objetos nao visuais. `0`/`1`, `zIndex`, `opacity`, `flex`, `lineHeight`, `var(--x)`, `transparent`/`inherit`/`currentColor` nunca reprovam.
+- **CSS-in-JS:** template strings (`styled.div`, `css`) ja eram lintadas linha a linha; agora com chaves camelCase e aspas.
+- **Tailwind:** valores arbitrarios (`p-[13px]`, `md:rounded-[6px]`, `text-[13px]`, `bg-[rgb(...)]`) viram `tailwind-arbitrary`; `[0px]`, `[1px]` e `[var(--x)]` passam.
+- **`--allow-token-definitions`:** em arquivos de tema, linhas de propriedade de objeto (`key: valor,` sem `;`) sao definicao e ficam liberadas (inclusive hex); uso em CSS (`padding: 12px;`) continua reprovado.
+- **Limitacoes restantes:** o lint segue textual, linha a linha. Nao detecta arrays (`padding: [8, 16]`), valores montados por expressao (`padding: base * 2`), unidades `rem`/`em` em CSS comum, cores nomeadas fora de uma lista curta, nem propriedades que abrangem varias linhas.
+- **Testes:** casos positivos/negativos por categoria e propriedades `fast-check` (numero > 1 em chave de espaco sempre sinalizado, 0/1 nunca; `Nk-[Npx]` sempre sinalizado).
+
+## [2.11.0] — 2026-09-19 — Gate de tokens do design system no Executor (Fase 9 do plano)
+
+O design system deixa de existir so como prosa no prompt do Executor (E1) e ganha uma politica para mudanca de token (E2).
+
+- **Lint de tokens em codigo:** novo `skills/executor-subagents/scripts/lib/design-tokens.mjs` (so builtins) e subcomando `executor-gates.mjs design-lint --contract <resolved>/design-contract.json --files <a,b> [--expected-sha <contractSha256>]`. Reprova (exit 1, `status: FAIL`) hex literal, px de espaco/raio, `style={{}}` inline e `var(--x)` ausente do contrato.
+- **Hash do contrato:** confere o `sha256` embutido no `design-contract.json` (mesma serializacao canonica de `cc-pensador/scripts/lib/token-mapper.mjs`) e o `contractSha256` do handoff (`CONTRACT_SHA_MISMATCH` / `HANDOFF_SHA_MISMATCH`).
+- **Plano de gates:** `executor-gates.mjs plan --design-contract true` inclui o gate `design-tokens` (fase 6) independentemente do risco.
+- **Politica E2:** o Executor nunca cria token. Uma correcao que exige token novo gera `DESIGN_CHANGE_REQUEST` no relatorio (token, usos `arquivo:linha`); o token so entra por uma nova versao do Pensador. `subagent-prompts.md` (secao 9) e `SKILL.md` atualizados.
+- **Testes:** `tests/design-tokens.test.mjs` — token inventado e reprovado, hash adulterado reprova, propriedade `fast-check` (todo `var(--x)` fora do contrato e sinalizado), CLI ponta a ponta.
+
+## [2.10.0] — 2026-09-19 — Contrato de handoff do design system (Fase 6 do plano)
+
+Sync com `cc-pensador` 2.32.0 (Fase 6 do plano de design system): `handoff-contract.md` reescrito (secao 6) e byte-identico nos 4 plugins; a linha `ui-prototype` (papel removido no Pensador 2.28.0) sai do contrato e do validador.
+
+- **Contrato:** `design-system-files` aponta para `design-systems/<id>/resolved/` (unico pacote normativo); `source/` guarda so a proveniencia do engine; nao existe mais `original/` nem verbatim de catalogo. Front matter do `DESIGN.md` e normativo, a prosa nao. `materializeInto` = `<uiPackageDir>/design-systems/<id>/`.
+- **Novos campos da entrada:** `contractSha256` (sha256 hex ou `null`), `themes` (inclui `light` e `dark`), `designBriefPath` (relativo ao `artifactRoot`), alem de `variant`, `authoritative`, `sourcePath`, `assetsManifest` e `validation.{status,audit}` no schema.
+- **Politica de token:** token novo so por nova versao do Pensador; a correcao que o exigir registra `DESIGN_CHANGE_REQUEST`.
+- **Validador:** `validateHandoff()` rejeita `contractSha256` malformado (`INVALID_CONTRACT_SHA256`), `themes` sem `light`/`dark` (`INVALID_DESIGN_THEMES`) e `designBriefPath` vazio (`INVALID_DESIGN_BRIEF_PATH`) em entradas `resolved`; fixture e casos de teste em cada um dos 4 plugins.
+
 ## [2.9.0] - 2026-09-17 - Triagem de imagery por superficie (`visual-imagery-plan.mjs`)
 
 Nova classificacao deterministica, na Fase 1, de se uma task front-end precisa de imagery AGY real
