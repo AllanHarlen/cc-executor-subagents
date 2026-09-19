@@ -16,6 +16,8 @@ Focus has shifted from "architectural orchestrator with OpenSpec" to **practical
 - Codex as the default backend/test/review executor, Antigravity (AGY) as the default front-end/image/wide-context executor — both configurable per project (see below);
 - lean verification and reporting.
 
+> **Guard rails (2.10.0):** the run state (`state.json`, `events.jsonl`) is written only by `executor-state.mjs` — a `PreToolUse` hook blocks hand-edits; `run --status DONE` refuses a `handoff.json` that fails `validateHandoff()`; the run is conducted in the main session (never delegated to a fork/background agent) and the final recap must disclose skipped, waived or degraded work.
+
 ## Agent stack (Project_Config)
 
 The executor stack is not hardcoded. Four roles decide who implements and who reviews, each set to `codex`, `agy`, or `claude-code`:

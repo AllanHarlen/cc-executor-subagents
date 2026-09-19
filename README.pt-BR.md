@@ -41,6 +41,8 @@ O preflight (`/executor preflight`) deriva quais CLIs/plugins são obrigatórios
 
 Quando um papel é `agy`, a implementação sempre é roteada para `cc-antigravity-plugin:antigravity-coder` (o agente com poder de escrita via bridge); `cc-antigravity-plugin:antigravity-agent` é somente leitura e serve apenas para análise de arquitetura ou review — nunca implementa. Uma task front-end pode devolver um bloco `IMAGE_SUGGESTIONS` com sugestões de imagem (hero, banners, ilustrações de empty-state); o executor apresenta essas opções ao usuário via `AskUserQuestion` antes de gerar qualquer imagem.
 
+> **Guard rails (2.10.0):** o estado da run (`state.json`, `events.jsonl`) so e escrito por `executor-state.mjs` — um hook `PreToolUse` bloqueia a edição manual; `run --status DONE` recusa um `handoff.json` que reprova em `validateHandoff()`; a run é conduzida na sessão principal (nunca delegada a fork/segundo plano) e o recap final precisa declarar o que foi pulado, dispensado ou degradado.
+
 ## Estado persistente e retomada
 
 Cada execução ganha seu próprio `{artefatos_dir}/state.json` + `events.jsonl`, seguro contra crash (o evento é gravado com fsync antes do snapshot trocar atomicamente — um crash no meio da escrita é reparado por replay, não perdido). `.executor/checkpoint.json` é um índice leve (`execucao_atual`, `historico[]`) apontando para a execução ativa. Retome com:

@@ -2,6 +2,28 @@
 
 Todas as mudancas notaveis deste plugin sao documentadas aqui.
 
+## [2.10.0] - 2026-09-19 - Guard do estado da run, handoff validado no DONE e sync com cc-pensador 2.28/2.29
+
+Endurece o plugin contra as falhas observadas numa run real do Pensador (OficinaAI, sessao
+`oficinaai-dd`, 2026-09-18): etapas delegadas a um fork em segundo plano (74 min sem progresso),
+checkpoint movido a mao de `INIT` para `DONE` pulando seis estagios, e um `handoff.json` escrito a
+mao que reprovava em `validate-handoff.mjs` apresentado como "PRD completo". O estado deste plugin
+ja e event-sourced e gated; o que faltava era impedir o contorno manual e validar o handoff no fechamento.
+
+- **Novo hook `PreToolUse`** (`hooks/hooks.json` → `scripts/guard-state.mjs`, decisao em
+  `lib/state-guard.mjs`): bloqueia `Edit`/`Write`/`MultiEdit` e escritas via Bash/PowerShell em
+  `state.json`, `events.jsonl` e `.state.lock` dentro de `.executor/`. Leituras e o proprio `executor-state.mjs`
+  passam; falha aberta. O `verify`/replay do CLI continua sendo a rede de seguranca.
+- **`run --status DONE` valida o handoff**: se `handoff.json` existe na pasta da run e reprova em
+  `validateHandoff()` (ou nao e JSON), o fechamento falha com `HANDOFF_INVALID`. Sem `handoff.json`
+  (run avulsa) nada muda; o gate `handoff` continua controlando a obrigatoriedade do arquivo.
+- **SKILL**: nova secao "Execucao no fio principal e estado so via CLI" — proibe delegar a conducao a
+  fork/segundo plano/`ScheduleWakeup`/`/loop`, proibe editar o estado a mao, exige validar o handoff e
+  obriga o recap final a declarar o que foi pulado, dispensado ou degradado (nunca "concluido" com lacunas).
+- Sync com o contrato do `cc-pensador` 2.28: role `ui-prototype` removido de `HANDOFF_ROLES_BY_STAGE.pensador`
+  e do `handoff-contract.md` (byte-identico nos 4 plugins).
+- Testes: `tests/state-guard.test.mjs`, `tests/handoff-gate-on-done.test.mjs`.
+
 ## [2.9.0] - 2026-09-17 - Triagem de imagery por superficie (`visual-imagery-plan.mjs`)
 
 Nova classificacao deterministica, na Fase 1, de se uma task front-end precisa de imagery AGY real
