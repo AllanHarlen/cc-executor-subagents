@@ -7,6 +7,8 @@ Todas as mudancas notaveis deste plugin sao documentadas aqui.
 - **`handoff-contract.md` (byte-identico nos quatro plugins):** a copia deste plugin estava defasada em relacao a canonica do cc-pensador (secao 6 ainda descrevia o layout verbatim antigo, sem `resolved/`). Agora bate com a do cc-pensador 2.38.0: role `design-prototype` (prototipo do Open Design, obrigatorio quando o Open Design e usado), `components.css` no layout do `resolved/` como unica folha de componentes importavel, e `requirements-index` com `nonFunctionalRequirements`/`architecturePatterns`. O lint de tokens e o `DESIGN_CHANGE_REQUEST` que a secao 6 cita chegam com o PR #8 (`feature/design-system-brief-contract`).
 - **`handoff-validator.mjs`:** `HANDOFF_ROLES_BY_STAGE.pensador` aceita `design-prototype`.
 - **`subagent-prompts.md`:** o prompt de front-end manda importar `components.css` depois de `tokens.css` (nunca `preview.css` nem as classes de andaime de `components.html`), e o gate de design system confere as classes de componente no CSS compilado do build.
+- **Contrato compartilhado:** seção 6 com `validation.review` (PASS = audit + review do design registrada, cc-pensador 2.38.0).
+- **Protocolo comum dos prompts:** código e config do produto nunca leem as pastas de coordenação (o contrato de API usado por tipos/mocks/CI é a cópia no repositório), nenhuma linha acima de 200 caracteres e formatador da stack antes do DONE.
 
 ## [2.10.0] - 2026-09-19 - Guard do estado da run, handoff validado no DONE e sync com cc-pensador 2.28/2.29
 

@@ -20,6 +20,8 @@ Auto-verificação local obrigatoria antes de reportar DONE: Execute o build/com
 Antes de prometer Codebase Memory ou Context7 no prompt de uma task Codex/AGY, prefira `checks.optional.mcpPerAgent.<agent>.<servidor>.ok` (verdade ao vivo por agente, so existe quando o preflight rodou com `--check-agent-mcp`) em vez do agregado `checks.optional.mcp.<servidor>.ok`, que so prova registro em algum lugar da maquina, nao necessariamente na CLI que vai executar a task (ver `references/mcp-context.md`). Se o sinal aplicavel indicar disponibilidade para Context7, use-o com consultas atomicas por conceito (Single-Concept Scoping, sem misturar multiplos topicos), versao canonica `/org/project/version` quando compativel com o projeto, e limite de ate 3 consultas por tarefa. Se o sinal aplicavel indicar disponibilidade do Codebase Memory e voce tiver acesso ao servidor, use search_graph/trace_path/get_code_snippet para localizar o simbolo, quem o chama e o que ele chama, antes de varrer arquivos com Read/Glob/Grep. Grafo e pista, nao prova: confirme por leitura do arquivo antes de alterar comportamento. Se o grafo nao cobrir o arquivo, ou a consulta falhar, leia o arquivo diretamente.
 
 Nao amplie escopo. Nao instale dependencia nova sem justificar e sem autorizacao explicita no prompt.
+
+Codigo, scripts de package.json, Dockerfile e config do produto nunca leem as pastas de coordenacao (.pensador/, .orchestrator/, .orchestration/, .testador/, .executor/): o contrato de API usado por tipos, mocks e CI e a copia dentro do repositorio (ex.: contracts/openapi.yaml). Nenhuma linha de codigo acima de 200 caracteres; rode o formatador da stack (dotnet format, Prettier quando configurado) na sua fatia antes de reportar DONE.
 ```
 
 ## 1. Codex executor geral
