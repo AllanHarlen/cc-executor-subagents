@@ -181,7 +181,7 @@ Ownership:
 Design system/padroes:
 <TOKENS, COMPONENTES, CONVENCOES>
 
-Quando houver design system (Open Design — `tokens.css`/`components.html`/`preview/` do handoff do Orchestrador/Pensador, ver `references/handoff-contract.md` secao 6): consuma `tokens.css` verbatim via `var(--*)`, sem inventar hex/raio/espacamento fora dos tokens, e bata os componentes com os estados de `components.html`. Ver a secao "Gate de design system" no fim deste arquivo — o review da Fase 6/6.5 aplica esse gate e trata violacao de requisito explicito como bloqueante.
+Quando houver design system (Open Design — `tokens.css`/`components.html`/`preview/` do handoff do Orchestrador/Pensador, ver `references/handoff-contract.md` secao 6): consuma `tokens.css` verbatim via `var(--*)`, sem inventar hex/raio/espacamento fora dos tokens, importe `components.css` do pacote no stylesheet global logo depois de `tokens.css` (e a unica folha de componentes; nunca copie `preview/preview.css` nem as classes de andaime de `components.html` — `.page`, `.scope`, `.grid`, `.state`) e bata os componentes com os estados de `components.html`. Ver a secao "Gate de design system" no fim deste arquivo — o review da Fase 6/6.5 aplica esse gate e trata violacao de requisito explicito como bloqueante.
 
 Estados obrigatorios:
 - loading:
@@ -429,6 +429,7 @@ Aplique este checklist na Fase 6 (verificacao) e na Fase 6.5 (review plano vs en
 
 - o estilo consome `tokens.css` via custom properties (`var(--*)`); SEM hex/raio/espacamento inventado fora dos tokens;
 - componentes batem com seletores/estados de `components.html` (default/hover/focus/active/disabled/loading/empty/error);
+- as classes de componente do pacote (`.btn`, `.input`, `.card`, `.badge`, `.alert`, `.modal`) usadas pelo codigo existem no **CSS compilado** do build, nao so no fonte — typecheck, lint e build nao detectam classe sem regra (pacote sem `components.css` importado entrega botoes e campos sem estilo);
 - **elementos interativos (botoes, links, cards clicaveis) tem estado `:hover`/`:focus` real, implementado como regra CSS/CSS-Modules/styled/Tailwind — NAO como `style={{}}` inline.** Inline style e estruturalmente incapaz de expressar `:hover`/`:focus`/`@keyframes`; se `components.html` especifica hover (ex.: `.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }`), o componente entregue precisa do equivalente real, nao so o estado default. Grep rapido de sanidade: proporcao alta de `style={{` sem nenhuma regra `:hover`/`:focus` no CSS do projeto e sinal de gate falho;
 - accent usado no maximo 2x por pagina (hero + CTA) alem de links; sem flood; sem emoji como icone; sem sombra se Depth & Elevation = minimal;
 - telas-chave conferidas contra o diretorio `preview/` (diferenca de layout/hierarquia/contraste; abrir `colors.html`, `spacing.html` ou `typography.html` conforme os arquivos disponiveis no system);
