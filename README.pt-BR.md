@@ -2,6 +2,8 @@
 
 Plugin de Claude Code para resoluções rápidas com subagentes. Ele adiciona a skill **`executor-subagents`** e o comando **`/executor`**.
 
+> **Sync do contrato de handoff (2.11.0):** `references/handoff-contract.md` volta a ser byte-idêntico à cópia canônica do Pensador (a cópia do `main` ainda descrevia o layout verbatim antigo): role `design-prototype`, `components.css` como única folha de componentes importável, review do design registrada (`validation.status: PASS` só com audit **e** review) e `requirements.json` com `nonFunctionalRequirements`/`architecturePatterns`. Todo prompt de subagente passa a levar as regras comuns: código do produto nunca lê as pastas de coordenação (o contrato de API vem da cópia no repositório), nenhuma linha acima de 200 caracteres, formatador da stack antes do `DONE`, importar `components.css` depois de `tokens.css` e conferir as classes de componente no CSS compilado.
+
 O foco mudou de "orquestrador arquitetural com OpenSpec" para **executor prático multiagente**:
 
 - sem OpenSpec obrigatório;
