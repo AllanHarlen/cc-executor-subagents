@@ -136,16 +136,17 @@ O consumidor nunca adivinha caminhos: descobre tudo via o `handoff.json` do esta
 | `architecture` | `architecture.md` | **sim, sempre** (ambos os modos) — EXPLORE e ARCH rodam sempre, na ordem fixa do `STAGE_ORDER`, independente de `hasBackend`/`hasFrontend`. Carrega os dominios descobertos, decisoes conhecidas e, em brownfield, as convencoes que o consumidor deve preservar (ver `WORKFLOW.md`, regra de precedencia brownfield). |
 | `api-contract` | `openapi.yaml` / `schema.graphql` / `service.proto` / `asyncapi.yaml` | quando `backendConfirmed` — **fonte da verdade** maquina-legivel (formato por `state.apiStyle`). Carrega `validation` (`{ spec, mock, validate }`) para o consumidor subir mock (fluxo paralelo front/back) e validar o codigo contra o contrato no CI ("a spec e lei"). |
 | `communication-contract` | `communication.md` | quando `backendConfirmed` — **visao legivel derivada** do `api-contract` (`derivedFrom` aponta o arquivo fonte). Nao e a fonte da verdade. |
-| `design-system` | `design-system.md` | **somente no fallback** (front-end sem Open Design) — DESIGN.md inline das 9 secoes. Quando o Open Design e usado, o `DESIGN.md` verbatim (role `design-system-files`) substitui este doc. |
-| `design-system-files` | `design-systems/<id>/` | quando `hasFrontend` **e** um system foi selecionado — **uma entrada por `<id>` concreto** (de `state.designSystems`), relativa ao `artifactRoot` (`.pensador/<slug>-vN/`), com os arquivos verbatim (`tokens.css`, `DESIGN.md`, `components.html`, `preview/`, …). Cada entrada carrega `materializeInto` (o alvo em `state.uiPackageDir`, ex.: `packages/ui/design-systems/<id>/`) que o Orchestrador/Executor usa ao materializar os arquivos na arvore de codigo real (secao 6). |
+| `design-system` | `design-system.md` | **somente no fallback** (front-end sem Open Design) — DESIGN.md inline das 9 secoes. Quando o Open Design e usado, o pacote `resolved/` (role `design-system-files`) substitui este doc. |
+| `design-system-files` | `design-systems/<id>/resolved/` | quando `hasFrontend` — **uma entrada por `<id>` gerado** (de `state.designSystems`, derivado do produto), relativa ao `artifactRoot` (`.pensador/<slug>-vN/`). Aponta para o pacote `resolved/`, unico normativo (secao 6). Carrega `contractSha256`, `themes`, `designBriefPath`, `sourcePath` (proveniencia do engine) e `materializeInto` (`<uiPackageDir>/design-systems/<id>/`) que o Orchestrador/Executor usa ao materializar os arquivos na arvore de codigo real. |
 | `brand-assets` | `assets/` | quando `hasFrontend` — diretorio de midia e brand assets reais gerados no DESIGN com o manifesto `assets/manifest.json`. |
 | `openspec-change` | `openspec/changes/<nome>/` | quando `artifactMode = spec` — change set OpenSpec (`proposal.md`, `design.md`, `tasks.md`, `specs/` — `specs/` omitido quando a mudanca declara `skip_specs: true`). **Caminho relativo ao projeto**, nao ao `artifactRoot` (gerido por `/opsx:propose`; consumidores confirmam o estado via `openspec status --change <nome> --json`, nao varredura de arquivos). Substitui `prd`/`userhistory`/`communication-contract` no modo Spec. |
 | `codebase-memory` | `codebase-memory.md` | **sim, sempre** (ambos os modos) — mesma garantia de `architecture`. Mapa do codigo real (simbolos, cadeias de chamada, raio de impacto) e, em brownfield, o baseline do contrato de API existente descoberto por `contractDiscoveryGlobs()` (EXPLORE). |
 | `project-baseline` | `project-baseline.json` | **sim, sempre** (ambos os modos) — resumo estruturado, maquina-legivel, de `isGreenfield`, `techStack`, `apiStyle`, `uiPackageDir` e `existingApiContractGlobs`. Complementa `architecture`/`codebase-memory` (prosa) com campos que o consumidor pode ler direto, sem parsear Markdown, para decidir roteamento e precedencia brownfield sem re-derivar o sinal. |
-| `requirements-index` | `requirements.json` | **somente no modo PRD** — extraido deterministicamente das tabelas `RF-XX`/`CA-XX` das secoes 6 e 14 do PRD (`scripts/lib/requirements-extractor.mjs`), com o vinculo `CA -> RF` preservado. E a materia-prima do gate de cobertura RF/CA do Orquestrador (secao 5 de `references/handoff-contract.md` do Orquestrador). No modo Spec, o equivalente (`SHALL` + `#### Scenario:`) ja e exposto ao vivo por `openspec status --change <nome> --json`; sem `requirements-index` (Spec, ou handoff de versao anterior), o gate degrada e registra a degradacao — nunca finge cobertura. |
+| `requirements-index` | `requirements.json` | **somente no modo PRD** — extraido deterministicamente das tabelas `RF-XX`/`CA-XX` das secoes 6 e 14 do PRD (`scripts/lib/requirements-extractor.mjs`), com o vinculo `CA -> RF` preservado, mais duas listas irmas: `nonFunctionalRequirements` (`RNF-XX`, secao 7) e `architecturePatterns` (ids sinteticos `ARC-01`, `ARC-02`… na ordem da tabela "Padroes de Arquitetura & Design", secao 15). E a materia-prima do gate de cobertura RF/RNF/ARC do Orquestrador (toda id das tres listas precisa de task e de evidencia; RNF/ARC nao tem `CA-XX` vinculado) (secao 5 de `references/handoff-contract.md` do Orquestrador). No modo Spec, o equivalente (`SHALL` + `#### Scenario:`) ja e exposto ao vivo por `openspec status --change <nome> --json`; sem `requirements-index` (Spec, ou handoff de versao anterior), o gate degrada e registra a degradacao — nunca finge cobertura. |
 | `ui-data-map` | `ui-data-map.json` | **sim, quando `hasFrontend`** (ambos os modos) — mapa tela -> operacao de contrato (leitura/escrita) por entidade (`buildUiDataMapScaffold`/schema `ui-data-map.schema.json`). `dataSource` de cada tela e sempre `"api-contract"` — nunca client-side storage. Materia-prima do gate `contractCoverage` do Orquestrador (Fase 4): uma tela sem operacao correspondente no contrato e um `CONTRACT_COVERAGE_GAP` bloqueante, nao uma lacuna silenciosa preenchida por dados locais ao navegador. |
 | `seed-plan` | `seed-plan.json` | **sim, quando `hasBackend`** (ambos os modos) — quantidade minima, estados, papeis e vinculo de imagem por entidade que o `ui-data-map` referencia (`buildSeedPlanScaffold`/schema `seed-plan.schema.json`). `persistenceLayer` e sempre `"database-seed"` — dado de demonstracao pertence a camada de seed/migration do banco, nunca a `localStorage`/`sessionStorage`, independente da stack. |
 | `surface-benchmark` | `surface-benchmark.json` | quando `buildSurfaceBenchmarkPlan(state)` detectar pelo menos uma superficie `conversion`/`catalog` — benchmark de >=3 referencias reais (WebFetch, nao so WebSearch) por superficie publica, com a anatomia de secoes confirmada/estendida (schema `surface-benchmark.schema.json`). Alimenta a pergunta obrigatoria do EXPAND ("toda secao table-stakes do benchmark que nao esta na demanda vira pergunta") e o gate de fidelidade visual do DESIGN para essa superficie. |
+| `design-prototype` | `prototypes/` | **sim, sempre que o Open Design for usado** (`design-system-files` presente e `hasFrontend`) — a escolha do agente do design nao tem opcao de pular nesse caso. Diretorio do prototipo gerado por um agente de codigo no estagio DESIGN, contendo telas interativas (HTML/CSS/JS) consumindo os tokens e componentes resolvidos. Referencia de fidelidade visual para o Orquestrador: as tasks de front-end o usam junto com `design-system-files` para reproduzir as telas na stack de front-end definida pelo PRD (`state.techStack`) — nao e copiado nem convertido mecanicamente. Ausente somente no fallback inline (sem Open Design). |
 | `shared-agents` | `shared-agents/` | opcional |
 
 ### Orchestrador (`stage: orchestrador`)
@@ -197,26 +198,60 @@ O consumidor nunca adivinha caminhos: descobre tudo via o `handoff.json` do esta
 
 ## 6. Open Design: contrato visual e materializacao
 
-Quando o Pensador tem front-end, o Open Design produz **arquivos verbatim** (nao prosa): `tokens.css` (fonte de verdade do estilo), `DESIGN.md` (9 secoes), `components.html` (fixtures) e `preview/` (sanity check visual — os arquivos variam por system: `colors.html`, `spacing.html`, `typography.html`). Esses arquivos sao um **contrato visual**, nao decoracao.
+Quando o Pensador tem front-end, o design system e **derivado** do brief pelo brand engine do Open Design — nao ha catalogo, nao ha arquivo verbatim de system pronto e nenhum valor de token e escrito por LLM. O resultado e um **contrato visual**, nao decoracao.
 
-### Ciclo de vida dos arquivos de design
+### Layout e autoridade
 
 ```text
-Pensador                              Orchestrador / Executor
-grava VERBATIM em                     MATERIALIZA em (via materializeInto)
-.pensador/<slug>-vN/                  packages/ui/design-systems/<id>/
-  design-systems/<id>/                  (ou src/styles/… em app unico)
-    tokens.css                        e CARREGA os caminhos no prompt de
-    DESIGN.md                         toda task front-end + usa no gate de
-    components.html                   design da fase de review.
-    preview/
+.pensador/<slug>-vN/
+  design-brief.json                 brief estruturado (campos travados/livres, aprovacao)
+  design-systems/<id>/
+    source/                         proveniencia do engine: brand.json, seed.json, engine/, engine-run.json
+    resolved/                       PACOTE NORMATIVO (unica autoridade)
+      design-contract.json          fonte editavel unica; tokens, temas, proveniencia, sha256
+      tokens.css  components.css  design-tokens.json (DTCG)  tailwind-v4.css  DESIGN.md
+      components.html  preview/  USAGE.md  manifest.json  provenance.json  design-audit.json
 ```
 
-- O Pensador **nunca** escreve na arvore de codigo real; persiste os arquivos dentro da pasta da feature. Cada entrada `design-system-files` do `handoff.json` do Pensador (raiz de `.pensador/<slug>-vN/`) carrega `materializeInto` com o alvo real.
-- O **Orchestrador** (modo conjunto ou quando recebe design via PRD/spec) **materializa** os arquivos em `materializeInto`, passa `tokens.css`/`components.html`/`DESIGN.md` (ou `design.md` + `specs/ui-design-system/spec.md` no modo Spec) e o diretorio `preview/` no prompt de toda task front-end, e aplica o **gate de design** no review: `tokens.css` consumido via `var(--*)` (nunca hex literal), accent contido (≤ 2x por pagina), telas-chave conferidas contra `preview/`, anti-padroes da secao 9 do DESIGN.md ausentes. Violacao de requisito explicito e **BLOQUEANTE**.
-- O **Testador** VALIDA a conformidade de token e anti-padroes contra a proposta inicial do Pensador: confere que o codigo materializado usa `var(--*)` (nunca hex literal), que nenhum token foi inventado ("never invent new tokens"), e que as telas-chave correspondem ao `preview/`. Achados sao bloqueantes por violacao de requisito explicito (secao 5 deste documento).
-- O **Executor** consome o mesmo contrato visual ao corrigir/ajustar o front-end: nao reinventa tokens, respeita `tokens.css` e valida a fidelidade contra `preview/`.
-- Regra inviolavel herdada do Open Design: **never invent new tokens.** Divergencia justificada vira override documentado (na secao *Decisions* do `design.md` no modo Spec, ou nota no `handoff.json` do Pensador no modo PRD), nunca um valor solto no `theme.ts`.
+- `resolved/` e o **unico** pacote normativo. `source/` guarda so a proveniencia do engine (auditoria e reproducao) e **nunca** e entregue a um consumidor como fonte de implementacao. Nao existe `original/` nem copia verbatim de catalogo.
+- `design-contract.json` e a fonte unica; todo o resto do `resolved/` e renderizado dele. O **front matter YAML do `DESIGN.md` e normativo**; a prosa e justificativa e nao prevalece sobre tokens.
+- O pacote sempre traz os temas `light` e `dark`, derivados do mesmo seed (`compact` e opcional).
+- Ordem de precedencia para o consumidor: `design-contract.json`/`tokens.css` > `components.html` > prosa do `DESIGN.md`.
+- `components.css` e a **unica** folha de componentes importavel do pacote (regras de produto de cada tipo de componente — botao, campos, select, checkbox/switch, card, tabela, abas, toast, sidebar/topnav, stepper, estado vazio, skeleton, entre outros — e seus estados; o cabecalho do arquivo lista as classes): o consumidor a importa no stylesheet global logo depois de `tokens.css`. `components.html` e `preview/` sao referencia visual — suas classes de andaime (`.page`, `.scope`, `.grid`, `.state`) nunca entram no produto. Componentes do contrato sem regra dedicada estao listados no `USAGE.md` e sao construidos a partir dos tokens.
+
+### Entrada `design-system-files` no handoff
+
+```json
+{
+  "role": "design-system-files",
+  "path": "design-systems/<id>/resolved/",
+  "required": true,
+  "variant": "resolved",
+  "authoritative": true,
+  "sourcePath": "design-systems/<id>/source/",
+  "materializeInto": "<uiPackageDir>/design-systems/<id>/",
+  "assetsManifest": "assets/manifest.json",
+  "contractSha256": "<sha256 hex do design-contract.json>",
+  "themes": ["light", "dark"],
+  "designBriefPath": "design-brief.json",
+  "validation": { "status": "PASS", "audit": "design-audit.json", "review": "design-review.json", "auditStatus": "PASS", "reviewStatus": "PASS" }
+}
+```
+
+- `contractSha256` e o `sha256` do contrato; `null` enquanto o audit nao o gravou. `validation.status` so e `PASS` quando o `design-audit.json` real **e** a review registrada em `design-review.json` (Codex, read-only) sao `PASS` para o mesmo `contractSha256`; `UNVERIFIED` sem audit, `UNREVIEWED` sem review do contrato atual, `FAIL` com review reprovada — nunca `PASS` presumido. O consumidor confere `design-review.json` em disco, como faz com o audit.
+- `themes` lista os temas presentes (sempre inclui `light` e `dark`). `designBriefPath` e relativo ao `artifactRoot`.
+- `materializeInto` e sempre `<uiPackageDir>/design-systems/<id>/`.
+
+### Ciclo de vida
+
+- O Pensador **nunca** escreve na arvore de codigo real; persiste tudo na pasta da feature.
+- O **Orchestrador** materializa `resolved/` em `materializeInto` **conferindo `contractSha256` e o status real do `design-audit.json`**; passa `design-contract.json`/`tokens.css`/`DESIGN.md` e `preview/` no prompt de toda task front-end e aplica o **gate de design** por onda: `var(--*)` sempre (nunca hex literal), sem token inventado, telas-chave conferidas contra `preview/`. Violacao de requisito explicito e **BLOQUEANTE**.
+- O **Testador** valida em runtime a conformidade com os tokens e com o `design-brief.json` (tema computado, cor primaria) e, quando o brief declara que o app expoe o tema escuro, nos dois temas.
+- O **Executor** consome o mesmo contrato ao corrigir: confere `contractSha256`, roda o lint de tokens e nao reinventa tokens.
+
+### Politica de mudanca de token
+
+**Never invent new tokens.** Um token novo ou alterado so entra por **nova versao do Pensador** (novo `design-contract.json`, novo `contractSha256`). Uma correcao que exige token novo nao o cria no codigo: o consumidor registra um `DESIGN_CHANGE_REQUEST` no relatorio/handoff e segue com os tokens existentes. Divergencia justificada nunca vira valor solto no `theme.ts`.
 
 ---
 
@@ -269,24 +304,8 @@ Saida JSON `{ ok, file, errors[] }`; exit code 0 somente quando `ok: true`. Esco
 
 ## 10. Extensao aditiva v1 — pacote visual resolvido
 
-`handoffVersion: 1` permanece. Para um novo handoff visual, a entrada autoritativa e:
+`handoffVersion: 1` permanece. A entrada autoritativa e a da secao 6. O consumidor carrega `design-contract.json`, `tokens.css`, `DESIGN.md` e `assets/manifest.json` como priority-files, copia assets conforme `materializeInto` e aplica `seedBindings`; nao gera imagens nem reabre decisoes visuais.
 
-```json
-{
-  "role": "design-system-files",
-  "path": "design-systems/<id>/resolved/",
-  "required": true,
-  "variant": "resolved",
-  "authoritative": true,
-  "sourcePath": "design-systems/<id>/original/",
-  "materializeInto": "apps/web/styles/design-systems/<id>/",
-  "assetsManifest": "assets/manifest.json",
-  "validation": { "status": "PASS", "audit": "design-audit.json" }
-}
-```
-
-O produtor preserva `original/` byte a byte e publica apenas `resolved/` como autoridade. O pacote resolvido contem `design-contract.json`, `tokens.css`, `design-tokens.json`, `DESIGN.md`, `components.html`, `preview/`, `assets/manifest.json`, `design-audit.json` e `provenance.json`. O consumidor carrega `design-contract.json`, `tokens.css`, `DESIGN.md` e `assets/manifest.json` como priority-files, copia assets conforme `materializeInto` e aplica `seedBindings`; nao gera imagens nem reabre decisoes visuais.
-
-Entrada antiga sem `variant` e aceita como `legacy-verbatim`, com aviso de degradacao e gates visuais reforcados. Finding alto/critico, audit diferente de `PASS`, asset `required` ausente ou artefato obrigatorio descartado bloqueia dispatch e `DONE`.
+Entrada sem `variant` (handoff anterior) e aceita como `legacy-verbatim`, com aviso de degradacao e gates visuais reforcados. Finding alto/critico, audit diferente de `PASS`, `contractSha256` divergente do contrato em disco, asset `required` ausente ou artefato obrigatorio descartado bloqueia dispatch e `DONE`.
 
 Assets funcionais de iconografia sao vetoriais, com pacote/versao/uso no contrato; emoji nao substitui icone. Evidencia visual exige screenshot, assercao de navegador, rota, viewport, requisito e prova de API real — hash de commit sozinho nao e evidencia visual.

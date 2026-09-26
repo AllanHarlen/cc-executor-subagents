@@ -2,6 +2,8 @@
 
 Claude Code plugin for rapid execution with subagents. It adds the skill **`executor-subagents`** and the command **`/executor`**.
 
+> **Handoff contract sync (2.11.0):** `references/handoff-contract.md` is byte-identical again to the Pensador's canonical copy (the `main` copy still described the old verbatim layout): `design-prototype` role, `components.css` as the only importable component stylesheet, the recorded design review (`validation.status: PASS` only with audit **and** review), and `requirements.json` with `nonFunctionalRequirements`/`architecturePatterns`. Every subagent prompt now carries the common rules: product code never reads the coordination folders (the API contract comes from the in-repo copy), no source line over 200 characters, run the stack formatter before `DONE`, import `components.css` after `tokens.css` and check component classes in the compiled CSS.
+
 📖 **[Documentação em Português](./README.pt-BR.md)** | **Portuguese Documentation**
 
 ## Overview
